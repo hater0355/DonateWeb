@@ -1,0 +1,361 @@
+@model DonateWeb.ViewModels.Wallet.DepositViewModel
+@{
+    ViewData["Title"] = "Nạp tiền vào ví (Viewer)";
+}
+
+<style>
+    .wallet-hero-card {
+        background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 60%, #40916c 100%);
+        border-radius: 16px;
+        color: #fff;
+        box-shadow: 0 8px 24px rgba(27, 67, 50, 0.18);
+    }
+    .quick-deposit-btn {
+        border: 1.5px solid var(--border-color, #cce3de);
+        background-color: #ffffff;
+        color: var(--dark-green, #1b4332);
+        font-weight: 600;
+        border-radius: 10px;
+        padding: 10px 14px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .quick-deposit-btn:hover, .quick-deposit-btn.active {
+        background-color: var(--dark-green, #1b4332);
+        color: #ffffff;
+        border-color: var(--dark-green, #1b4332);
+        transform: translateY(-1px);
+    }
+    .method-option-card {
+        border: 1.5px solid #dee2e6;
+        border-radius: 12px;
+        padding: 12px 14px;
+        cursor: pointer;
+        background: #fff;
+        transition: all 0.2s ease;
+    }
+    .method-option-card:hover {
+        border-color: #2d6a4f;
+        background-color: #f4fbf7;
+    }
+    .method-option-card input[type="radio"]:checked + div {
+        color: #1b4332;
+        font-weight: 700;
+    }
+</style>
+
+<div class="pb-5">
+    <!-- Header tiêu đề -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <div>
+            <h4 class="fw-bold text-dark-green mb-1 d-flex align-items-center gap-2">
+                <i class="fa-solid fa-wallet text-success"></i> NẠP TIỀN VÀO VÍ
+            </h4>
+            <p class="text-muted small mb-0">Dành cho tài khoản <strong>Viewer</strong> — Nạp số dư để ủng hộ (donate) nhanh chóng cho Streamer yêu thích</p>
+        </div>
+        <a href="/Streamer/Donate" class="btn btn-outline-success rounded-pill px-3 fw-semibold btn-sm">
+            <i class="fa-solid fa-heart me-1"></i> Đi tới trang Donate Streamer
+        </a>
+    </div>
+
+    <!-- Thông báo kết quả -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success rounded-3 d-flex align-items-center gap-3 p-3 mb-4 shadow-sm border-success">
+            <i class="fa-solid fa-circle-check fs-3 text-success"></i>
+            <div>
+                <h6 class="fw-bold mb-0">Giao dịch nạp tiền thành công!</h6>
+                <div>@TempData["SuccessMessage"]</div>
+            </div>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger rounded-3 d-flex align-items-center gap-3 p-3 mb-4 shadow-sm">
+            <i class="fa-solid fa-triangle-exclamation fs-3 text-danger"></i>
+            <div>
+                <h6 class="fw-bold mb-0">Không thể thực hiện nạp tiền</h6>
+                <div>@Model.ErrorMessage</div>
+            </div>
+        </div>
+    }
+
+    <!-- Banner Số dư hiện tại -->
+    <div class="wallet-hero-card p-4 mb-4">
+        <div class="row align-items-center g-3">
+            <div class="col-12 col-md-7">
+                <span class="badge bg-light text-dark-green fw-bold px-3 py-1 rounded-pill mb-2">
+                    <i class="fa-solid fa-user-check me-1 text-success"></i> TÀI KHOẢN VIEWER: @Model.FullName (@@@Model.Username)
+                </span>
+                <div class="text-white-50 small text-uppercase fw-semibold">Số dư ví hiện tại của bạn</div>
+                <div class="display-6 fw-extrabold text-white mt-1">
+                    <span id="currentBalanceDisplay">@Model.CurrentBalance.ToString("N0")</span> <small class="fs-4">VNĐ</small>
+                </div>
+            </div>
+            <div class="col-12 col-md-5 text-md-end">
+                <div class="bg-white bg-opacity-10 rounded-3 p-3 d-inline-block text-start border border-light border-opacity-25">
+                    <div class="small text-white-50">Số dư dự kiến sau khi nạp:</div>
+                    <div class="fs-5 fw-bold text-warning mt-1" id="expectedBalanceAfterDeposit">
+                        @((Model.CurrentBalance + Model.Amount).ToString("N0")) VNĐ
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Cột trái: Form Nạp tiền -->
+        <div class="col-12 col-lg-7">
+            <div class="card card-custom bg-white border-0 shadow-sm p-4 h-100">
+                <h5 class="fw-bold text-dark-green mb-3">
+                    <i class="fa-solid fa-circle-plus text-success me-2"></i> THÔNG TIN NẠP TIỀN
+                </h5>
+
+                <form asp-action="Deposit" asp-controller="Wallet" method="post" id="depositForm">
+                    @Html.AntiForgeryToken()
+
+                    <!-- Nhập số tiền cần nạp -->
+                    <div class="mb-3">
+                        <label asp-for="Amount" class="form-label fw-semibold text-dark-green">
+                            Số tiền muốn nạp (VNĐ) <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group input-group-lg mb-2">
+                            <span class="input-group-text bg-light-green text-success border-end-0">
+                                <i class="fa-solid fa-coins"></i>
+                            </span>
+                            <input asp-for="Amount"
+                                   id="depositAmountInput"
+                                   type="number"
+                                   min="10000"
+                                   max="500000000"
+                                   step="1000"
+                                   class="form-control fw-bold text-success fs-4"
+                                   placeholder="Nhập số tiền cần nạp (tối thiểu 10.000đ)"
+                                   required />
+                            <span class="input-group-text bg-light-green fw-bold text-dark-green">VNĐ</span>
+                        </div>
+                        <span asp-validation-for="Amount" class="text-danger small"></span>
+
+                        <!-- Chọn nhanh mệnh giá -->
+                        <div class="mt-2">
+                            <small class="text-muted d-block mb-2">Chọn nhanh mệnh giá:</small>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="button" class="quick-deposit-btn" onclick="selectDepositAmount(20000, this)">20.000đ</button>
+                                <button type="button" class="quick-deposit-btn active" onclick="selectDepositAmount(50000, this)">50.000đ</button>
+                                <button type="button" class="quick-deposit-btn" onclick="selectDepositAmount(100000, this)">100.000đ</button>
+                                <button type="button" class="quick-deposit-btn" onclick="selectDepositAmount(200000, this)">200.000đ</button>
+                                <button type="button" class="quick-deposit-btn" onclick="selectDepositAmount(500000, this)">500.000đ</button>
+                                <button type="button" class="quick-deposit-btn" onclick="selectDepositAmount(1000000, this)">1.000.000đ</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Phương thức nạp -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark-green">Phương thức thanh toán</label>
+                        <div class="row g-2">
+                            <div class="col-12 col-md-4">
+                                <label class="method-option-card w-100 d-flex align-items-center gap-2 mb-0">
+                                    <input type="radio" asp-for="PaymentMethod" value="Chuyển khoản ngân hàng (VietQR)" class="form-check-input mt-0" checked />
+                                    <div class="small">
+                                        <i class="fa-solid fa-qrcode text-primary me-1"></i> Ngân hàng (QR)
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="method-option-card w-100 d-flex align-items-center gap-2 mb-0">
+                                    <input type="radio" asp-for="PaymentMethod" value="Ví điện tử MoMo" class="form-check-input mt-0" />
+                                    <div class="small">
+                                        <i class="fa-solid fa-mobile-screen-button text-danger me-1"></i> Ví MoMo
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="method-option-card w-100 d-flex align-items-center gap-2 mb-0">
+                                    <input type="radio" asp-for="PaymentMethod" value="Cổng thanh toán VNPay" class="form-check-input mt-0" />
+                                    <div class="small">
+                                        <i class="fa-solid fa-credit-card text-info me-1"></i> VNPay
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ghi chú -->
+                    <div class="mb-4">
+                        <label asp-for="Note" class="form-label fw-semibold text-dark-green small">Ghi chú giao dịch (Tùy chọn)</label>
+                        <input asp-for="Note" class="form-control form-control-custom" placeholder="Ví dụ: Nạp tiền vào ví ủng hộ Streamer..." />
+                        <span asp-validation-for="Note" class="text-danger small"></span>
+                    </div>
+
+                    <button type="submit" class="btn btn-dark-green w-100 py-3 rounded-pill fw-bold fs-6 shadow-sm">
+                        <i class="fa-solid fa-bolt me-2"></i> XÁC NHẬN NẠP TIỀN VÀO VÍ
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Cột phải: Mã QR Nạp tiền tự động -->
+        <div class="col-12 col-lg-5">
+            <div class="card card-custom bg-white border-0 shadow-sm p-4 h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <h6 class="fw-bold text-dark-green mb-3">
+                        <i class="fa-solid fa-qrcode text-success me-2"></i> MÃ QR CHUYỂN KHOẢN NẠP VÍ
+                    </h6>
+
+                    <div class="text-center p-3 bg-light rounded-3 border mb-3">
+                        <img id="depositQrImg"
+                             src="@Model.GeneratedQrBase64"
+                             alt="Mã QR nạp tiền vào ví"
+                             class="img-fluid rounded-2 bg-white p-2 border shadow-sm"
+                             style="max-height: 210px;" />
+                        <div class="small fw-semibold text-dark-green mt-2">
+                            Quét mã QR bằng ứng dụng Ngân hàng / Ví điện tử
+                        </div>
+                    </div>
+
+                    <div class="bg-light-green p-3 rounded-3 border">
+                        <div class="d-flex justify-content-between small mb-2">
+                            <span class="text-muted">Đơn vị thụ hưởng:</span>
+                            <strong class="text-dark-green">CONG TY DONATEWEB VIET NAM</strong>
+                        </div>
+                        <div class="d-flex justify-content-between small mb-2">
+                            <span class="text-muted">Ngân hàng:</span>
+                            <strong class="text-dark-green">MB Bank (Ngân hàng Quân Đội)</strong>
+                        </div>
+                        <div class="d-flex justify-content-between small mb-2">
+                            <span class="text-muted">Số tài khoản:</span>
+                            <strong class="text-dark-green">888899996666</strong>
+                        </div>
+                        <div class="d-flex justify-content-between small mb-2">
+                            <span class="text-muted">Số tiền nạp:</span>
+                            <strong id="qrAmountPreview" class="text-danger fs-6">@Model.Amount.ToString("N0") VNĐ</strong>
+                        </div>
+                        <div class="small">
+                            <span class="text-muted d-block">Nội dung chuyển khoản:</span>
+                            <code id="qrContentPreview" class="bg-white px-2 py-1 rounded border text-success fw-bold d-block mt-1">@Model.TransferContent</code>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="small text-muted mt-3 pt-2 border-top">
+                    <i class="fa-solid fa-shield-halved text-success me-1"></i>
+                    Số dư sẽ được cộng đồng bộ ngay lập tức vào ví tài khoản của bạn sau khi xác nhận nạp tiền.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lịch sử nạp tiền gần đây -->
+    <div class="card card-custom bg-white border-0 shadow-sm p-4 mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold text-dark-green mb-0">
+                <i class="fa-solid fa-clock-rotate-left text-success me-2"></i> LỊCH SỬ NẠP TIỀN GẦN ĐÂY
+            </h6>
+            <a href="/Transactions" class="small text-success fw-semibold text-decoration-none">
+                Xem toàn bộ giao dịch <i class="fa-solid fa-arrow-right ms-1"></i>
+            </a>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="small text-dark-green">MÃ GIAO DỊCH</th>
+                        <th class="small text-dark-green">THỜI GIAN</th>
+                        <th class="small text-dark-green">PHƯƠNG THỨC</th>
+                        <th class="small text-dark-green">SỐ TIỀN NẠP</th>
+                        <th class="small text-dark-green">SỐ DƯ SAU GD</th>
+                        <th class="small text-dark-green">TRẠNG THÁI</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.RecentTransactions != null && Model.RecentTransactions.Any())
+                    {
+                        foreach (var item in Model.RecentTransactions)
+                        {
+                            <tr>
+                                <td class="fw-semibold small text-dark-green"><code>@item.TransactionCode</code></td>
+                                <td class="small text-muted">@item.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</td>
+                                <td class="small">@item.PaymentMethodName</td>
+                                <td class="fw-bold text-success">+@item.Amount.ToString("N0") VNĐ</td>
+                                <td class="fw-semibold text-dark-green">@item.BalanceAfter.ToString("N0") VNĐ</td>
+                                <td>
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">
+                                        <i class="fa-solid fa-check me-1"></i> Thành công
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted small">
+                                Chưa có giao dịch nạp tiền nào. Hãy nạp tiền vào ví để bắt đầu ủng hộ Streamer!
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        const baseBalance = @Model.CurrentBalance.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        let qrTimer = null;
+
+        function selectDepositAmount(val, btnEl) {
+            const input = document.getElementById('depositAmountInput');
+            if (input) {
+                input.value = val;
+            }
+            document.querySelectorAll('.quick-deposit-btn').forEach(b => b.classList.remove('active'));
+            if (btnEl) btnEl.classList.add('active');
+            updateDepositPreview();
+        }
+
+        function updateDepositPreview() {
+            const input = document.getElementById('depositAmountInput');
+            const expectedEl = document.getElementById('expectedBalanceAfterDeposit');
+            const qrAmountEl = document.getElementById('qrAmountPreview');
+            if (!input) return;
+
+            const amount = parseFloat(input.value) || 0;
+            const afterBalance = baseBalance + (amount > 0 ? amount : 0);
+
+            if (expectedEl) {
+                expectedEl.textContent = afterBalance.toLocaleString('vi-VN') + ' VNĐ';
+            }
+            if (qrAmountEl) {
+                qrAmountEl.textContent = (amount > 0 ? amount : 0).toLocaleString('vi-VN') + ' VNĐ';
+            }
+
+            if (qrTimer) clearTimeout(qrTimer);
+            qrTimer = setTimeout(async () => {
+                if (amount < 10000) return;
+                try {
+                    const res = await fetch(`/Wallet/GenerateDepositQrAjax?amount=${encodeURIComponent(amount)}`);
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    if (data && data.success) {
+                        const qrImg = document.getElementById('depositQrImg');
+                        if (qrImg && data.qrBase64) qrImg.src = data.qrBase64;
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            }, 300);
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const input = document.getElementById('depositAmountInput');
+            if (input) {
+                input.addEventListener('input', updateDepositPreview);
+            }
+        });
+    </script>
+}

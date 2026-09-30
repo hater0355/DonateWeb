@@ -1,0 +1,404 @@
+:root {
+    --dark-green: #1F452F;
+    --primary-green: #29503E;
+    --card-dark-green: #2e7453;
+    --card-dark-hover: #235d42;
+    --banner-dark-green: #345f4e;
+    --badge-dark-green: #1d4d3c;
+    --light-green: #E6F0E9;
+    --bg-color: #FFFFFF;
+    --border-color: #A3C7B5;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    color: var(--dark-green);
+    background-color: #f4fcf6; /* Màu nền cơ bản */
+}
+
+/* Animated Background Container */
+html, body {
+    background-color: transparent !important;
+}
+
+.main-wrapper, 
+.main-content, 
+main {
+    background-color: transparent !important; 
+}
+
+.animated-bg-container {
+    background-color: #ffffff; /* Trả về nền trắng như ảnh */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none; /* Không cản trở tương tác chuột */
+}
+
+.moving-bar {
+    position: absolute;
+    bottom: -20vh;
+    height: 120vh;
+    filter: blur(50px); /* Giảm mờ một chút để thấy hình khối di chuyển rành mạch hơn */
+    opacity: 0.8;
+    transform-origin: bottom center;
+}
+
+.bar-1 {
+    width: 35vw; /* Thu hẹp bề ngang để khi di chuyển tạo ra sự thay đổi rõ ràng trên nền */
+    left: -5vw;
+    background: linear-gradient(to top, rgba(100, 255, 160, 0.7) 10%, rgba(60, 180, 110, 0.4) 50%, transparent 90%);
+    animation: auroraWave1 5s ease-in-out infinite alternate; /* Tăng tốc lên 5s */
+}
+
+.bar-2 {
+    width: 40vw;
+    left: 25vw;
+    background: linear-gradient(to top, rgba(70, 250, 180, 0.6) 15%, rgba(40, 150, 90, 0.3) 55%, transparent 90%);
+    animation: auroraWave2 6s ease-in-out infinite alternate;
+}
+
+.bar-3 {
+    width: 45vw;
+    left: 55vw;
+    background: linear-gradient(to top, rgba(130, 255, 80, 0.65) 5%, rgba(70, 200, 120, 0.35) 45%, transparent 85%);
+    animation: auroraWave3 4s ease-in-out infinite alternate;
+}
+
+@keyframes auroraWave1 {
+    0% { transform: scaleY(0.9) skewX(-25deg) translate(-20vw, 5vh); }
+    100% { transform: scaleY(1.3) skewX(30deg) translate(35vw, -5vh); }
+}
+
+@keyframes auroraWave2 {
+    0% { transform: scaleY(1.2) skewX(30deg) translate(30vw, -10vh); }
+    100% { transform: scaleY(0.8) skewX(-30deg) translate(-30vw, 10vh); }
+}
+
+@keyframes auroraWave3 {
+    0% { transform: scaleY(0.8) skewX(-35deg) translate(-35vw, 10vh); }
+    100% { transform: scaleY(1.4) skewX(20deg) translate(25vw, -15vh); }
+}
+
+.text-dark-green {
+    color: var(--dark-green) !important;
+}
+
+.text-primary-green {
+    color: var(--primary-green) !important;
+}
+
+.bg-light-green {
+    background-color: var(--light-green) !important;
+}
+
+/* Header */
+.header-custom {
+    background-color: white;
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    min-height: 70px;
+}
+
+.header-search-group {
+    background-color: var(--light-green);
+    border: 1px solid var(--border-color);
+    width: 260px;
+    transition: all 0.2s ease;
+}
+
+.header-search-group:focus-within {
+    border-color: var(--primary-green);
+    box-shadow: 0 0 0 0.2rem rgba(46, 116, 83, 0.18);
+    background-color: #ffffff;
+}
+
+.header-search-input {
+    font-size: 0.85rem;
+    color: var(--dark-green);
+}
+
+.header-search-input::placeholder {
+    color: #6c8a7b;
+}
+
+.active-nav {
+    color: var(--dark-green) !important;
+    border-bottom: 2px solid var(--dark-green);
+}
+
+.wallet-badge {
+    background-color: var(--light-green);
+    color: var(--dark-green);
+    border: 1px solid var(--border-color);
+}
+
+.add-money-btn {
+    width: 24px;
+    height: 24px;
+    line-height: 1;
+    color: var(--dark-green);
+}
+
+/* Sidebar */
+.main-wrapper {
+    min-height: calc(100vh - 70px);
+}
+
+.sidebar-custom {
+    width: 70px;
+    background-color: #FFFFFF;
+    border-right: 1px solid var(--border-color);
+    position: sticky;
+    top: 70px;
+    height: calc(100vh - 70px);
+}
+
+.sidebar-icon {
+    color: #9CA3AF;
+    font-size: 1.25rem;
+    transition: 0.2s;
+}
+
+    .sidebar-icon:hover, .sidebar-icon.active {
+        color: var(--dark-green);
+    }
+
+/* Components */
+.card-custom {
+    border-radius: 8px;
+    box-shadow: none;
+    border: 1px solid var(--border-color);
+}
+
+.btn-dark-green {
+    background-color: var(--dark-green);
+    color: white;
+}
+
+    .btn-dark-green:hover {
+        background-color: #124033;
+        color: white;
+    }
+
+.fs-7 {
+    font-size: 0.85rem;
+}
+
+/* Breaking News Banner */
+.breaking-news-banner {
+    background-color: var(--banner-dark-green);
+}
+
+.badge-breaking {
+    background-color: var(--badge-dark-green);
+    color: white;
+}
+
+/* Forms */
+.form-control-custom {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    height: 42px;
+}
+
+    .form-control-custom:focus {
+        border-color: var(--primary-green);
+        box-shadow: 0 0 0 0.2rem rgba(46, 125, 91, 0.25);
+    }
+
+/* Campaign Banner */
+.campaign-banner {
+    background-color: #638575;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Effects Tabs */
+.effect-tabs .nav-link {
+    color: var(--dark-green);
+    background-color: transparent;
+    border: 1px solid var(--dark-green);
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+    .effect-tabs .nav-link.active {
+        background-color: var(--dark-green);
+        color: white;
+    }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .sidebar-custom {
+        width: 50px;
+    }
+
+    .story-container {
+        overflow-x: auto;
+    }
+}
+
+/* =========================================
+   DARK THEME
+   ========================================= */
+body.dark-theme {
+    background-color: #121212 !important;
+    color: #e0e0e0 !important;
+}
+
+/* Base background */
+body.dark-theme .animated-bg-container {
+    background: radial-gradient(circle at top right, #102018 0%, #0d1210 100%) !important;
+}
+
+/* Animated bars (Aurora Dark Mode) */
+body.dark-theme .bar-1 { background: linear-gradient(to top, rgba(46, 255, 120, 0.5) 10%, rgba(10, 120, 60, 0.2) 50%, transparent 90%) !important; }
+body.dark-theme .bar-2 { background: linear-gradient(to top, rgba(20, 255, 180, 0.45) 15%, rgba(15, 100, 70, 0.15) 55%, transparent 90%) !important; }
+body.dark-theme .bar-3 { background: linear-gradient(to top, rgba(100, 255, 50, 0.45) 5%, rgba(20, 140, 50, 0.15) 45%, transparent 85%) !important; }
+
+/* Structural Elements */
+body.dark-theme .header-custom,
+body.dark-theme .sidebar-custom,
+body.dark-theme .card-custom,
+body.dark-theme .bg-white,
+body.dark-theme .bg-light-green {
+    background-color: #161d19 !important;
+    border-color: #24352b !important;
+    color: #e0e0e0 !important;
+}
+
+/* Texts and Icons */
+body.dark-theme .text-dark-green {
+    color: #8fceaa !important;
+}
+body.dark-theme .text-muted,
+body.dark-theme .sidebar-icon {
+    color: #a0a0a0 !important;
+}
+body.dark-theme .sidebar-icon:hover, 
+body.dark-theme .sidebar-icon.active {
+    color: #8fceaa !important;
+}
+body.dark-theme .active-nav {
+    color: #8fceaa !important;
+    border-bottom-color: #8fceaa !important;
+}
+
+/* Inputs */
+body.dark-theme .form-control, 
+body.dark-theme .form-control-custom,
+body.dark-theme .form-select,
+body.dark-theme .input-group,
+body.dark-theme input {
+    background-color: #1e2923 !important;
+    color: #e0e0e0 !important;
+    border-color: #2c4236 !important;
+}
+
+/* Badges & Buttons */
+body.dark-theme .wallet-badge {
+    background-color: #1a251f !important;
+    color: #8fceaa !important;
+    border-color: #24352b !important;
+}
+body.dark-theme .btn-dark-green {
+    background-color: #2e7453 !important;
+    color: #ffffff !important;
+}
+body.dark-theme .btn-dark-green:hover {
+    background-color: #3ba172 !important;
+}
+body.dark-theme .btn-outline-secondary {
+    background-color: #161d19 !important;
+    border-color: #24352b !important;
+    color: #e0e0e0 !important;
+}
+body.dark-theme .btn-outline-secondary:hover {
+    background-color: #1e2923 !important;
+}
+body.dark-theme .accordion-button {
+    background-color: #1a251f !important;
+    color: #e0e0e0 !important;
+}
+body.dark-theme .accordion-body {
+    background-color: #161d19 !important;
+    color: #b0b0b0 !important;
+}
+
+/* ====================================================================
+   WIDGETS CONFIG & OVERLAY STYLES
+   ==================================================================== */
+.widget-card {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 14px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+}
+
+.widget-input {
+    background-color: #1e293b !important;
+    border: 1px solid #475569 !important;
+    color: #f8fafc !important;
+}
+
+.widget-input:focus {
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 0.25rem rgba(16, 185, 129, 0.25) !important;
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+}
+
+.copy-box {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 8px 14px;
+}
+
+.preview-stage {
+    background: #020617;
+    border: 2px dashed #334155;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-emerald {
+    background-color: #10b981 !important;
+    color: #ffffff !important;
+    border: none;
+}
+
+.btn-emerald:hover {
+    background-color: #059669 !important;
+    color: #ffffff !important;
+}
+
+.btn-outline-emerald {
+    color: #10b981 !important;
+    border-color: #10b981 !important;
+}
+
+.btn-outline-emerald:hover {
+    background-color: #10b981 !important;
+    color: #ffffff !important;
+}
+
+.text-emerald {
+    color: #10b981 !important;
+}
+
+.bg-emerald {
+    background-color: #10b981 !important;
+}
+

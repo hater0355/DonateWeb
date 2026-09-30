@@ -1,0 +1,83 @@
+@{
+    var currentPath = Context.Request.Path.Value?.ToLower() ?? "";
+}
+<aside class="sidebar-custom d-flex flex-column align-items-center py-4 gap-4">
+    <a href="/" class="sidebar-icon @(currentPath == "/" ? "active" : "")" title="Home">
+        <i class="fa-solid fa-house"></i>
+    </a>
+    <a href="/Profile" class="sidebar-icon @(currentPath.StartsWith("/profile") ? "active" : "")" title="Profile">
+        <i class="fa-regular fa-user"></i>
+    </a>
+    <a href="/Streamer/Overview" class="sidebar-icon @(currentPath.StartsWith("/streamer") ? "active" : "")" title="Streamer">
+        <i class="fa-regular fa-heart"></i>
+    </a>
+    <a href="/Wallet" class="sidebar-icon @(currentPath.StartsWith("/wallet") ? "active" : "")" title="Ví số dư (Nạp / Rút tiền)">
+        <i class="fa-solid fa-wallet"></i>
+    </a>
+    <a href="/Orders" class="sidebar-icon @(currentPath.StartsWith("/orders") ? "active" : "")" title="Orders">
+        <i class="fa-solid fa-cart-shopping"></i>
+    </a>
+    <a href="/Transactions" class="sidebar-icon @(currentPath.StartsWith("/transactions") ? "active" : "")" title="History">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+    </a>
+    <a href="/Coupons" class="sidebar-icon @(currentPath.StartsWith("/coupons") ? "active" : "")" title="Coupon">
+        <i class="fa-solid fa-ticket"></i>
+    </a>
+    <a href="/Effects" class="sidebar-icon @(currentPath.StartsWith("/effects") ? "active" : "")" title="Effects">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+    </a>
+    @if (User.IsInRole(DonateWeb.Models.Enums.UserRoles.Admin))
+    {
+        <a href="/Admin" class="sidebar-icon @(currentPath.StartsWith("/admin") ? "active" : "") text-danger" title="Trang Quản trị (Admin Panel)">
+            <i class="fa-solid fa-shield-halved"></i>
+        </a>
+    }
+    <div class="mt-auto d-flex flex-column gap-4 align-items-center">
+        <!-- Nút Đổi giao diện -->
+        <button id="themeToggleBtn" class="sidebar-icon border-0 bg-transparent text-muted" title="Đổi giao diện" style="cursor: pointer; transition: 0.3s;">
+            <i class="fa-solid fa-moon"></i>
+        </button>
+
+        <a href="#" class="sidebar-icon" title="Help">
+            <i class="fa-solid fa-circle-info"></i>
+        </a>
+    </div>
+
+    <!-- Script xử lý Đổi màu tạm thời (chỉ dùng CSS filter hoặc custom class) -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleBtn = document.getElementById('themeToggleBtn');
+            const icon = toggleBtn.querySelector('i');
+            const body = document.body;
+
+            // Kiểm tra trạng thái đã lưu
+            if (localStorage.getItem('theme') === 'dark') {
+                enableDark();
+            }
+
+            toggleBtn.addEventListener('click', function() {
+                if (body.classList.contains('dark-theme')) {
+                    disableDark();
+                } else {
+                    enableDark();
+                }
+            });
+
+            function enableDark() {
+                body.classList.add('dark-theme');
+                localStorage.setItem('theme', 'dark');
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
+                
+                // Thay vì nhúng CSS tạm, giờ ta sẽ dựa vào file site.css
+            }
+
+            function disableDark() {
+                body.classList.remove('dark-theme');
+                localStorage.setItem('theme', 'light');
+                icon.classList.remove('fa-sun');
+                icon.classList.add('fa-moon');
+            }
+        });
+    </script>
+</aside>

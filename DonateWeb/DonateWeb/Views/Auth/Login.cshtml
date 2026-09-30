@@ -1,0 +1,187 @@
+@model DonateWeb.ViewModels.Auth.LoginViewModel
+@{
+    ViewData["Title"] = "Đăng nhập";
+}
+
+<div class="d-flex justify-content-center align-items-center py-5">
+    <div class="card border-0 shadow-lg" style="max-width: 880px; width: 100%; border-radius: 12px; overflow: hidden; background-color: var(--bg-color);">
+        
+        <!-- Header -->
+        <div class="p-3 px-4 d-flex align-items-center justify-content-between border-bottom" style="background-color: var(--dark-green);">
+            <div class="d-flex align-items-center gap-5">
+                <!-- Logo -->
+                <div class="fw-bold fs-5 d-flex align-items-center gap-2 text-white">
+                    <i class="fa-solid fa-leaf text-success"></i> ONLY FAN
+                </div>
+                
+                <!-- Tabs -->
+                <div class="d-flex gap-4 position-relative" style="top: 8px;">
+                    <a href="/Auth/Login" class="text-white text-decoration-none fw-bold pb-2 border-bottom border-3 border-success" style="font-size: 1.05rem;">Đăng nhập</a>
+                    <a href="/Auth/Register" class="text-white-50 text-decoration-none fw-semibold pb-2" style="font-size: 1.05rem; transition: 0.2s;">Đăng ký</a>
+                </div>
+            </div>
+            
+            <!-- Home Link -->
+            <a href="/" class="btn btn-link text-white-50 p-0 text-decoration-none" title="Trang chủ">
+                <i class="fa-solid fa-xmark fs-4"></i>
+            </a>
+        </div>
+
+        <!-- Alerts -->
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success m-4 mb-0 rounded-3 d-flex align-items-center gap-2">
+                <i class="fa-solid fa-circle-check"></i> @TempData["SuccessMessage"]
+            </div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger m-4 mb-0 rounded-3 d-flex align-items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation"></i> @TempData["ErrorMessage"]
+            </div>
+        }
+
+        <!-- Body -->
+        <div class="card-body p-4 p-md-5">
+            <div class="row g-5">
+                <!-- Left Column (Login Form) -->
+                <div class="col-12 col-md-6 position-relative">
+                    <h6 class="fw-semibold mb-3 text-dark-green opacity-75">Đăng nhập bằng Email / Tên đăng nhập</h6>
+                    
+                    <form asp-action="Login" asp-controller="Auth" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="ReturnUrl" />
+
+                        <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+
+                        <!-- Username / Email Input -->
+                        <div class="mb-3">
+                            <label asp-for="UsernameOrEmail" class="form-label small fw-semibold text-dark-green mb-1"></label>
+                            <div class="input-group rounded-3 overflow-hidden border" style="background-color: var(--light-green); border-color: var(--border-color) !important;">
+                                <span class="input-group-text bg-transparent border-0 text-dark-green opacity-75">
+                                    <i class="fa-solid fa-user"></i>
+                                </span>
+                                <input asp-for="UsernameOrEmail" class="form-control border-0 bg-transparent text-dark-green" placeholder="Email hoặc Username" style="box-shadow: none;" required />
+                            </div>
+                            <span asp-validation-for="UsernameOrEmail" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Password Input -->
+                        <div class="mb-2">
+                            <label asp-for="Password" class="form-label small fw-semibold text-dark-green mb-1"></label>
+                            <div class="input-group rounded-3 overflow-hidden border" style="background-color: var(--light-green); border-color: var(--border-color) !important;">
+                                <span class="input-group-text bg-transparent border-0 text-dark-green opacity-75">
+                                    <i class="fa-solid fa-lock"></i>
+                                </span>
+                                <input asp-for="Password" id="passwordInput" type="password" class="form-control border-0 bg-transparent text-dark-green" placeholder="Mật khẩu" style="box-shadow: none;" required />
+                                <button class="btn border-0 text-dark-green opacity-50" type="button" onclick="togglePassword()" title="Hiển thị mật khẩu">
+                                    <i class="fa-regular fa-eye" id="toggleIcon"></i>
+                                </button>
+                            </div>
+                            <span asp-validation-for="Password" class="text-danger small"></span>
+                        </div>
+                        
+                        <!-- Remember me & Forgot Password -->
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <div class="form-check">
+                                <input asp-for="RememberMe" class="form-check-input" id="rememberMeCheck" />
+                                <label asp-for="RememberMe" class="form-check-label small text-muted" for="rememberMeCheck">Ghi nhớ đăng nhập</label>
+                            </div>
+                            <a href="#" class="text-success text-decoration-none small fw-semibold">Quên mật khẩu?</a>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button type="submit" class="btn btn-dark-green w-100 py-3 rounded-3 fw-bold shadow-sm fs-6" style="letter-spacing: 0.5px;">
+                            Đăng nhập
+                        </button>
+                    </form>
+
+                    <!-- Quick Demo Accounts -->
+                    <div class="mt-4 p-3 rounded-3 border" style="background-color: rgba(46,125,91,0.06); border-color: var(--border-color) !important;">
+                        <div class="small fw-bold text-dark-green mb-2"><i class="fa-solid fa-key text-warning me-1"></i> Tài khoản thử nghiệm (Test Accounts):</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-success rounded-pill" onclick="fillAccount('admin@donateweb.com', 'Admin@123')">Admin</button>
+                            <button type="button" class="btn btn-sm btn-outline-success rounded-pill" onclick="fillAccount('streamer@donateweb.com', 'Streamer@123')">Streamer (tenstreamer)</button>
+                            <button type="button" class="btn btn-sm btn-outline-success rounded-pill" onclick="fillAccount('viewer@donateweb.com', 'Viewer@123')">Viewer</button>
+                        </div>
+                    </div>
+
+                    <!-- Divider for mobile -->
+                    <div class="d-md-none border-bottom my-5"></div>
+                    
+                    <!-- Vertical Divider for Desktop -->
+                    <div class="d-none d-md-block position-absolute end-0 top-0 bottom-0 border-end" style="width: 1px; margin-right: -1.5rem;"></div>
+                </div>
+
+                <!-- Right Column (OAuth 3rd Party Login) -->
+                <div class="col-12 col-md-6 ps-md-4 d-flex flex-column">
+                    <h6 class="fw-semibold mb-3 text-dark-green opacity-75">Đăng nhập bằng bên thứ 3</h6>
+                    
+                    <!-- Social Buttons -->
+                    <div class="d-flex flex-column gap-3 mb-4">
+                        <a asp-controller="Auth" asp-action="ExternalLogin" asp-route-provider="Google" asp-route-returnUrl="@Model?.ReturnUrl"
+                           class="btn btn-outline-secondary w-100 rounded-pill py-2 d-flex align-items-center justify-content-center gap-3 bg-white shadow-xs"
+                           style="border-color: #dee2e6; color: var(--dark-green); text-decoration: none;">
+                            <i class="fa-brands fa-google fs-5" style="color: #DB4437;"></i>
+                            <span class="fw-semibold">Đăng nhập bằng Google</span>
+                        </a>
+
+                        <a asp-controller="Auth" asp-action="ExternalLogin" asp-route-provider="Facebook" asp-route-returnUrl="@Model?.ReturnUrl"
+                           class="btn btn-outline-secondary w-100 rounded-pill py-2 d-flex align-items-center justify-content-center gap-3 bg-white shadow-xs"
+                           style="border-color: #dee2e6; color: var(--dark-green); text-decoration: none;">
+                            <i class="fa-brands fa-facebook fs-5" style="color: #1877F2;"></i>
+                            <span class="fw-semibold">Đăng nhập bằng Facebook</span>
+                        </a>
+
+                        <a asp-controller="Auth" asp-action="ExternalLogin" asp-route-provider="YouTube" asp-route-returnUrl="@Model?.ReturnUrl"
+                           class="btn btn-outline-secondary w-100 rounded-pill py-2 d-flex align-items-center justify-content-center gap-3 bg-white shadow-xs"
+                           style="border-color: #dee2e6; color: var(--dark-green); text-decoration: none;">
+                            <i class="fa-brands fa-youtube fs-5" style="color: #FF0000;"></i>
+                            <span class="fw-semibold">Đăng nhập bằng YouTube</span>
+                        </a>
+                    </div>
+
+                    <!-- Terms -->
+                    <p class="text-muted small mt-auto mb-0 lh-base text-center text-md-start" style="font-size: 0.8rem;">
+                        Đăng nhập đồng nghĩa với việc bạn chấp thuận 
+                        <a href="#" class="text-success text-decoration-none fw-semibold">Điều khoản sử dụng</a> 
+                        và 
+                        <a href="#" class="text-success text-decoration-none fw-semibold">Chính sách bảo mật</a> của DonateWeb.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function togglePassword() {
+        const input = document.getElementById('passwordInput');
+        const icon = document.getElementById('toggleIcon');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+
+    function fillAccount(email, password) {
+        document.getElementById('UsernameOrEmail').value = email;
+        document.getElementById('passwordInput').value = password;
+    }
+</script>
+
+<style>
+    .btn-outline-secondary:hover {
+        background-color: var(--light-green) !important;
+        border-color: var(--border-color) !important;
+    }
+    .input-group:focus-within {
+        border-color: var(--primary-green) !important;
+        box-shadow: 0 0 0 0.2rem rgba(41, 80, 62, 0.25);
+    }
+</style>

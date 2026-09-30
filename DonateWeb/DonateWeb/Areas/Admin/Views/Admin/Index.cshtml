@@ -1,0 +1,381 @@
+@model DonateWeb.Areas.Admin.ViewModels.AdminDashboardViewModel
+@{
+    ViewData["Title"] = "Giám sát Tổng Dòng Tiền Ra / Vào Hệ Thống";
+}
+
+<!-- FILE: Areas/Admin/Views/Admin/Index.cshtml -->
+<!-- CHỨC NĂNG: GIÁM SÁT TỔNG DÒNG TIỀN RA/VÀO VÀ BÁO CÁO TÀI CHÍNH HỆ THỐNG -->
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1 text-dark">
+            <i class="fa-solid fa-chart-pie text-success me-2"></i>Giám sát Tổng Dòng Tiền Ra / Vào Hệ Thống
+        </h4>
+        <p class="text-muted small mb-0">Theo dõi thời gian thực dòng tiền nạp vào, thanh toán donate, chi trả streamer và phí sàn</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/Admin/Transactions" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+            <i class="fa-solid fa-magnifying-glass me-1"></i> Tra cứu giao dịch
+        </a>
+        <button class="btn btn-success btn-sm rounded-pill px-3" onclick="window.print()">
+            <i class="fa-solid fa-print me-1"></i> In báo cáo
+        </button>
+    </div>
+</div>
+
+@if (Model.PendingStreamersCount > 0)
+{
+    <!-- THÔNG BÁO CÓ ĐƠN DUYỆT STREAMER MỚI -->
+    <div class="alert alert-warning border-0 shadow-sm rounded-4 p-3 mb-4 d-flex justify-content-between align-items-center flex-wrap gap-2" style="background-color: #fef3c7; border-left: 5px solid #f59e0b !important;">
+        <div class="d-flex align-items-center gap-3">
+            <div class="bg-warning text-dark rounded-circle p-2 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 42px; height: 42px;">
+                <i class="fa-solid fa-bell fs-5 text-dark"></i>
+            </div>
+            <div>
+                <h6 class="fw-bold mb-1 text-dark">Có @Model.PendingStreamersCount đơn đăng ký Streamer mới đang chờ xét duyệt!</h6>
+                <p class="small text-muted mb-0">Hồ sơ đăng ký kênh streamer cần được Quản trị viên duyệt để kích hoạt kênh, cấp quyền và chuyển đổi mã ID.</p>
+            </div>
+        </div>
+        <a href="/Admin/Streamers?statusFilter=pending" class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-clipboard-check me-1"></i> Xem & Phê Duyệt Ngay (@Model.PendingStreamersCount)
+        </a>
+    </div>
+}
+
+<!-- KHỐI 1: 4 THẺ CHỈ SỐ KPI DÒNG TIỀN TRỌNG TÂM -->
+<div class="row g-3 mb-4">
+    <!-- 1. Dòng tiền vào -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="stat-card border-start border-success border-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-muted small fw-semibold text-uppercase">Dòng tiền vào (Inflow)</span>
+                <div class="stat-icon bg-success-subtle text-success">
+                    <i class="fa-solid fa-arrow-down-long"></i>
+                </div>
+            </div>
+            <h3 class="fw-bold text-dark mb-1">@Model.TotalInflow.ToString("N0") <span class="fs-6 fw-normal text-muted">VNĐ</span></h3>
+            <div class="small text-muted">
+                <i class="fa-solid fa-circle-check text-success me-1"></i> @Model.TotalSuccessfulTransactions giao dịch thành công
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Dòng tiền ra -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="stat-card border-start border-danger border-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-muted small fw-semibold text-uppercase">Dòng tiền ra (Outflow)</span>
+                <div class="stat-icon bg-danger-subtle text-danger">
+                    <i class="fa-solid fa-arrow-up-long"></i>
+                </div>
+            </div>
+            <h3 class="fw-bold text-dark mb-1">@Model.TotalOutflow.ToString("N0") <span class="fs-6 fw-normal text-muted">VNĐ</span></h3>
+            <div class="small text-muted">
+                <i class="fa-solid fa-hand-holding-dollar text-primary me-1"></i> 95% trả Streamer & Hoàn tiền
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Số dư lưu ký hệ thống -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="stat-card border-start border-info border-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-muted small fw-semibold text-uppercase">Số dư ví người dùng</span>
+                <div class="stat-icon bg-info-subtle text-info">
+                    <i class="fa-solid fa-wallet"></i>
+                </div>
+            </div>
+            <h3 class="fw-bold text-dark mb-1">@Model.PlatformBalance.ToString("N0") <span class="fs-6 fw-normal text-muted">VNĐ</span></h3>
+            <div class="small text-muted">
+                <i class="fa-solid fa-shield-halved text-info me-1"></i> Tiền đang lưu ký an toàn trong ví
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Doanh thu phí sàn -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="stat-card border-start border-warning border-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-muted small fw-semibold text-uppercase">Doanh thu sàn (5%)</span>
+                <div class="stat-icon bg-warning-subtle text-warning">
+                    <i class="fa-solid fa-coins"></i>
+                </div>
+            </div>
+            <h3 class="fw-bold text-dark mb-1">@Model.PlatformRevenue.ToString("N0") <span class="fs-6 fw-normal text-muted">VNĐ</span></h3>
+            <div class="small text-muted">
+                <i class="fa-solid fa-chart-line text-warning me-1"></i> Phí hoa hồng dịch vụ nền tảng
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KHỐI 2: CÁC CHỈ SỐ CẢNH BÁO VẬN HÀNH & KHIẾU NẠI -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="p-3 bg-white rounded-3 border d-flex align-items-center gap-3">
+            <div class="stat-icon bg-purple-subtle text-purple fs-4" style="background-color: #f3e8ff; color: #9333ea;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div>
+                <div class="fs-5 fw-bold text-dark">@Model.TotalDisputedTransactions</div>
+                <a href="/Admin/Transactions?isDisputed=true" class="text-decoration-none small text-danger fw-semibold">
+                    Khiếu nại cần xử lý <i class="fa-solid fa-chevron-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="p-3 bg-white rounded-3 border d-flex align-items-center gap-3">
+            <div class="stat-icon bg-danger-subtle text-danger fs-4">
+                <i class="fa-solid fa-ban"></i>
+            </div>
+            <div>
+                <div class="fs-5 fw-bold text-dark">@Model.SuspendedStreamersCount</div>
+                <a href="/Admin/Streamers?statusFilter=locked" class="text-decoration-none small text-danger fw-semibold">
+                    Streamer bị khóa vi phạm <i class="fa-solid fa-chevron-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="p-3 bg-white rounded-3 border d-flex align-items-center gap-3">
+            <div class="stat-icon bg-success-subtle text-success fs-4">
+                <i class="fa-solid fa-satellite-dish"></i>
+            </div>
+            <div>
+                <div class="fs-5 fw-bold text-dark">@Model.ActiveStreamersCount</div>
+                <a href="/Admin/Streamers?statusFilter=active" class="text-decoration-none small text-success fw-semibold">
+                    Streamer đang hoạt động <i class="fa-solid fa-chevron-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="p-3 bg-white rounded-3 border d-flex align-items-center gap-3">
+            <div class="stat-icon bg-warning-subtle text-warning fs-4">
+                <i class="fa-solid fa-hourglass-half"></i>
+            </div>
+            <div>
+                <div class="fs-5 fw-bold text-dark">@Model.TotalPendingTransactions</div>
+                <span class="small text-muted">GD đang chờ thanh toán</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KHỐI 3: BIỂU ĐỒ TRỰC QUAN DÒNG TIỀN THEO NGÀY (CHART.JS) -->
+<div class="card border-0 shadow-sm rounded-4 mb-4">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-bold text-dark">
+            <i class="fa-solid fa-chart-column text-primary me-2"></i>Biểu đồ Dòng tiền 7 ngày gần nhất (VNĐ)
+        </h6>
+        <span class="badge bg-light text-dark border">Cập nhật tự động</span>
+    </div>
+    <div class="card-body p-4">
+        <div style="height: 280px;">
+            <canvas id="cashFlowChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- KHỐI 4: TOP STREAMERS & NHẬT KÝ KIỂM TRA MỚI NHẤT -->
+<div class="row g-4">
+    <!-- Cột trái: Top Streamer nhận donate nhiều nhất -->
+    <div class="col-12 col-lg-7">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold text-dark">
+                    <i class="fa-solid fa-trophy text-warning me-2"></i>Top Streamers Nhận Tiền Nhiều Nhất
+                </h6>
+                <a href="/Admin/Streamers" class="btn btn-link btn-sm text-decoration-none text-success fw-semibold p-0">
+                    Xem tất cả streamer &rarr;
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr class="small text-muted">
+                                <th>Streamer</th>
+                                <th>Slug Kênh</th>
+                                <th class="text-end">Tổng tiền nhận</th>
+                                <th class="text-center">Trạng thái</th>
+                                <th class="text-center">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.TopStreamers.Any())
+                            {
+                                foreach (var s in Model.TopStreamers)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <img src="@s.AvatarUrl" class="rounded-circle border" width="36" height="36" alt="@s.DisplayName">
+                                                <div>
+                                                    <div class="fw-semibold text-dark">
+                                                        @s.DisplayName
+                                                        @if (s.IsVerified)
+                                                        {
+                                                            <i class="fa-solid fa-circle-check text-primary small ms-1" title="Đã xác minh"></i>
+                                                        }
+                                                    </div>
+                                                    <span class="small text-muted">@s.FollowerCount.ToString("N0") người theo dõi</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <a href="/@s.Slug" target="_blank" class="badge bg-light text-primary text-decoration-none border">
+                                                /@s.Slug <i class="fa-solid fa-external-link small ms-1"></i>
+                                            </a>
+                                        </td>
+                                        <td class="text-end fw-bold text-success">
+                                            @s.TotalReceived.ToString("N0") đ
+                                        </td>
+                                        <td class="text-center">
+                                            @if (s.IsActive)
+                                            {
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">Hoạt động</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">Đang bị khóa</span>
+                                            }
+                                        </td>
+                                        <td class="text-center">
+                                            <a href="/Admin/Streamers?search=@s.Slug" class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-0" title="Quản lý kênh">
+                                                <i class="fa-solid fa-gear"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">Chưa có dữ liệu streamer</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cột phải: Nhật ký kiểm tra (Audit Logs) giao dịch mới nhất -->
+    <div class="col-12 col-lg-5">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold text-dark">
+                    <i class="fa-solid fa-shield-halved text-info me-2"></i>Nhật Ký Kiểm Tra Log Mới Nhất
+                </h6>
+                <a href="/Admin/Transactions" class="btn btn-link btn-sm text-decoration-none text-info fw-semibold p-0">
+                    Xem tất cả &rarr;
+                </a>
+            </div>
+            <div class="card-body p-3">
+                @if (Model.RecentLogs.Any())
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var log in Model.RecentLogs)
+                        {
+                            <div class="list-group-item px-0 py-2 border-bottom">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="badge bg-dark font-monospace">@log.TransactionCode</span>
+                                    <span class="small text-muted" style="font-size: 0.75rem;">
+                                        @log.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                                    </span>
+                                </div>
+                                <div class="small fw-semibold text-secondary">
+                                    <span class="badge bg-light text-dark border me-1">@log.ActionType</span>
+                                    bởi <span class="text-primary">@log.PerformedBy</span>
+                                </div>
+                                @if (!string.IsNullOrEmpty(log.Note))
+                                {
+                                    <p class="small text-muted mb-0 mt-1 fst-italic text-truncate" title="@log.Note">
+                                        "@log.Note"
+                                    </p>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-4 text-muted small">
+                        <i class="fa-solid fa-clipboard-check fs-2 text-muted mb-2 d-block"></i>
+                        Chưa có nhật ký kiểm tra log giao dịch nào được ghi nhận.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Vẽ biểu đồ trực quan Dòng tiền vào vs Dòng tiền ra bằng Chart.js
+        const ctx = document.getElementById('cashFlowChart').getContext('2d');
+        const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ChartLabels));
+        const inflowData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ChartInflowData));
+        const outflowData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ChartOutflowData));
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Dòng tiền vào (Inflow)',
+                        data: inflowData,
+                        backgroundColor: 'rgba(16, 185, 129, 0.75)',
+                        borderColor: '#10b981',
+                        borderWidth: 1,
+                        borderRadius: 6
+                    },
+                    {
+                        label: 'Dòng tiền ra (Outflow)',
+                        data: outflowData,
+                        backgroundColor: 'rgba(239, 68, 68, 0.75)',
+                        borderColor: '#ef4444',
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { font: { family: 'Inter', weight: '500' } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + new Intl.NumberFormat('vi-VN').format(context.raw) + ' VNĐ';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                if (value >= 1000000) return (value / 1000000) + 'M';
+                                if (value >= 1000) return (value / 1000) + 'K';
+                                return value;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+}

@@ -1,0 +1,198 @@
+@model DonateWeb.Areas.Widgets.ViewModels.LeaderboardViewModel
+@{
+    ViewData["Title"] = "Bảng Xếp Hạng Top Donate & Tin Nhắn Gần Nhất";
+}
+
+<div class="row g-4">
+    <!-- Tiêu đề & Hộp URL OBS Leaderboard -->
+    <div class="col-12">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <h3 class="fw-bold mb-1 text-white">
+                    <i class="fa-solid fa-trophy text-warning me-2"></i> Bảng Xếp Hạng Top Donate & Tin Nhắn
+                </h3>
+                <p class="text-secondary mb-0">
+                    Báo cáo vinh danh những người ủng hộ nhiều nhất và hiển thị danh sách tin nhắn donate mới nhất trên livestream.
+                </p>
+            </div>
+        </div>
+
+        <!-- Hộp URL OBS Leaderboard Overlay -->
+        <div class="widget-card p-3 mt-3 border border-info border-opacity-50">
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-info text-dark fw-bold">URL OBS BROWSER SOURCE - BẢNG VINH DANH</span>
+                        <small class="text-muted">Kích thước khuyên dùng: <strong>Width: 400 | Height: 600</strong></small>
+                    </div>
+                    <div class="copy-box d-flex align-items-center justify-content-between">
+                        <span class="font-monospace text-info small text-truncate me-2">@Model.ObsOverlayUrl</span>
+                        <button type="button" class="btn btn-sm btn-outline-info text-nowrap" onclick="copyToClipboard('@Model.ObsOverlayUrl')">
+                            <i class="fa-regular fa-copy me-1"></i> Sao chép URL
+                        </button>
+                    </div>
+                </div>
+                <div class="col-lg-4 mt-3 mt-lg-0 text-secondary small">
+                    <i class="fa-solid fa-code me-1 text-warning"></i>
+                    <strong>REST API sẵn sàng:</strong>
+                    <br />
+                    <code>/api/widgets/leaderboard/@Model.StreamerSlug?period=@Model.Period</code>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hộp URL OBS Recent Messages Overlay -->
+        <div class="widget-card p-3 mt-2 border border-success border-opacity-50">
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-success text-white fw-bold">URL OBS BROWSER SOURCE - TIN NHẮN GẦN NHẤT</span>
+                        <small class="text-muted">Kích thước khuyên dùng: <strong>Width: 400 | Height: 450</strong></small>
+                    </div>
+                    <div class="copy-box d-flex align-items-center justify-content-between">
+                        <span class="font-monospace text-success small text-truncate me-2">@($"{Context.Request.Scheme}://{Context.Request.Host}/Widgets/Overlay/RecentMessages/{Model.StreamerSlug}")</span>
+                        <button type="button" class="btn btn-sm btn-outline-success text-nowrap" onclick="copyToClipboard('@($"{Context.Request.Scheme}://{Context.Request.Host}/Widgets/Overlay/RecentMessages/{Model.StreamerSlug}")')">
+                            <i class="fa-regular fa-copy me-1"></i> Sao chép URL
+                        </button>
+                    </div>
+                </div>
+                <div class="col-lg-4 mt-3 mt-lg-0 text-secondary small">
+                    <i class="fa-solid fa-code me-1 text-warning"></i>
+                    <strong>REST API tin nhắn:</strong>
+                    <br />
+                    <code>/api/widgets/recent-donations/@Model.StreamerSlug?limit=10</code>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cột trái: Bảng xếp hạng Top Donors -->
+    <div class="col-lg-7">
+        <div class="widget-card p-4">
+            <!-- Bộ lọc chu kỳ thời gian -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center pb-3 mb-3 border-bottom border-secondary gap-2">
+                <h5 class="fw-bold text-white mb-0">
+                    <i class="fa-solid fa-ranking-star text-warning me-2"></i> Top Người Hâm Mộ
+                </h5>
+
+                <div class="btn-group btn-group-sm">
+                    <a href="/Widgets/Config/Leaderboard?period=day" class="btn @(Model.Period == "day" ? "btn-warning fw-bold text-dark" : "btn-outline-secondary")">
+                        Hôm nay
+                    </a>
+                    <a href="/Widgets/Config/Leaderboard?period=week" class="btn @(Model.Period == "week" ? "btn-warning fw-bold text-dark" : "btn-outline-secondary")">
+                        Tuần này
+                    </a>
+                    <a href="/Widgets/Config/Leaderboard?period=month" class="btn @(Model.Period == "month" ? "btn-warning fw-bold text-dark" : "btn-outline-secondary")">
+                        Tháng này
+                    </a>
+                    <a href="/Widgets/Config/Leaderboard?period=all" class="btn @(Model.Period == "all" ? "btn-warning fw-bold text-dark" : "btn-outline-secondary")">
+                        Toàn thời gian
+                    </a>
+                </div>
+            </div>
+
+            @if (!Model.TopDonors.Any())
+            {
+                <div class="text-center py-5 text-secondary">
+                    <i class="fa-solid fa-crown fs-1 mb-3 text-muted"></i>
+                    <p>Chưa có dữ liệu Donate trong khoảng thời gian này.</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle">
+                        <thead>
+                            <tr class="text-secondary small">
+                                <th style="width: 60px;" class="text-center">Hạng</th>
+                                <th>Người ủng hộ</th>
+                                <th class="text-center">Số lượt</th>
+                                <th class="text-end">Tổng số tiền</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var d in Model.TopDonors)
+                            {
+                                <tr>
+                                    <td class="text-center">
+                                        @if (d.Rank == 1)
+                                        {
+                                            <span class="fs-4" title="Cúp Vàng">🥇</span>
+                                        }
+                                        else if (d.Rank == 2)
+                                        {
+                                            <span class="fs-4" title="Cúp Bạc">🥈</span>
+                                        }
+                                        else if (d.Rank == 3)
+                                        {
+                                            <span class="fs-4" title="Cúp Đồng">🥉</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary rounded-pill px-2 py-1 fw-bold">#@d.Rank</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold text-light">@d.DonorName</div>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-dark border border-secondary px-2 py-1 text-info">
+                                            @d.DonationCount lần
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="fw-bold text-warning fs-6">
+                                            @d.FormattedAmount
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Cột phải: Danh sách tin nhắn donate gần đây nhất -->
+    <div class="col-lg-5">
+        <div class="widget-card p-4">
+            <div class="d-flex justify-content-between align-items-center pb-3 mb-3 border-bottom border-secondary">
+                <h5 class="fw-bold text-white mb-0">
+                    <i class="fa-solid fa-comments text-emerald me-2"></i> Tin Nhắn Gần Nhất
+                </h5>
+                <span class="badge bg-dark border border-secondary text-secondary">Thời gian thực</span>
+            </div>
+
+            @if (!Model.RecentDonations.Any())
+            {
+                <div class="text-center py-5 text-secondary">
+                    <i class="fa-regular fa-comment-dots fs-1 mb-3 text-muted"></i>
+                    <p>Chưa có tin nhắn Donate nào gần đây.</p>
+                </div>
+            }
+            else
+            {
+                <div class="d-flex flex-column gap-3" style="max-height: 520px; overflow-y: auto;">
+                    @foreach (var r in Model.RecentDonations)
+                    {
+                        <div class="p-3 rounded-3" style="background: #0f172a; border: 1px solid #334155;">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold text-light">@r.DonorName</span>
+                                <span class="badge bg-success bg-opacity-25 text-success fw-bold">
+                                    +@r.FormattedAmount
+                                </span>
+                            </div>
+                            <p class="text-secondary small mb-2 text-break">
+                                @(string.IsNullOrWhiteSpace(r.Message) ? "(Không có lời nhắn)" : $"\"{r.Message}\"")
+                            </p>
+                            <div class="text-end text-muted" style="font-size: 0.75rem;">
+                                <i class="fa-regular fa-clock me-1"></i> @r.TimeAgo
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>

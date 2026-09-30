@@ -1,0 +1,72 @@
+@{
+    ViewData["Title"] = "Guides";
+}
+
+<div class="mb-4">
+    <h5 class="fw-bold text-dark-green mb-0 d-flex align-items-center gap-2">
+        <span class="border-start border-3 border-success ps-2 text-uppercase">HƯỚNG DẪN</span>
+        <i class="fa-solid fa-book text-success opacity-75"></i>
+    </h5>
+</div>
+
+<div class="card card-custom border-0 bg-transparent">
+    <div class="accordion" id="guidesAccordion">
+        <!-- Item 1 -->
+        <div class="accordion-item border-0 mb-3 rounded-3 shadow-sm overflow-hidden" style="border: 1px solid var(--border-color) !important;">
+            <h2 class="accordion-header" id="headingOne">
+                <button class="accordion-button collapsed fw-bold text-dark-green" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne" style="background-color: var(--light-green);">
+                    Các câu hỏi thường gặp
+                </button>
+            </h2>
+            <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#guidesAccordion">
+                <div class="accordion-body bg-white text-muted">
+                    Nội dung các câu hỏi thường gặp sẽ được cập nhật tại đây. Bạn có thể tìm thấy các giải đáp cho những thắc mắc phổ biến nhất của người dùng về hệ thống Donate.
+                </div>
+            </div>
+        </div>
+
+        <!-- Item 2 -->
+        <div class="accordion-item border-0 mb-3 rounded-3 shadow-sm overflow-hidden" style="border: 1px solid var(--border-color) !important;">
+            <h2 class="accordion-header" id="headingTwo">
+                <button class="accordion-button collapsed fw-bold text-dark-green" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo" style="background-color: var(--light-green);">
+                    Cấu hình hướng dẫn cho Streamer
+                </button>
+            </h2>
+            <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#guidesAccordion">
+                <div class="accordion-body bg-white text-muted">
+                    Hướng dẫn chi tiết cách cấu hình dành cho Streamer mới đăng ký. Các bước thiết lập ban đầu, cách kết nối tài khoản ngân hàng và thiết lập giao diện hiển thị trên luồng live stream.
+                </div>
+            </div>
+        </div>
+
+        <!-- Item 3 -->
+        <div class="accordion-item border-0 mb-3 rounded-3 shadow-sm overflow-hidden" style="border: 1px solid var(--border-color) !important;">
+            <h2 class="accordion-header" id="headingThree">
+                <button class="accordion-button collapsed fw-bold text-dark-green" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree" style="background-color: var(--light-green);">
+                    Lỗi sửa hướng dẫn không hiển thị Donate
+                </button>
+            </h2>
+            <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#guidesAccordion">
+                <div class="accordion-body bg-white text-muted">
+                    Tổng hợp các bước khắc phục sự cố khi thông báo Donate không hiển thị trên phần mềm OBS, XSplit của bạn. Hướng dẫn làm mới URL Widget và kiểm tra kết nối mạng.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Tuỳ chỉnh Accordion để ăn khớp với theme xanh của web */
+    .accordion-button:not(.collapsed) {
+        color: var(--dark-green);
+        background-color: #d1e3d8 !important; /* Xanh đậm hơn chút so với light-green khi mở */
+        box-shadow: inset 0 -1px 0 rgba(0,0,0,.125);
+    }
+    .accordion-button:focus {
+        border-color: var(--primary-green);
+        box-shadow: 0 0 0 0.25rem rgba(41, 80, 62, 0.25);
+    }
+    .accordion-button::after {
+        filter: invert(24%) sepia(16%) saturate(1450%) hue-rotate(101deg) brightness(97%) contrast(87%); /* Đổi màu icon mũi tên sang xanh */
+    }
+</style>

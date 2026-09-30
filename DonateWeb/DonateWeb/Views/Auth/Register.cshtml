@@ -1,0 +1,188 @@
+@model DonateWeb.ViewModels.Auth.RegisterViewModel
+@{
+    ViewData["Title"] = "Đăng ký tài khoản";
+}
+
+<div class="d-flex justify-content-center align-items-center py-5">
+    <div class="card border-0 shadow-lg" style="max-width: 900px; width: 100%; border-radius: 12px; overflow: hidden; background-color: var(--bg-color);">
+        
+        <!-- Header -->
+        <div class="p-3 px-4 d-flex align-items-center justify-content-between border-bottom" style="background-color: var(--dark-green);">
+            <div class="d-flex align-items-center gap-5">
+                <!-- Logo -->
+                <div class="fw-bold fs-5 d-flex align-items-center gap-2 text-white">
+                    <i class="fa-solid fa-leaf text-success"></i> ONLY FAN
+                </div>
+                
+                <!-- Tabs -->
+                <div class="d-flex gap-4 position-relative" style="top: 8px;">
+                    <a href="/Auth/Login" class="text-white-50 text-decoration-none fw-semibold pb-2" style="font-size: 1.05rem; transition: 0.2s;">Đăng nhập</a>
+                    <a href="/Auth/Register" class="text-white text-decoration-none fw-bold pb-2 border-bottom border-3 border-success" style="font-size: 1.05rem;">Đăng ký</a>
+                </div>
+            </div>
+            
+            <a href="/" class="btn btn-link text-white-50 p-0 text-decoration-none" title="Đóng">
+                <i class="fa-solid fa-xmark fs-4"></i>
+            </a>
+        </div>
+
+        <!-- Body -->
+        <div class="card-body p-4 p-md-5">
+            <div class="row g-5">
+                <!-- Left Column (Register Form) -->
+                <div class="col-12 col-md-7 position-relative">
+                    <h6 class="fw-semibold mb-3 text-dark-green opacity-75">Tạo tài khoản mới</h6>
+                    
+                    <form asp-action="Register" asp-controller="Auth" method="post">
+                        @Html.AntiForgeryToken()
+                        @if (!ViewData.ModelState.IsValid)
+                        {
+                            <div asp-validation-summary="All" class="alert alert-danger small py-2 px-3 mb-3 rounded-3"></div>
+                        }
+
+                        <!-- Chọn vai trò (RBAC) -->
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-dark-green">Bạn muốn tham gia với vai trò:</label>
+                            <div class="d-flex gap-3">
+                                <div class="form-check p-3 rounded-3 border flex-fill" style="background-color: var(--light-green);">
+                                    <input class="form-check-input" type="radio" asp-for="RoleType" value="Viewer" id="roleViewer" onchange="toggleStreamerFields(false)" />
+                                    <label class="form-check-label fw-semibold text-dark-green small" for="roleViewer">
+                                        <i class="fa-solid fa-heart text-danger me-1"></i> Viewer / Donor
+                                        <div class="text-muted fw-normal" style="font-size: 0.72rem;">Xem và ủng hộ streamer</div>
+                                    </label>
+                                </div>
+                                <div class="form-check p-3 rounded-3 border flex-fill" style="background-color: var(--light-green);">
+                                    <input class="form-check-input" type="radio" asp-for="RoleType" value="Streamer" id="roleStreamer" onchange="toggleStreamerFields(true)" />
+                                    <label class="form-check-label fw-semibold text-dark-green small" for="roleStreamer">
+                                        <i class="fa-solid fa-video text-success me-1"></i> Streamer
+                                        <div class="text-muted fw-normal" style="font-size: 0.72rem;">Nhận donate & tạo slug riêng</div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Thông báo định dạng ID tự động -->
+                        <div class="alert alert-light border rounded-3 py-2 px-3 mb-3 d-flex align-items-center gap-2" style="font-size: 0.75rem;">
+                            <i class="fa-solid fa-id-badge text-success fs-5 flex-shrink-0"></i>
+                            <div>
+                                <strong>Cấp mã ID 10 số tự động:</strong> Streamer bắt đầu bằng số <strong>1</strong>, Viewer bắt đầu bằng số <strong>9</strong> và 4 số kế tiếp là năm đăng ký tài khoản.
+                            </div>
+                        </div>
+
+                        <!-- Streamer specific fields (Tạo slug & tên kênh) -->
+                        <div id="streamerFields" class="p-3 mb-3 rounded-3 border bg-white @(Model?.RoleType == "Streamer" ? "" : "d-none")" style="border-color: #2E7D5B !important;">
+                            <div class="small fw-bold text-success mb-2"><i class="fa-solid fa-link me-1"></i> Thiết lập trang cá nhân Streamer:</div>
+                            <div class="mb-2">
+                                <label asp-for="StreamerSlug" class="form-label small fw-semibold text-dark-green mb-1">Tên miền trang cá nhân (ID Streamer)</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-light text-muted small">domain.com/</span>
+                                    <input asp-for="StreamerSlug" class="form-control font-monospace" placeholder="Mã ID (để trống hệ thống tự cấp theo ID)" />
+                                </div>
+                                <span asp-validation-for="StreamerSlug" class="text-danger small"></span>
+                                <div class="text-muted small mt-1" style="font-size: 0.7rem;">Tên miền trang cá nhân sẽ tự động theo mã ID tài khoản (ví dụ: domain.com/12026xxxxx)</div>
+                            </div>
+                            <div>
+                                <label asp-for="StreamerDisplayName" class="form-label small fw-semibold text-dark-green mb-1">Tên hiển thị kênh</label>
+                                <input asp-for="StreamerDisplayName" class="form-control form-control-sm" placeholder="Ví dụ: Độ Mixi, Nam Gaming" />
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label asp-for="Username" class="form-label small fw-semibold text-dark-green mb-1"></label>
+                                <input asp-for="Username" class="form-control rounded-3 border bg-light-green text-dark-green" placeholder="Username" required />
+                                <span asp-validation-for="Username" class="text-danger small"></span>
+                            </div>
+                            <div class="col-6">
+                                <label asp-for="FullName" class="form-label small fw-semibold text-dark-green mb-1"></label>
+                                <input asp-for="FullName" class="form-control rounded-3 border bg-light-green text-dark-green" placeholder="Họ và tên" />
+                            </div>
+                        </div>
+
+                        <!-- Email Input -->
+                        <div class="mb-3">
+                            <label asp-for="Email" class="form-label small fw-semibold text-dark-green mb-1"></label>
+                            <input asp-for="Email" type="email" class="form-control rounded-3 border bg-light-green text-dark-green" placeholder="example@email.com" required />
+                            <span asp-validation-for="Email" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Phone -->
+                        <div class="mb-3">
+                            <label asp-for="PhoneNumber" class="form-label small fw-semibold text-dark-green mb-1"></label>
+                            <input asp-for="PhoneNumber" class="form-control rounded-3 border bg-light-green text-dark-green" placeholder="0901234567" />
+                        </div>
+
+                        <!-- Password Inputs -->
+                        <div class="row g-2 mb-4">
+                            <div class="col-6">
+                                <label asp-for="Password" class="form-label small fw-semibold text-dark-green mb-1"></label>
+                                <input asp-for="Password" type="password" class="form-control rounded-3 border bg-light-green text-dark-green" placeholder="Mật khẩu" required />
+                                <span asp-validation-for="Password" class="text-danger small"></span>
+                            </div>
+                            <div class="col-6">
+                                <label asp-for="ConfirmPassword" class="form-label small fw-semibold text-dark-green mb-1"></label>
+                                <input asp-for="ConfirmPassword" type="password" class="form-control rounded-3 border bg-light-green text-dark-green" placeholder="Nhập lại" required />
+                                <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
+                            </div>
+                            <div class="col-12 text-muted small" style="font-size: 0.72rem;">
+                                Mật khẩu phải gồm tối thiểu 6 ký tự.
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button type="submit" class="btn btn-dark-green w-100 py-3 rounded-3 fw-bold shadow-sm fs-6" style="letter-spacing: 0.5px;">
+                            Đăng ký tài khoản
+                        </button>
+                    </form>
+
+                    <!-- Divider for mobile -->
+                    <div class="d-md-none border-bottom my-5"></div>
+                    
+                    <!-- Vertical Divider for Desktop -->
+                    <div class="d-none d-md-block position-absolute end-0 top-0 bottom-0 border-end" style="width: 1px; margin-right: -1.5rem;"></div>
+                </div>
+
+                <!-- Right Column (OAuth 3rd Party) -->
+                <div class="col-12 col-md-5 ps-md-4 d-flex flex-column">
+                    <h6 class="fw-semibold mb-3 text-dark-green opacity-75">Hoặc đăng nhập / đăng ký bằng bên thứ 3</h6>
+                    
+                    <div class="d-flex flex-column gap-3 mb-4">
+                        <a asp-controller="Auth" asp-action="ExternalLogin" asp-route-provider="Google"
+                           class="btn btn-outline-secondary w-100 rounded-pill py-2 d-flex align-items-center justify-content-center gap-3 bg-white shadow-xs"
+                           style="border-color: #dee2e6; color: var(--dark-green); text-decoration: none;">
+                            <i class="fa-brands fa-google fs-5" style="color: #DB4437;"></i> 
+                            <span class="fw-semibold">Đăng nhập bằng Google</span>
+                        </a>
+                        <a asp-controller="Auth" asp-action="ExternalLogin" asp-route-provider="Facebook"
+                           class="btn btn-outline-secondary w-100 rounded-pill py-2 d-flex align-items-center justify-content-center gap-3 bg-white shadow-xs"
+                           style="border-color: #dee2e6; color: var(--dark-green); text-decoration: none;">
+                            <i class="fa-brands fa-facebook fs-5" style="color: #1877F2;"></i> 
+                            <span class="fw-semibold">Đăng nhập bằng Facebook</span>
+                        </a>
+                        <a asp-controller="Auth" asp-action="ExternalLogin" asp-route-provider="YouTube"
+                           class="btn btn-outline-secondary w-100 rounded-pill py-2 d-flex align-items-center justify-content-center gap-3 bg-white shadow-xs"
+                           style="border-color: #dee2e6; color: var(--dark-green); text-decoration: none;">
+                            <i class="fa-brands fa-youtube fs-5" style="color: #FF0000;"></i> 
+                            <span class="fw-semibold">Đăng nhập bằng YouTube</span>
+                        </a>
+                    </div>
+
+                    <p class="text-muted small mt-auto mb-0 lh-base text-center text-md-start" style="font-size: 0.8rem;">
+                        Khi đăng ký bạn đồng ý với <a href="#" class="text-success text-decoration-none fw-semibold">Điều khoản sử dụng</a> và <a href="#" class="text-success text-decoration-none fw-semibold">Chính sách bảo mật</a>.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleStreamerFields(isStreamer) {
+        const fields = document.getElementById('streamerFields');
+        if (isStreamer) {
+            fields.classList.remove('d-none');
+        } else {
+            fields.classList.add('d-none');
+        }
+    }
+</script>

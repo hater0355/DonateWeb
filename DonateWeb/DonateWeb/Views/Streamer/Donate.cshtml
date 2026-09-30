@@ -1,0 +1,774 @@
+@model DonateWeb.ViewModels.Streamer.StreamerDonateViewModel
+@{
+    var isStreamerAccount = User.IsInRole(DonateWeb.Models.Enums.UserRoles.Streamer) || (ViewBag.IsOwnerStreamer == true);
+    ViewData["Title"] = isStreamerAccount ? $"Trang cá nhân - {Model.DisplayName}" : $"Donate cho {Model.DisplayName} (ID: {Model.Slug})";
+}
+
+@if (isStreamerAccount)
+{
+    <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
+}
+
+<style>
+    .streamer-cover {
+        height: 240px;
+        background-size: cover;
+        background-position: center;
+        border-radius: 16px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+    }
+    .streamer-cover-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(13,38,27,0.85) 100%);
+    }
+    .streamer-header-info {
+        position: absolute;
+        bottom: 20px;
+        left: 24px;
+        right: 24px;
+        display: flex;
+        align-items: flex-end;
+        gap: 20px;
+    }
+    .streamer-profile-avatar {
+        width: 95px;
+        height: 95px;
+        border-radius: 50%;
+        border: 4px solid #ffffff;
+        object-fit: cover;
+        background-color: #fff;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+    .greeting-bubble {
+        background-color: rgba(255, 255, 255, 0.92);
+        border-left: 4px solid var(--primary-green);
+        border-radius: 10px;
+        padding: 14px 18px;
+        font-size: 0.95rem;
+        color: var(--dark-green);
+        backdrop-filter: blur(8px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .quick-amount-btn {
+        border: 1px solid var(--border-color);
+        background-color: rgba(255,255,255,0.8);
+        color: var(--dark-green);
+        font-weight: 600;
+        font-size: 0.85rem;
+        border-radius: 8px;
+        padding: 8px 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .quick-amount-btn:hover, .quick-amount-btn.active {
+        background-color: var(--dark-green);
+        color: #ffffff;
+        border-color: var(--dark-green);
+    }
+    .payment-method-card {
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 12px;
+        background-color: #ffffff;
+        cursor: pointer;
+        transition: 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .payment-method-card:hover {
+        border-color: var(--primary-green);
+        background-color: var(--light-green);
+    }
+    .payment-method-card input[type="radio"]:checked + label {
+        color: var(--primary-green);
+        font-weight: bold;
+    }
+    .ql-editor { min-height: 180px; font-size: 0.95rem; color: var(--dark-green, #1a3a28); line-height: 1.65; }
+    .ql-toolbar.ql-snow { border-radius: 10px 10px 0 0; border-color: var(--border-color, #dee2e6); background-color: #f8faf9; }
+    .ql-container.ql-snow { border-radius: 0 0 10px 10px; border-color: var(--border-color, #dee2e6); background: #fff; }
+</style>
+
+<div class="pb-5">
+
+    <!-- 1. Streamer Cover Banner & Header Info -->
+    <div class="streamer-cover mb-4" style="background-image: url('@(string.IsNullOrEmpty(Model.BannerUrl) ? "/images/default-banner.jpg" : Model.BannerUrl)');">
+        <div class="streamer-cover-overlay"></div>
+        <div class="streamer-header-info">
+            <img src="@(string.IsNullOrEmpty(Model.AvatarUrl) ? "/images/default-avatar.png" : Model.AvatarUrl)" 
+                 alt="@Model.DisplayName" 
+                 class="streamer-profile-avatar" />
+            
+            <div class="text-white flex-grow-1">
+                <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                    <h3 class="fw-bold mb-0 text-white">@Model.DisplayName</h3>
+                    @if (Model.IsVerified)
+                    {
+                        <span class="badge bg-success rounded-pill px-2 py-1 small" title="Streamer đã xác minh">
+                            <i class="fa-solid fa-check me-1"></i> Đã xác minh
+                        </span>
+                    }
+                    <span class="badge bg-white text-dark-green rounded-pill px-2 py-1 small fw-bold">
+                        <i class="fa-solid fa-trophy text-warning me-1"></i> Rank #@Model.Rank
+                    </span>
+                </div>
+                <div class="text-white-50 small d-flex align-items-center gap-3">
+                    <span><i class="fa-solid fa-link me-1"></i> domain.com/@Model.Slug</span>
+                    <span><i class="fa-solid fa-users me-1"></i> @Model.FollowerCount.ToString("N0") người theo dõi</span>
+                </div>
+            </div>
+
+            <!-- Social Links -->
+            <div class="d-none d-md-flex align-items-center gap-2">
+                @if (!string.IsNullOrEmpty(Model.YoutubeUrl))
+                {
+                    <a href="@Model.YoutubeUrl" target="_blank" class="btn btn-sm btn-light rounded-circle text-danger" title="YouTube"><i class="fa-brands fa-youtube"></i></a>
+                }
+                @if (!string.IsNullOrEmpty(Model.TwitchUrl))
+                {
+                    <a href="@Model.TwitchUrl" target="_blank" class="btn btn-sm btn-light rounded-circle" style="color:#9146FF;" title="Twitch"><i class="fa-brands fa-twitch"></i></a>
+                }
+                @if (!string.IsNullOrEmpty(Model.DiscordUrl))
+                {
+                    <a href="@Model.DiscordUrl" target="_blank" class="btn btn-sm btn-light rounded-circle" style="color:#5865F2;" title="Discord"><i class="fa-brands fa-discord"></i></a>
+                }
+                @if (!string.IsNullOrEmpty(Model.FacebookUrl))
+                {
+                    <a href="@Model.FacebookUrl" target="_blank" class="btn btn-sm btn-light rounded-circle" style="color:#1877F2;" title="Facebook"><i class="fa-brands fa-facebook"></i></a>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Thông báo TempData khi Streamer cập nhật Bio -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success rounded-3 d-flex align-items-center gap-2 p-3 mb-4 shadow-sm">
+            <i class="fa-solid fa-circle-check fs-4 text-success"></i>
+            <div class="fw-semibold">@TempData["SuccessMessage"]</div>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger rounded-3 d-flex align-items-center gap-2 p-3 mb-4 shadow-sm">
+            <i class="fa-solid fa-triangle-exclamation fs-4 text-danger"></i>
+            <div class="fw-semibold">@TempData["ErrorMessage"]</div>
+        </div>
+    }
+
+    <!-- 2. Streamer Greeting Message (Lời chào) -->
+    <div class="greeting-bubble mb-4">
+        <div class="d-flex align-items-start gap-3">
+            <i class="fa-solid fa-quote-left text-success fs-3 mt-1 opacity-50"></i>
+            <div>
+                <div class="fw-bold small text-uppercase text-success mb-1">Lời chào từ Streamer:</div>
+                <div class="fst-italic text-dark-green">
+                    "@(string.IsNullOrWhiteSpace(Model.GreetingMessage) ? "Cảm ơn bạn đã luôn đồng hành và ủng hộ mình nhé!" : Model.GreetingMessage)"
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2b. Streamer Bio / About Me (Giới thiệu bản thân hiển thị công khai) -->
+    <div class="card border-0 shadow-sm rounded-3 mb-4 overflow-hidden">
+        <div class="card-header bg-light-green border-0 py-2 px-4 d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-id-card text-success"></i>
+                <span class="fw-bold text-dark-green small text-uppercase">Giới thiệu về @Model.DisplayName (Bio)</span>
+            </div>
+        </div>
+        <div class="card-body px-4 py-3">
+            <div id="publicBioDisplay" class="streamer-bio-content" style="color: var(--dark-green, #1a3a28); line-height: 1.75; font-size: 0.95rem;">
+                @if (!string.IsNullOrWhiteSpace(Model.Bio))
+                {
+                    @Html.Raw(Model.Bio)
+                }
+                else
+                {
+                    <span class="text-muted fst-italic small">Chưa có lời giới thiệu bản thân.</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- CẢNH BÁO KÊNH BỊ KHÓA DO VI PHẠM CHÍNH SÁCH -->
+    @if (!Model.IsActive)
+    {
+        <div class="alert alert-danger rounded-4 p-4 mb-4 border-2 border-danger shadow-sm">
+            <div class="d-flex align-items-center gap-3">
+                <i class="fa-solid fa-ban fs-1 text-danger"></i>
+                <div>
+                    <h5 class="fw-bold text-danger mb-1">
+                        ⚠️ KÊNH STREAMER ĐANG BỊ TẠM KHÓA HOẠT ĐỘNG
+                    </h5>
+                    <p class="mb-1 text-dark">
+                        Kênh của streamer này hiện đang bị Quản trị viên tạm ngừng hoạt động do vi phạm chính sách của nền tảng.
+                    </p>
+                    @if (!string.IsNullOrEmpty(Model.LockReason))
+                    {
+                        <div class="small fw-semibold text-danger">
+                            <i class="fa-solid fa-circle-exclamation me-1"></i> Lý do: @Model.LockReason
+                        </div>
+                    }
+                    <div class="small text-muted mt-1">
+                        Chức năng gửi Donate tạm thời bị vô hiệu hóa cho đến khi kênh được mở lại.
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Alerts Feedback (dành cho Viewer/Admin khi gửi Donate) -->
+    @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+    {
+        <div class="alert alert-success rounded-3 d-flex align-items-center gap-3 p-3 mb-4 shadow-sm">
+            <i class="fa-solid fa-circle-check fs-2 text-success"></i>
+            <div>
+                <h6 class="fw-bold mb-1">Donate thành công!</h6>
+                <div>@Model.SuccessMessage</div>
+            </div>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger rounded-3 d-flex align-items-center gap-3 p-3 mb-4 shadow-sm">
+            <i class="fa-solid fa-triangle-exclamation fs-2 text-danger"></i>
+            <div>
+                <h6 class="fw-bold mb-1">Không thể thực hiện Donate</h6>
+                <div>@Model.ErrorMessage</div>
+            </div>
+        </div>
+    }
+
+    <!-- 3. PHẦN CHÍNH: Nếu là Tài khoản Streamer -> Hiển thị Thông tin cá nhân & Cập nhật Lời giới thiệu (Bỏ phần Gửi Donate) -->
+    <!--                 Nếu là Viewer hoặc Admin -> Giữ nguyên Form Gửi Donate -->
+    <div class="row g-4">
+        <div class="col-12 col-lg-7">
+            @if (isStreamerAccount)
+            {
+                <!-- TRONG TÀI KHOẢN STREAMER: Bỏ phần gửi Donate, thay bằng Cập nhật Thông tin cá nhân & Lời giới thiệu (Bio) -->
+                <div class="card card-custom p-4 bg-white border-0 shadow-sm h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold text-dark-green mb-0">
+                            <i class="fa-solid fa-user-pen text-success me-2"></i> THÔNG TIN CÁ NHÂN &amp; CẬP NHẬT LỜI GIỚI THIỆU
+                        </h5>
+                        <span class="badge bg-light-green text-dark-green border px-3 py-2">
+                            Tài khoản Streamer
+                        </span>
+                    </div>
+
+                    <form asp-action="UpdateBio" asp-controller="Streamer" method="post" enctype="multipart/form-data" id="streamerBioForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="slug" value="@Model.Slug" />
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-semibold text-dark-green">Tên hiển thị kênh</label>
+                                <input type="text" name="displayName" value="@Model.DisplayName" class="form-control form-control-custom" required />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-semibold text-dark-green">Tên miền trang cá nhân (ID Streamer)</label>
+                                <input type="text" value="domain.com/@Model.Slug" class="form-control form-control-custom" readonly />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-semibold text-dark-green">Ảnh đại diện (Tải lên từ máy tính)</label>
+                                <input type="file" name="avatarFile" accept="image/*" class="form-control form-control-custom" />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-semibold text-dark-green">Ảnh bìa (Banner URL)</label>
+                                <input type="text" name="bannerUrl" value="@Model.BannerUrl" class="form-control form-control-custom" placeholder="URL ảnh bìa" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-semibold text-dark-green">Lời chào ngắn trên trang cá nhân</label>
+                                <input type="text" name="greetingMessage" value="@Model.GreetingMessage" class="form-control form-control-custom" placeholder="Nhập lời chào..." />
+                            </div>
+                        </div>
+
+                        <!-- Lời giới thiệu (Bio) -->
+                        <div class="mb-4">
+                            <label class="form-label small fw-bold text-dark-green mb-1">
+                                <i class="fa-solid fa-pen-nib text-success me-1"></i> Lời giới thiệu bản thân (Bio / About Me)
+                            </label>
+                            <div class="text-muted small mb-2" style="font-size: 0.78rem;">
+                                Nhập hoặc chỉnh sửa đoạn giới thiệu về bản thân, lịch stream, cấu hình máy... Nội dung sẽ hiển thị trực tiếp trên trang cá nhân cho Viewer xem.
+                            </div>
+                            <input type="hidden" name="bio" id="streamerBioHiddenInput" value="@Model.Bio" />
+                            <div id="streamerBioEditor"></div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-dark-green flex-grow-1 py-3 rounded-pill fw-bold fs-6 shadow-sm">
+                                <i class="fa-solid fa-floppy-disk me-2"></i> LƯU THÔNG TIN &amp; LỜI GIỚI THIỆU (BIO)
+                            </button>
+                            <a href="/Streamer/Config" class="btn btn-outline-success py-3 px-4 rounded-pill fw-semibold" title="Cấu hình ngân hàng & mạng xã hội">
+                                <i class="fa-solid fa-sliders"></i>
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            }
+            else
+            {
+                <!-- TRONG TÀI KHOẢN VIEWER & ADMIN (HOẶC KHÁCH): Giữ nguyên Form Gửi Donate -->
+                <div class="card card-custom p-4 bg-white border-0 shadow-sm">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold text-dark-green mb-0">
+                            <i class="fa-solid fa-heart text-danger me-2"></i> GỬI DONATE
+                        </h5>
+                        <span class="badge bg-light-green text-dark-green border px-3 py-2">
+                            Tối thiểu: <strong class="text-success">@Model.MinDonateAmount.ToString("N0") VNĐ</strong>
+                        </span>
+                    </div>
+
+                    <form asp-action="Donate" asp-controller="Streamer" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="Slug" />
+                        <input type="hidden" asp-for="StreamerProfileId" />
+
+                        <!-- Tên người ủng hộ -->
+                        <div class="mb-3">
+                            <label asp-for="DonorName" class="form-label small fw-semibold text-dark-green">Tên của bạn / Biệt danh</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-user"></i></span>
+                                <input asp-for="DonorName" class="form-control" placeholder="Nhập tên hiển thị trên màn hình livestream" required />
+                            </div>
+                            <span asp-validation-for="DonorName" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Số tiền donate -->
+                        <div class="mb-3">
+                            <label asp-for="Amount" class="form-label small fw-semibold text-dark-green">Số tiền Donate (VNĐ)</label>
+                            <div class="input-group mb-2">
+                                <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-coins text-warning"></i></span>
+                                <input asp-for="Amount" id="donateAmountInput" type="number" step="1000" min="@Model.MinDonateAmount" class="form-control fw-bold text-success fs-5" required />
+                                <span class="input-group-text bg-light-green text-dark-green fw-bold">VNĐ</span>
+                            </div>
+                            <span asp-validation-for="Amount" class="text-danger small"></span>
+
+                            <!-- Các nút chọn tiền nhanh -->
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <button type="button" class="quick-amount-btn" onclick="setAmount(10000)">10.000đ</button>
+                                <button type="button" class="quick-amount-btn" onclick="setAmount(20000)">20.000đ</button>
+                                <button type="button" class="quick-amount-btn" onclick="setAmount(50000)">50.000đ</button>
+                                <button type="button" class="quick-amount-btn" onclick="setAmount(100000)">100.000đ</button>
+                                <button type="button" class="quick-amount-btn" onclick="setAmount(200000)">200.000đ</button>
+                                <button type="button" class="quick-amount-btn" onclick="setAmount(500000)">500.000đ</button>
+                            </div>
+                        </div>
+
+                        <!-- Lời nhắn -->
+                        <div class="mb-4">
+                            <label asp-for="Message" class="form-label small fw-semibold text-dark-green">Lời nhắn gửi Streamer (Text-to-Speech)</label>
+                            <textarea asp-for="Message" class="form-control" rows="3" placeholder="Gửi lời nhắn động viên, bài hát yêu cầu hoặc lời chúc..."></textarea>
+                            <span asp-validation-for="Message" class="text-danger small"></span>
+                        </div>
+
+                        <!-- ========================================================================= -->
+                        <!-- [CHỈNH SỬA & MỚI THÊM]: Phương thức thanh toán cho Viewer (Chỉ để 2 phương thức) -->
+                        <!-- 1. Donate từ số dư có sẵn trong tài khoản (PaymentMethod = 1)              -->
+                        <!-- 2. Chuyển khoản ngân hàng kèm mã QR thanh toán động (PaymentMethod = 2)     -->
+                        <!-- ========================================================================= -->
+                        <div class="mb-4">
+                            <label class="form-label small fw-semibold text-dark-green mb-2">Phương thức thanh toán</label>
+                            <div class="row g-2">
+                                <!-- Phương thức 1: Donate từ số dư có sẵn trong tài khoản -->
+                                <div class="col-12 col-md-6">
+                                    <label class="payment-method-card w-100 mb-0" for="paymentWalletRadio">
+                                        <input type="radio" asp-for="PaymentMethod" id="paymentWalletRadio" value="1" class="form-check-input mt-0" onchange="handlePaymentMethodChange()" />
+                                        <div>
+                                            <div class="small fw-semibold text-dark-green">
+                                                <i class="fa-solid fa-wallet text-success me-1"></i> Số dư tài khoản
+                                            </div>
+                                            <div class="text-muted" style="font-size: 0.72rem;">
+                                                Số dư có sẵn: <strong class="text-success">@Model.CurrentWalletBalance.ToString("N0") VNĐ</strong>
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <!-- Phương thức 2: Chuyển khoản ngân hàng (Quét mã QR) -->
+                                <div class="col-12 col-md-6">
+                                    <label class="payment-method-card w-100 mb-0" for="paymentBankRadio">
+                                        <input type="radio" asp-for="PaymentMethod" id="paymentBankRadio" value="2" class="form-check-input mt-0" onchange="handlePaymentMethodChange()" />
+                                        <div>
+                                            <div class="small fw-semibold text-dark-green">
+                                                <i class="fa-solid fa-building-columns text-primary me-1"></i> Chuyển khoản ngân hàng
+                                            </div>
+                                            <div class="text-muted" style="font-size: 0.72rem;">
+                                                Quét mã QR (Tự động điền số tiền & nội dung)
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                            <span asp-validation-for="PaymentMethod" class="text-danger small"></span>
+
+                            <!-- [MỚI THÊM]: Thông báo trạng thái số dư khi chọn Donate từ số dư tài khoản -->
+                            <div id="walletPaymentInfoBox" class="mt-3 p-3 rounded-3 bg-light-green border border-success border-opacity-25">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="small text-dark-green">
+                                        <i class="fa-solid fa-circle-check text-success me-1"></i> Trừ trực tiếp từ số dư tài khoản của bạn:
+                                    </span>
+                                    <strong class="text-success">@Model.CurrentWalletBalance.ToString("N0") VNĐ</strong>
+                                </div>
+                                <div id="walletInsufficientWarning" class="small text-danger mt-1 d-none">
+                                    <i class="fa-solid fa-triangle-exclamation me-1"></i> Số dư hiện tại không đủ cho mức Donate này. Vui lòng nạp thêm hoặc chọn <strong>Chuyển khoản ngân hàng</strong>.
+                                </div>
+                            </div>
+
+                            <!-- [MỚI THÊM]: Khối hiển thị Mã QR thanh toán động ngay trong Form khi chọn Chuyển khoản ngân hàng -->
+                            <div id="bankQrPaymentBox" class="mt-3 p-3 rounded-3 bg-light border border-primary border-opacity-25 d-none">
+                                <div class="row align-items-center g-3">
+                                    <div class="col-12 col-sm-5 text-center">
+                                        <div class="bg-white p-2 rounded-3 border shadow-sm d-inline-block">
+                                            <img id="inlineGeneratedQrImg"
+                                                 src="@(!string.IsNullOrEmpty(Model.GeneratedQrBase64) ? Model.GeneratedQrBase64 : Model.PaymentQrUrl)"
+                                                 alt="Mã QR Thanh toán chứa số tiền và nội dung chuyển khoản"
+                                                 class="img-fluid rounded-2"
+                                                 style="max-width: 170px;" />
+                                        </div>
+                                        <div class="small text-primary fw-semibold mt-1" style="font-size: 0.75rem;">
+                                            <i class="fa-solid fa-qrcode me-1"></i> Quét mã để thanh toán
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-sm-7">
+                                        <div class="small fw-bold text-dark-green mb-2">
+                                            <i class="fa-solid fa-file-invoice-dollar text-primary me-1"></i> Thông tin mã QR đã tạo:
+                                        </div>
+                                        <div class="small mb-1">
+                                            <span class="text-muted">Ngân hàng:</span>
+                                            <strong class="text-dark-green">@(string.IsNullOrEmpty(Model.BankName) ? "MB Bank" : Model.BankName)</strong>
+                                        </div>
+                                        <div class="small mb-1">
+                                            <span class="text-muted">Số tài khoản:</span>
+                                            <strong class="text-dark-green">@(string.IsNullOrEmpty(Model.BankAccountNumber) ? "0987654321" : Model.BankAccountNumber)</strong>
+                                        </div>
+                                        <div class="small mb-1">
+                                            <span class="text-muted">Chủ TK:</span>
+                                            <strong class="text-dark-green">@(string.IsNullOrEmpty(Model.BankAccountName) ? Model.DisplayName.ToUpper() : Model.BankAccountName)</strong>
+                                        </div>
+                                        <div class="small mb-1">
+                                            <span class="text-muted">Số tiền trong QR:</span>
+                                            <strong id="inlineQrAmountText" class="text-danger fs-6">@Model.Amount.ToString("N0") VNĐ</strong>
+                                        </div>
+                                        <div class="small">
+                                            <span class="text-muted d-block">Nội dung chuyển khoản trong QR:</span>
+                                            <code id="inlineQrContentText" class="bg-white px-2 py-1 rounded border text-success fw-bold d-block mt-1">@Model.TransferContent</code>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Nút Submit -->
+                        @if (Model.IsActive)
+                        {
+                            <button type="submit" id="submitDonateBtn" class="btn btn-dark-green w-100 py-3 rounded-pill fw-bold fs-6 shadow-sm">
+                                <i class="fa-solid fa-paper-plane me-2"></i> ỦNG HỘ NGAY (@Model.DisplayName)
+                            </button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-secondary w-100 py-3 rounded-pill fw-bold fs-6 shadow-sm" disabled>
+                                <i class="fa-solid fa-lock me-2"></i> KÊNH ĐANG BỊ KHÓA - KHÔNG THỂ GỬI DONATE
+                            </button>
+                        }
+                    </form>
+                </div>
+            }
+        </div>
+
+        <!-- Cột phải: Thông tin QR / Chuyển khoản của Streamer -->
+        <div class="col-12 col-lg-5">
+            <div class="card card-custom p-4 bg-white border-0 shadow-sm h-100 d-flex flex-column">
+                <h6 class="fw-bold text-dark-green mb-3">
+                    <i class="fa-solid fa-building-columns text-success me-2"></i> THÔNG TIN NHẬN DONATE & MÃ QR
+                </h6>
+
+                <!-- [MỚI THÊM]: Hiển thị mã QR được sinh tự động bằng QRCoder (chứa số tiền + nội dung chuyển khoản) -->
+                @if (!string.IsNullOrEmpty(Model.GeneratedQrBase64) || !string.IsNullOrEmpty(Model.PaymentQrUrl))
+                {
+                    <div class="text-center p-3 bg-light rounded-3 border mb-3">
+                        <img id="sideGeneratedQrImg"
+                             src="@(!string.IsNullOrEmpty(Model.GeneratedQrBase64) ? Model.GeneratedQrBase64 : Model.PaymentQrUrl)"
+                             alt="Mã QR nhận donate"
+                             class="img-fluid rounded-2 shadow-sm bg-white p-2 border"
+                             style="max-height: 220px;" />
+                        <div class="small text-dark-green fw-semibold mt-2">
+                            <i class="fa-solid fa-camera text-success me-1"></i> Quét mã QR để chuyển khoản nhanh
+                        </div>
+                        <div class="small text-muted" style="font-size: 0.75rem;">
+                            Mã QR tự động cập nhật theo <strong>số tiền</strong> và <strong>nội dung</strong> bạn nhập
+                        </div>
+                    </div>
+                }
+
+                <div class="bg-light-green p-3 rounded-3 border flex-grow-1">
+                    <div class="mb-2">
+                        <small class="text-muted d-block">Ngân hàng:</small>
+                        <strong class="text-dark-green">@(string.IsNullOrEmpty(Model.BankName) ? "Ngân hàng Quân Đội (MB Bank)" : Model.BankName)</strong>
+                    </div>
+                    <div class="mb-2">
+                        <small class="text-muted d-block">Số tài khoản:</small>
+                        <strong class="text-dark-green fs-5">@(string.IsNullOrEmpty(Model.BankAccountNumber) ? "0987654321" : Model.BankAccountNumber)</strong>
+                    </div>
+                    <div class="mb-2">
+                        <small class="text-muted d-block">Tên chủ tài khoản:</small>
+                        <strong class="text-dark-green">@(string.IsNullOrEmpty(Model.BankAccountName) ? Model.DisplayName.ToUpper() : Model.BankAccountName)</strong>
+                    </div>
+                    <!-- [MỚI THÊM]: Hiển thị trực quan Số tiền & Nội dung chuyển khoản đã nhúng vào QR -->
+                    <div class="mb-2">
+                        <small class="text-muted d-block">Số tiền thanh toán (trong QR):</small>
+                        <strong id="sideQrAmountText" class="text-danger fs-6">@Model.Amount.ToString("N0") VNĐ</strong>
+                    </div>
+                    <div>
+                        <small class="text-muted d-block">Nội dung chuyển khoản (trong QR):</small>
+                        <code id="sideQrContentText" class="bg-white p-1 rounded text-success fw-bold d-block">@Model.TransferContent</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Danh sách Streamer đề xuất khác -->
+    <div class="mt-5 pt-4 border-top">
+        <h6 class="fw-bold text-dark-green mb-3 text-uppercase">
+            <i class="fa-solid fa-compass text-success me-2"></i> Khám phá các Streamer khác
+        </h6>
+        <div class="row g-3">
+            <div class="col-6 col-md-3">
+                <a href="/tenstreamer" class="text-decoration-none">
+                    <div class="p-3 bg-white rounded-3 border shadow-sm d-flex align-items-center gap-3 transition">
+                        <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=HoangNam" class="rounded-circle border" width="45" height="45" />
+                        <div>
+                            <div class="fw-bold text-dark-green small">Hoàng Nam Gaming</div>
+                            <div class="text-muted small" style="font-size: 0.72rem;">@@tenstreamer</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-6 col-md-3">
+                <a href="/domixi" class="text-decoration-none">
+                    <div class="p-3 bg-white rounded-3 border shadow-sm d-flex align-items-center gap-3 transition">
+                        <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=DoMixi" class="rounded-circle border" width="45" height="45" />
+                        <div>
+                            <div class="fw-bold text-dark-green small">Độ Phùng (Mixi)</div>
+                            <div class="text-muted small" style="font-size: 0.72rem;">@@domixi</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-6 col-md-3">
+                <a href="/pewpew" class="text-decoration-none">
+                    <div class="p-3 bg-white rounded-3 border shadow-sm d-flex align-items-center gap-3 transition">
+                        <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=PewPew" class="rounded-circle border" width="45" height="45" />
+                        <div>
+                            <div class="fw-bold text-dark-green small">PewPew Channel</div>
+                            <div class="text-muted small" style="font-size: 0.72rem;">@@pewpew</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-6 col-md-3">
+                <a href="/streamer/register" class="text-decoration-none">
+                    <div class="p-3 bg-light-green rounded-3 border border-success shadow-sm d-flex align-items-center justify-content-center text-center gap-2 h-100">
+                        <i class="fa-solid fa-plus-circle text-success fs-5"></i>
+                        <span class="fw-bold text-dark-green small">Tạo kênh Streamer</span>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // =========================================================================
+    // [MỚI THÊM]: Script xử lý chọn phương thức thanh toán và tự động sinh mã QR
+    // chứa thông tin Số tiền + Nội dung chuyển khoản ngay trên giao diện Viewer
+    // =========================================================================
+    const currentWalletBalance = @Model.CurrentWalletBalance.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    const streamerSlug = '@Model.Slug';
+    let qrUpdateTimer = null;
+
+    function setAmount(val) {
+        const amountInput = document.getElementById('donateAmountInput');
+        if (amountInput) {
+            amountInput.value = val;
+        }
+        document.querySelectorAll('.quick-amount-btn').forEach(btn => btn.classList.remove('active'));
+        if (event && event.target) {
+            event.target.classList.add('active');
+        }
+        // [MỚI THÊM]: Cập nhật lại mã QR và kiểm tra số dư khi chọn mệnh giá nhanh
+        checkWalletBalance();
+        scheduleQrUpdate();
+    }
+
+    // [MỚI THÊM]: Kiểm tra số dư ví có đủ so với số tiền nhập hay không
+    function checkWalletBalance() {
+        const amountInput = document.getElementById('donateAmountInput');
+        const warningEl = document.getElementById('walletInsufficientWarning');
+        const walletRadio = document.getElementById('paymentWalletRadio');
+        if (!amountInput || !warningEl || !walletRadio) return;
+
+        const amount = parseFloat(amountInput.value) || 0;
+        if (walletRadio.checked && amount > currentWalletBalance) {
+            warningEl.classList.remove('d-none');
+        } else {
+            warningEl.classList.add('d-none');
+        }
+    }
+
+    // [MỚI THÊM]: Chuyển đổi hiển thị giữa "Số dư tài khoản" và "Chuyển khoản ngân hàng (Mã QR)"
+    function handlePaymentMethodChange() {
+        const walletRadio = document.getElementById('paymentWalletRadio');
+        const bankRadio = document.getElementById('paymentBankRadio');
+        const walletBox = document.getElementById('walletPaymentInfoBox');
+        const bankQrBox = document.getElementById('bankQrPaymentBox');
+        const submitBtn = document.getElementById('submitDonateBtn');
+
+        if (!walletRadio || !bankRadio) return;
+
+        if (bankRadio.checked) {
+            if (walletBox) walletBox.classList.add('d-none');
+            if (bankQrBox) bankQrBox.classList.remove('d-none');
+            if (submitBtn) {
+                submitBtn.innerHTML = '<i class="fa-solid fa-check-circle me-2"></i> XÁC NHẬN ĐÃ CHUYỂN KHOẢN (@Model.DisplayName)';
+            }
+            scheduleQrUpdate();
+        } else {
+            if (walletBox) walletBox.classList.remove('d-none');
+            if (bankQrBox) bankQrBox.classList.add('d-none');
+            if (submitBtn) {
+                submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane me-2"></i> ỦNG HỘ NGAY (@Model.DisplayName)';
+            }
+            checkWalletBalance();
+        }
+    }
+
+    // [MỚI THÊM]: Gọi AJAX lên Server (/Streamer/GenerateQrAjax) để tạo lại mã QR
+    // chứa thông tin Số tiền và Nội dung chuyển khoản mới nhất
+    function scheduleQrUpdate() {
+        if (qrUpdateTimer) clearTimeout(qrUpdateTimer);
+        qrUpdateTimer = setTimeout(fetchUpdatedQrCode, 300);
+    }
+
+    async function fetchUpdatedQrCode() {
+        const amountInput = document.getElementById('donateAmountInput');
+        const donorInput = document.getElementById('DonorName');
+        const messageInput = document.getElementById('Message');
+        if (!amountInput) return;
+
+        const amount = parseFloat(amountInput.value) || 0;
+        const donorName = donorInput ? donorInput.value : '';
+        const message = messageInput ? messageInput.value : '';
+
+        try {
+            const url = `/Streamer/GenerateQrAjax?slug=${encodeURIComponent(streamerSlug)}&amount=${encodeURIComponent(amount)}&donorName=${encodeURIComponent(donorName)}&message=${encodeURIComponent(message)}`;
+            const response = await fetch(url);
+            if (!response.ok) return;
+
+            const data = await response.json();
+            if (data && data.success) {
+                // Cập nhật ảnh QR trên cả khung trong Form và cột bên phải
+                const inlineImg = document.getElementById('inlineGeneratedQrImg');
+                const sideImg = document.getElementById('sideGeneratedQrImg');
+                if (inlineImg && data.qrBase64) inlineImg.src = data.qrBase64;
+                if (sideImg && data.qrBase64) sideImg.src = data.qrBase64;
+
+                // Cập nhật text số tiền và nội dung chuyển khoản
+                const inlineAmount = document.getElementById('inlineQrAmountText');
+                const sideAmount = document.getElementById('sideQrAmountText');
+                if (inlineAmount) inlineAmount.textContent = data.formattedAmount;
+                if (sideAmount) sideAmount.textContent = data.formattedAmount;
+
+                const inlineContent = document.getElementById('inlineQrContentText');
+                const sideContent = document.getElementById('sideQrContentText');
+                if (inlineContent) inlineContent.textContent = data.transferContent;
+                if (sideContent) sideContent.textContent = data.transferContent;
+            }
+        } catch (err) {
+            console.error('Lỗi khi cập nhật mã QR:', err);
+        }
+    }
+
+    // [MỚI THÊM]: Lắng nghe sự kiện thay đổi Số tiền, Tên người gửi, Lời nhắn để cập nhật QR tức thì
+    document.addEventListener('DOMContentLoaded', function () {
+        const amountInput = document.getElementById('donateAmountInput');
+        const donorInput = document.getElementById('DonorName');
+        const messageInput = document.getElementById('Message');
+
+        if (amountInput) {
+            amountInput.addEventListener('input', function () {
+                checkWalletBalance();
+                scheduleQrUpdate();
+            });
+        }
+        if (donorInput) {
+            donorInput.addEventListener('input', scheduleQrUpdate);
+        }
+        if (messageInput) {
+            messageInput.addEventListener('input', scheduleQrUpdate);
+        }
+
+        handlePaymentMethodChange();
+    });
+</script>
+
+@if (isStreamerAccount)
+{
+    <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const editorContainer = document.getElementById('streamerBioEditor');
+            const hiddenInput = document.getElementById('streamerBioHiddenInput');
+            const publicBioDisplay = document.getElementById('publicBioDisplay');
+
+            if (editorContainer && hiddenInput) {
+                const quill = new Quill('#streamerBioEditor', {
+                    theme: 'snow',
+                    placeholder: 'Nhập lời giới thiệu bản thân (Bio / About Me)...',
+                    modules: {
+                        toolbar: [
+                            [{ 'header': [2, 3, false] }],
+                            ['bold', 'italic', 'underline', 'strike'],
+                            [{ 'color': [] }],
+                            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                            ['link', 'blockquote', 'clean']
+                        ]
+                    }
+                });
+
+                if (hiddenInput.value) {
+                    quill.root.innerHTML = hiddenInput.value;
+                }
+
+                quill.on('text-change', function () {
+                    const html = quill.root.innerHTML;
+                    const isEmpty = quill.getText().trim().length === 0 && !html.includes('<img');
+                    hiddenInput.value = isEmpty ? '' : html;
+
+                    if (publicBioDisplay) {
+                        publicBioDisplay.innerHTML = isEmpty
+                            ? '<span class="text-muted fst-italic small">Chưa có lời giới thiệu bản thân.</span>'
+                            : html;
+                    }
+                });
+
+                const form = document.getElementById('streamerBioForm');
+                if (form) {
+                    form.addEventListener('submit', function () {
+                        const html = quill.root.innerHTML;
+                        const isEmpty = quill.getText().trim().length === 0 && !html.includes('<img');
+                        hiddenInput.value = isEmpty ? '' : html;
+                    });
+                }
+            }
+        });
+    </script>
+}
+

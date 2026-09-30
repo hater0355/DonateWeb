@@ -1,0 +1,266 @@
+@model DonateWeb.ViewModels.Streamer.StreamerProfileConfigViewModel
+@{
+    ViewData["Title"] = "Thông tin cá nhân Streamer";
+}
+
+<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
+<style>
+    .ql-editor { min-height: 220px; font-size: 0.95rem; }
+    .ql-toolbar.ql-snow { border-radius: 8px 8px 0 0; border-color: var(--border-color, #dee2e6); }
+    .ql-container.ql-snow { border-radius: 0 0 8px 8px; border-color: var(--border-color, #dee2e6); background: #fff; }
+    .bio-hint { font-size: 0.72rem; }
+</style>
+
+<div class="mb-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h5 class="fw-bold text-dark-green mb-0 d-flex align-items-center gap-2">
+                <span class="border-start border-3 border-success ps-2 text-uppercase">THÔNG TIN CÁ NHÂN & CẤU HÌNH KÊNH STREAMER</span>
+            </h5>
+            <small class="text-muted">Cập nhật Lời giới thiệu (Bio), Slug cá nhân, avatar, ảnh bìa và thông tin nhận Donate.</small>
+        </div>
+        <a href="/@Model.Slug" target="_blank" class="btn btn-outline-success rounded-pill px-3 py-1 small fw-semibold">
+            <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Xem trang cá nhân (/@Model.Slug)
+        </a>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success rounded-3 d-flex align-items-center gap-2 mb-4">
+        <i class="fa-solid fa-circle-check fs-5"></i>
+        <div>@TempData["SuccessMessage"]</div>
+    </div>
+}
+
+<form asp-action="Config" asp-controller="Streamer" method="post" enctype="multipart/form-data" id="configForm">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Id" />
+    <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+
+    <div class="row g-4">
+        <!-- Col 1: Thong tin kenh -->
+        <div class="col-12 col-lg-7">
+            <div class="card card-custom p-4 bg-white shadow-sm border-0 mb-4">
+                <h6 class="fw-bold text-dark-green mb-3 text-uppercase">
+                    <i class="fa-solid fa-sliders text-success me-2"></i> Thông tin hiển thị trang Donate
+                </h6>
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-6">
+                        <label asp-for="DisplayName" class="form-label small fw-semibold text-dark-green"></label>
+                        <input asp-for="DisplayName" class="form-control form-control-custom" placeholder="Ví dụ: Hoàng Nam Gaming" required />
+                        <span asp-validation-for="DisplayName" class="text-danger small"></span>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label asp-for="Slug" class="form-label small fw-semibold text-dark-green">Tên miền trang cá nhân (ID Streamer)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light-green text-dark-green small border-end-0">domain.com/</span>
+                            <input asp-for="Slug" class="form-control form-control-custom fw-bold font-monospace" readonly style="background-color: #f8fafc;" />
+                        </div>
+                        <span asp-validation-for="Slug" class="text-danger small"></span>
+                        <div class="text-muted small mt-1" style="font-size: 0.72rem;">Tên miền trang cá nhân được định danh cố định theo mã ID Streamer của bạn</div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="GreetingMessage" class="form-label small fw-semibold text-dark-green"></label>
+                    <textarea asp-for="GreetingMessage" class="form-control form-control-custom" rows="3" placeholder="Nhập lời chào người xem khi họ vào trang donate của bạn..."></textarea>
+                    <span asp-validation-for="GreetingMessage" class="text-danger small"></span>
+                </div>
+                <div class="mb-4">
+                    <label asp-for="MinDonateAmount" class="form-label small fw-semibold text-dark-green"></label>
+                    <div class="input-group" style="max-width: 320px;">
+                        <input asp-for="MinDonateAmount" type="number" step="1000" min="1000" class="form-control form-control-custom" required />
+                        <span class="input-group-text bg-light-green text-dark-green fw-bold">VNĐ</span>
+                    </div>
+                    <span asp-validation-for="MinDonateAmount" class="text-danger small"></span>
+                    <div class="text-muted small mt-1" style="font-size: 0.72rem;">Mức tối thiểu người xem có thể gửi mỗi lần Donate.</div>
+                </div>
+                <h6 class="fw-bold text-dark-green mb-3 pt-3 border-top text-uppercase">
+                    <i class="fa-regular fa-image text-success me-2"></i> Hình ảnh giao diện
+                </h6>
+                <div class="mb-3">
+                    <label asp-for="AvatarFile" class="form-label small fw-semibold text-dark-green">Ảnh đại diện (Tải lên từ máy tính)</label>
+                    <div class="d-flex align-items-center gap-3">
+                        <img id="configAvatarPreview"
+                             src="@(string.IsNullOrEmpty(Model.AvatarUrl) ? "/images/default-avatar.png" : Model.AvatarUrl)"
+                             class="rounded-circle border object-fit-cover flex-shrink-0" width="56" height="56" alt="Avatar"
+                             onerror="this.src='/images/default-avatar.png'" />
+                        <div class="w-100">
+                            <input type="file" name="avatarFile" asp-for="AvatarFile" accept="image/*" class="form-control form-control-custom"
+                                   onchange="if(this.files && this.files[0]) document.getElementById('configAvatarPreview').src = window.URL.createObjectURL(this.files[0]);" />
+                            <input type="hidden" asp-for="AvatarUrl" />
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="BannerUrl" class="form-label small fw-semibold text-dark-green"></label>
+                    <input asp-for="BannerUrl" class="form-control form-control-custom" placeholder="https://... hoặc /images/banner.jpg" />
+                </div>
+            </div>
+
+            <!-- BIO / GIOI THIEU BAN THAN -->
+            <div class="card card-custom p-4 bg-white shadow-sm border-0 mb-4">
+                <h6 class="fw-bold text-dark-green mb-1 text-uppercase">
+                    <i class="fa-solid fa-id-card text-success me-2"></i> Giới thiệu bản thân (Bio / About Me)
+                </h6>
+                <p class="text-muted small mb-3">
+                    Viết vài dòng về bản thân, kênh của bạn, lịch stream hoặc bất kỳ điều gì bạn muốn chia sẻ.
+                    Nội dung này sẽ hiển thị công khai trên trang donate của bạn.
+                </p>
+                <input type="hidden" asp-for="Bio" id="bioHiddenInput" />
+                <div id="bioQuillEditor"></div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <span class="bio-hint text-muted">
+                        <i class="fa-solid fa-circle-info me-1 text-success"></i>
+                        Hỗ trợ in đậm, in nghiêng, tiêu đề, danh sách, màu sắc và đường link.
+                    </span>
+                    <span class="text-muted bio-hint" id="bioCharCount">0 ký tự</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Col 2: Thanh toan & Mang xa hoi -->
+        <div class="col-12 col-lg-5">
+            <div class="card card-custom p-4 bg-white shadow-sm border-0 mb-4">
+                <h6 class="fw-bold text-dark-green mb-3 text-uppercase">
+                    <i class="fa-solid fa-qrcode text-success me-2"></i> Thông tin nhận tiền & QR Code
+                </h6>
+                <div class="mb-3">
+                    <label asp-for="BankName" class="form-label small fw-semibold text-dark-green"></label>
+                    <input asp-for="BankName" class="form-control form-control-custom" placeholder="Ví dụ: MB Bank, Vietcombank, Techcombank" />
+                </div>
+                <div class="mb-3">
+                    <label asp-for="BankAccountNumber" class="form-label small fw-semibold text-dark-green"></label>
+                    <input asp-for="BankAccountNumber" class="form-control form-control-custom" placeholder="Số tài khoản ngân hàng" />
+                </div>
+                <div class="mb-3">
+                    <label asp-for="BankAccountName" class="form-label small fw-semibold text-dark-green"></label>
+                    <input asp-for="BankAccountName" class="form-control form-control-custom" placeholder="Tên chủ tài khoản (in hoa không dấu)" />
+                </div>
+                <div class="mb-3">
+                    <label asp-for="PaymentQrUrl" class="form-label small fw-semibold text-dark-green"></label>
+                    <input asp-for="PaymentQrUrl" class="form-control form-control-custom" placeholder="URL hình ảnh mã VietQR hoặc MoMo" />
+                </div>
+            </div>
+
+            <div class="card card-custom p-4 bg-white shadow-sm border-0 mb-4">
+                <h6 class="fw-bold text-dark-green mb-3 text-uppercase">
+                    <i class="fa-solid fa-share-nodes text-success me-2"></i> Mạng xã hội liên kết
+                </h6>
+                <div class="mb-2">
+                    <label asp-for="YoutubeUrl" class="form-label small fw-semibold text-dark-green"></label>
+                    <input asp-for="YoutubeUrl" class="form-control form-control-custom" placeholder="https://youtube.com/c/..." />
+                </div>
+                <div class="mb-2">
+                    <label asp-for="TwitchUrl" class="form-label small fw-semibold text-dark-green"></label>
+                    <input asp-for="TwitchUrl" class="form-control form-control-custom" placeholder="https://twitch.tv/..." />
+                </div>
+                <div class="mb-2">
+                    <label asp-for="DiscordUrl" class="form-label small fw-semibold text-dark-green"></label>
+                    <input asp-for="DiscordUrl" class="form-control form-control-custom" placeholder="https://discord.gg/..." />
+                </div>
+                <div class="mb-2">
+                    <label asp-for="FacebookUrl" class="form-label small fw-semibold text-dark-green"></label>
+                    <input asp-for="FacebookUrl" class="form-control form-control-custom" placeholder="https://facebook.com/..." />
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-dark-green w-100 py-3 rounded-3 fw-bold shadow-sm text-uppercase">
+                <i class="fa-solid fa-floppy-disk me-2"></i> Lưu cấu hình trang donate
+            </button>
+        </div>
+    </div>
+</form>
+
+<!-- Danger Zone: HỦY TƯ CÁCH STREAMER -->
+<div class="card card-custom p-4 bg-white shadow-sm border border-danger-subtle rounded-3 mt-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+        <div>
+            <h6 class="fw-bold text-danger mb-1 text-uppercase d-flex align-items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation text-danger"></i> Khu vực nguy hiểm: Hủy tư cách Streamer
+            </h6>
+            <p class="text-muted small mb-0">
+                Nếu không muốn tiếp tục làm Streamer nhận donate, bạn có thể hủy kênh bất cứ lúc nào. Tài khoản của bạn sẽ trở về trạng thái <strong>Viewer</strong> và mã ID tài khoản sẽ đổi chữ số đầu tiên từ <strong>1</strong> thành <strong>9</strong>.
+            </p>
+        </div>
+        <button type="button" class="btn btn-outline-danger px-4 py-2 fw-semibold rounded-pill flex-shrink-0" data-bs-toggle="modal" data-bs-target="#cancelStreamerModal">
+            <i class="fa-solid fa-user-xmark me-1"></i> HỦY STREAMER
+        </button>
+    </div>
+</div>
+
+<!-- Modal xác nhận Hủy Streamer -->
+<div class="modal fade" id="cancelStreamerModal" tabindex="-1" aria-labelledby="cancelStreamerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form asp-action="CancelStreamer" asp-controller="Streamer" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="cancelStreamerModalLabel">
+                        <i class="fa-solid fa-triangle-exclamation me-2"></i>Xác nhận Hủy Kênh Streamer
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="alert alert-warning small border-0 d-flex gap-2 mb-3">
+                        <i class="fa-solid fa-circle-exclamation text-warning fs-5 flex-shrink-0 mt-1"></i>
+                        <div>
+                            <strong>Lưu ý quan trọng:</strong><br />
+                            Kênh Streamer <code>/@Model.Slug</code> của bạn sẽ bị đóng. Các widget OBS, cấu hình nhận donate và mục tiêu sẽ bị xóa.
+                        </div>
+                    </div>
+                    <p class="small text-muted mb-2">
+                        Tài khoản của bạn sẽ không bị mất dữ liệu số dư ví cá nhân và được chuyển về vai trò <strong>Viewer</strong>.
+                    </p>
+                    <p class="small text-dark fw-semibold mb-0">
+                        <i class="fa-solid fa-id-badge text-success me-1"></i> Mã ID của bạn sẽ tự động chuyển đổi chữ số đầu tiên từ <strong>1</strong> sang <strong>9</strong>.
+                    </p>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-danger fw-semibold">
+                        <i class="fa-solid fa-user-xmark me-1"></i> Xác nhận Hủy Kênh
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+<script>
+    var quill = new Quill('#bioQuillEditor', {
+        theme: 'snow',
+        placeholder: 'Viết giới thiệu về bản thân, kênh, lịch stream của bạn...',
+        modules: {
+            toolbar: [
+                [{ 'header': [2, 3, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ 'color': [] }, { 'background': [] }],
+                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                ['link', 'blockquote'],
+                ['clean']
+            ]
+        }
+    });
+
+    var existingBio = document.getElementById('bioHiddenInput').value;
+    if (existingBio && existingBio.trim() !== '') {
+        quill.clipboard.dangerouslyPasteHTML(existingBio);
+    }
+
+    function updateCharCount() {
+        var textLen = quill.getText().replace(/\n/g, '').trim().length;
+        document.getElementById('bioCharCount').textContent = textLen.toLocaleString('vi-VN') + ' ky tu';
+    }
+    quill.on('text-change', updateCharCount);
+    updateCharCount();
+
+    document.getElementById('configForm').addEventListener('submit', function () {
+        var html = quill.root.innerHTML;
+        document.getElementById('bioHiddenInput').value =
+            (html === '<p><br></p>' || html.trim() === '') ? '' : html;
+    });
+</script>
+}

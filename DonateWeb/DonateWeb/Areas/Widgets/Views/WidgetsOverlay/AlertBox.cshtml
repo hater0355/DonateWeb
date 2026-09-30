@@ -1,0 +1,188 @@
+@model DonateWeb.Areas.Widgets.ViewModels.AlertBoxConfigViewModel
+@{
+    Layout = "_OverlayLayout";
+}
+
+<!-- Khung chứa Alert Box hiển thị thông báo Donate trên màn hình Livestream OBS -->
+<div id="alertBoxWrapper" style="display: flex; align-items: center; justify-content: center; width: 100vw; height: 100vh;">
+    <div id="alertBoxContainer" style="display: none; text-align: center; max-width: 650px;" class="animate__animated">
+        <!-- Ảnh GIF hoặc Video WebM/MP4 hoạt ảnh -->
+        <div style="margin-bottom: 15px;">
+            <img id="alertImage" src="@Model.ImageUrl" alt="Donate Alert" style="max-height: 260px; max-width: 450px; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.7)); @(Model.MediaType == "video" ? "display: none;" : "")" />
+            <video id="alertVideo" autoplay loop muted playsinline style="max-height: 260px; max-width: 450px; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.7)); @(Model.MediaType == "video" ? "" : "display: none;")"></video>
+        </div>
+
+        <!-- Dòng tiêu đề thông báo chính -->
+        <div id="alertTitle" style="color: @Model.TextColor; font-family: '@Model.FontFamily', sans-serif; font-size: @(Model.FontSize)px; font-weight: 800; text-shadow: 2px 2px 8px #000, 0 0 16px rgba(0,0,0,0.9); line-height: 1.3;">
+            @Model.DisplayName
+        </div>
+
+        <!-- Lời nhắn của người Donate -->
+        <div id="alertMessageWrapper" style="display: none; margin-top: 12px; padding: 10px 20px; background: rgba(15, 23, 42, 0.85); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 12px; backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgba(0,0,0,0.6);">
+            <div id="alertMessageText" style="color: #f8fafc; font-family: 'Inter', sans-serif; font-size: 20px; font-weight: 500; text-shadow: 1px 1px 4px #000; word-break: break-word;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Audio Player ẩn dùng để phát âm thanh hiệu ứng -->
+<audio id="alertAudioPlayer" preload="auto"></audio>
+
+@section Scripts {
+    <script>
+        // Cấu hình ban đầu từ ViewModel
+        const streamerSlug = '@Html.Raw(Model.StreamerSlug)';
+        const defaultImageUrl = '@Html.Raw(Model.ImageUrl)';
+        const defaultSoundUrl = '@Html.Raw(Model.SoundUrl)';
+        const defaultDuration = @Model.DurationSeconds;
+        const defaultVolume = @Model.SoundVolume;
+        const defaultAnimIn = '@Html.Raw(Model.AnimationIn)';
+        const defaultAnimOut = '@Html.Raw(Model.AnimationOut)';
+
+        const alertContainer = document.getElementById('alertBoxContainer');
+        const alertImage = document.getElementById('alertImage');
+        const alertVideo = document.getElementById('alertVideo');
+        const alertTitle = document.getElementById('alertTitle');
+        const alertMessageWrapper = document.getElementById('alertMessageWrapper');
+        const alertMessageText = document.getElementById('alertMessageText');
+        const audioPlayer = document.getElementById('alertAudioPlayer');
+
+        // Hàng đợi các Alert đang chờ phát lần lượt
+        let alertQueue = [];
+        let isPlayingAlert = false;
+        let lastDonationId = 0;
+
+        // Khởi động lấy id ban đầu
+        async function initAlertState() {
+            try {
+                // Thăm dò API lần đầu để lấy lastId hiện tại, tránh phát lại toàn bộ lịch sử donate cũ khi vừa mở OBS
+                const res = await fetch('/api/widgets/recent-donations/' + encodeURIComponent(streamerSlug) + '?limit=1');
+                const json = await res.json();
+                if (json.success && json.data && json.data.length > 0) {
+                    lastDonationId = json.data[0].id;
+                }
+            } catch (err) {
+                console.error("Lỗi khởi tạo trạng thái alert:", err);
+            }
+
+            // Bắt đầu vòng lặp polling
+            pollLoop();
+        }
+
+        // Vòng lặp Polling kiểm tra donate mới hoặc Test Alert từ streamer
+        async function pollLoop() {
+            try {
+                const url = '/api/widgets/alertbox/poll/' + encodeURIComponent(streamerSlug) + '?lastId=' + lastDonationId;
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result.success) {
+                    if (result.hasAlert && result.data) {
+                        // Cập nhật lastDonationId nếu đây là donate thật
+                        if (result.data.donationId > 0) {
+                            lastDonationId = Math.max(lastDonationId, result.data.donationId);
+                        }
+
+                        // Đưa thông báo vào hàng đợi phát
+                        alertQueue.push(result.data);
+                        processQueue();
+                    }
+                }
+            } catch (err) {
+                console.log("Polling error (sẽ thử lại):", err);
+            } finally {
+                // Tiếp tục lặp sau 2.5 giây
+                setTimeout(pollLoop, 2500);
+            }
+        }
+
+        // Xử lý hàng đợi phát thông báo
+        function processQueue() {
+            if (isPlayingAlert || alertQueue.length === 0) return;
+
+            isPlayingAlert = true;
+            const currentAlert = alertQueue.shift();
+            playSingleAlert(currentAlert);
+        }
+
+        // Thực thi phát một Alert cụ thể
+        function playSingleAlert(alertData) {
+            const mediaUrl = alertData.mediaUrl || alertData.imageUrl || defaultImageUrl;
+            const soundUrl = alertData.soundUrl || defaultSoundUrl;
+            const durationSec = alertData.durationSeconds || defaultDuration;
+            const volume = typeof alertData.soundVolume === 'number' ? alertData.soundVolume : defaultVolume;
+            const animIn = alertData.animationIn || defaultAnimIn;
+            const animOut = alertData.animationOut || defaultAnimOut;
+
+            const isVideo = (alertData.mediaType === 'video') || mediaUrl.endsWith('.webm') || mediaUrl.endsWith('.mp4');
+
+            // 1. Cập nhật Media hiển thị (Video WebM/MP4 hoặc Ảnh GIF)
+            if (isVideo) {
+                alertImage.style.display = 'none';
+                alertVideo.style.display = 'inline-block';
+                alertVideo.src = mediaUrl;
+                alertVideo.currentTime = 0;
+                alertVideo.play().catch(e => console.log("Không thể tự động phát video:", e));
+            } else {
+                alertVideo.style.display = 'none';
+                alertVideo.pause();
+                alertImage.style.display = 'inline-block';
+                alertImage.src = mediaUrl;
+            }
+
+            // Cập nhật nội dung chữ
+            alertTitle.innerText = alertData.displayText || (alertData.donorName + ' vừa ủng hộ ' + alertData.formattedAmount + '!');
+            alertTitle.style.color = alertData.textColor || '#10b981';
+            alertTitle.style.fontFamily = (alertData.fontFamily || 'Inter') + ', sans-serif';
+            alertTitle.style.fontSize = (alertData.fontSize || 28) + 'px';
+
+            if (alertData.message && alertData.message.trim() !== '') {
+                alertMessageText.innerText = '"' + alertData.message.trim() + '"';
+                alertMessageWrapper.style.display = 'block';
+            } else {
+                alertMessageWrapper.style.display = 'none';
+            }
+
+            // 2. Phát âm thanh MP3
+            if (soundUrl) {
+                audioPlayer.src = soundUrl;
+                audioPlayer.volume = Math.max(0, Math.min(1, volume / 100));
+                audioPlayer.play().catch(e => console.log("Không thể tự động phát âm thanh:", e));
+            }
+
+            // 3. Đọc lời nhắn Text-to-Speech nếu được bật
+            if (alertData.isTtsEnabled && 'speechSynthesis' in window) {
+                setTimeout(() => {
+                    const textToRead = alertData.donorName + ' nói: ' + (alertData.message || 'Cảm ơn streamer!');
+                    const utterance = new SpeechSynthesisUtterance(textToRead);
+                    utterance.lang = 'vi-VN';
+                    utterance.rate = 1.0;
+                    window.speechSynthesis.speak(utterance);
+                }, 1000);
+            }
+
+            // 4. Kích hoạt hiệu ứng xuất hiện (Animation In)
+            alertContainer.className = 'animate__animated animate__' + animIn;
+            alertContainer.style.display = 'block';
+
+            // 5. Chờ hết thời gian hiển thị, kích hoạt hiệu ứng biến mất (Animation Out)
+            setTimeout(() => {
+                alertContainer.className = 'animate__animated animate__' + animOut;
+
+                setTimeout(() => {
+                    alertContainer.style.display = 'none';
+                    if (isVideo) {
+                        alertVideo.pause();
+                    }
+                    isPlayingAlert = false;
+
+                    // Tiếp tục phát thông báo kế tiếp trong hàng đợi nếu có
+                    processQueue();
+                }, 1000);
+            }, durationSec * 1000);
+        }
+
+        // Bắt đầu chạy khi tải xong trang trong OBS
+        window.addEventListener('DOMContentLoaded', initAlertState);
+    </script>
+}

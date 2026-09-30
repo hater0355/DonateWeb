@@ -1,0 +1,205 @@
+@using System.Security.Claims
+@using DonateWeb.Models.Enums
+@inject DonateWeb.Data.AppDbContext DbContext
+<!-- FILE: Views/Shared/_Header.cshtml -->
+<header class="navbar navbar-expand-lg header-custom sticky-top px-3">
+    <div class="container-fluid align-items-center">
+        <!-- Logo -->
+        <a class="navbar-brand d-flex align-items-center gap-2 fw-bold text-dark-green" href="/">
+            <i class="fa-solid fa-leaf text-primary-green"></i> ONLY FAN
+        </a>
+
+        <!-- Center Nav -->
+        <ul class="navbar-nav mx-auto flex-row gap-4 d-none d-lg-flex">
+            <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value == "/" ? "active-nav" : "text-muted")" href="/"><i class="fa-solid fa-home me-1"></i> Home</a></li>
+            <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value?.StartsWith("/Streamer/Register", StringComparison.OrdinalIgnoreCase) == true ? "active-nav" : "text-muted")" href="/Streamer/Register"><i class="fa-solid fa-video me-1"></i> New Streamer</a></li>
+            <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value?.StartsWith("/Guides") == true ? "active-nav" : "text-muted")" href="/Guides"><i class="fa-solid fa-book me-1"></i> Guides</a></li>
+            <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value?.StartsWith("/Orders") == true ? "active-nav" : "text-muted")" href="/Orders"><i class="fa-solid fa-store me-1"></i> Shop</a></li>
+        </ul>
+
+        <!-- Thanh Tìm kiếm (Search Bar) -->
+        <form asp-controller="Home" asp-action="Index" method="get" class="header-search-form d-flex align-items-center me-3" role="search">
+            <div class="input-group input-group-sm header-search-group rounded-pill">
+                <span class="input-group-text bg-transparent border-0 ps-3 pe-1 text-muted">
+                    <i class="fa-solid fa-magnifying-glass text-primary-green"></i>
+                </span>
+                <input type="text"
+                       name="keyword"
+                       value="@Context.Request.Query["keyword"]"
+                       class="form-control border-0 bg-transparent shadow-none header-search-input"
+                       placeholder="Tìm Streamer, bài viết..."
+                       aria-label="Tìm kiếm tên Streamer hoặc bài viết"
+                       autocomplete="off" />
+                @if (!string.IsNullOrWhiteSpace(Context.Request.Query["keyword"]))
+                {
+                    <a href="/" class="btn btn-sm border-0 text-muted d-flex align-items-center px-2" title="Xóa từ khóa">
+                        <i class="fa-solid fa-xmark"></i>
+                    </a>
+                }
+                <button type="submit" class="btn btn-sm btn-dark-green rounded-pill px-3 my-1 me-1 fw-semibold">
+                    Tìm
+                </button>
+            </div>
+        </form>
+
+        <!-- Right Side -->
+        <div class="d-flex align-items-center gap-3">
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                var fullName = User.FindFirst("FullName")?.Value ?? User.Identity.Name ?? "Người dùng";
+                var avatarUrl = User.FindFirst("AvatarUrl")?.Value ?? "/images/default-avatar.png";
+                var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var isAdmin = User.IsInRole(UserRoles.Admin);
+                var isStreamer = User.IsInRole(UserRoles.Streamer);
+                var isViewer = User.IsInRole(UserRoles.Viewer);
+                decimal? liveBalance = null;
+                if (int.TryParse(userIdClaim, out var uid))
+                {
+                    if (isStreamer)
+                    {
+                        var spId = DbContext.StreamerProfiles.Where(sp => sp.UserId == uid).Select(sp => (int?)sp.Id).FirstOrDefault();
+                        if (spId.HasValue)
+                        {
+                            var hasDonations = DbContext.Donations.Any(d => d.StreamerProfileId == spId.Value && d.Status == DonateWeb.Models.Enums.DonationStatus.Success);
+                            if (!hasDonations)
+                            {
+                                var uEntity = DbContext.Users.FirstOrDefault(u => u.Id == uid);
+                                if (uEntity != null && uEntity.WalletBalance != 0m)
+                                {
+                                    uEntity.WalletBalance = 0m;
+                                    DbContext.SaveChanges();
+                                }
+                                liveBalance = 0m;
+                            }
+                        }
+                    }
+                    liveBalance ??= DbContext.Users.Where(u => u.Id == uid).Select(u => (decimal?)u.WalletBalance).FirstOrDefault();
+                }
+                var walletBalance = (liveBalance ?? 0m).ToString("N0");
+                var streamerSlug = User.FindFirst("StreamerSlug")?.Value;
+                var accountId = User.FindFirst("AccountId")?.Value;
+                if (string.IsNullOrEmpty(accountId) && int.TryParse(userIdClaim, out var uident))
+                {
+                    accountId = DbContext.Users.Where(u => u.Id == uident).Select(u => u.AccountId).FirstOrDefault();
+                }
+                if (string.IsNullOrEmpty(streamerSlug) && isStreamer)
+                {
+                    streamerSlug = accountId;
+                }
+
+                <div class="wallet-badge d-flex align-items-center gap-2 px-3 py-1 rounded-pill">
+                    <i class="fa-solid fa-wallet text-success"></i>
+                    <span class="fw-bold">Ví: @walletBalance VNĐ</span>
+                    @if (isStreamer)
+                    {
+                        <a href="/Wallet/Withdraw" class="badge bg-success text-white text-decoration-none ms-1 px-2 py-1 rounded-pill" title="Rút tiền dành cho Streamer">
+                            <i class="fa-solid fa-money-bill-transfer me-1"></i>Rút tiền
+                        </a>
+                    }
+                    else if (isViewer)
+                    {
+                        <a href="/Wallet/Deposit" class="badge bg-success text-white text-decoration-none ms-1 px-2 py-1 rounded-pill" title="Nạp tiền dành cho Viewer">
+                            <i class="fa-solid fa-circle-plus me-1"></i>Nạp tiền
+                        </a>
+                    }
+                </div>
+
+                <div class="dropdown">
+                    <a href="#" class="d-flex align-items-center text-decoration-none dropdown-toggle text-dark" data-bs-toggle="dropdown">
+                        <img src="@avatarUrl" class="rounded-circle me-2 border" width="34" height="34" alt="Avatar">
+                        <span class="fw-semibold text-dark-green d-none d-md-inline-block">@fullName</span>
+                        @if (isAdmin)
+                        {
+                            <span class="badge bg-danger ms-1 small" style="font-size: 0.65rem;">Admin</span>
+                        }
+                        else if (isStreamer)
+                        {
+                            <span class="badge bg-success ms-1 small" style="font-size: 0.65rem;">Streamer</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary ms-1 small" style="font-size: 0.65rem;">Viewer</span>
+                        }
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end border-0 shadow-sm" style="min-width: 220px;">
+                        @if (!string.IsNullOrEmpty(accountId))
+                        {
+                            <li class="px-3 py-2 border-bottom bg-light">
+                                <small class="text-muted d-block fw-semibold" style="font-size: 0.68rem; letter-spacing: 0.05em;">MÃ ID TÀI KHOẢN (10 SỐ)</small>
+                                <div class="d-flex align-items-center justify-content-between gap-2 mt-1">
+                                    <span class="font-monospace fw-bold text-dark-green" style="font-size: 0.95rem; letter-spacing: 0.05em;">@accountId</span>
+                                    <span class="badge @(accountId.StartsWith("1") ? "bg-success" : "bg-primary") rounded-pill" style="font-size: 0.65rem;">
+                                        @(accountId.StartsWith("1") ? "Streamer" : "Viewer")
+                                    </span>
+                                </div>
+                            </li>
+                        }
+                        @if (!isStreamer)
+                        {
+                            <li><a class="dropdown-item" href="/Profile"><i class="fa-solid fa-user me-2 text-muted"></i>Hồ sơ cá nhân</a></li>
+                        }
+                        
+                        @if (isAdmin)
+                        {
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header text-uppercase text-danger" style="font-size: 0.7rem;"><i class="fa-solid fa-shield-halved me-1"></i> Quản trị hệ thống</h6></li>
+                            <li><a class="dropdown-item text-danger fw-semibold" href="/Admin"><i class="fa-solid fa-gauge-high me-2"></i>Trang Quản trị (Admin Panel)</a></li>
+                        }
+
+                        @if (isStreamer)
+                        {
+                            <li><h6 class="dropdown-header text-uppercase" style="font-size: 0.7rem;">Kênh Streamer &amp; Số dư</h6></li>
+                            <li><a class="dropdown-item text-success fw-semibold" href="/@(string.IsNullOrEmpty(streamerSlug) ? "Streamer/Donate" : streamerSlug)"><i class="fa-solid fa-id-card me-2"></i>Trang cá nhân (@(!string.IsNullOrEmpty(streamerSlug) ? "/" + streamerSlug : ""))</a></li>
+                            <li><a class="dropdown-item fw-semibold text-primary" href="/Wallet/Withdraw"><i class="fa-solid fa-money-bill-transfer me-2"></i>Rút tiền doanh thu</a></li>
+                            <li><a class="dropdown-item" href="/Streamer/Config"><i class="fa-solid fa-sliders me-2 text-muted"></i>Cấu hình nâng cao</a></li>
+                            <li><a class="dropdown-item" href="/Streamer/Overview"><i class="fa-solid fa-chart-line me-2 text-muted"></i>Thống kê donate</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header text-uppercase" style="font-size: 0.7rem;">Tiện ích OBS (Widgets)</h6></li>
+                            <li><a class="dropdown-item" href="/Widgets/Config/AlertBox"><i class="fa-solid fa-bell me-2 text-warning"></i>Cài đặt Alert Box OBS</a></li>
+                            <li><a class="dropdown-item" href="/Widgets/Config/Goals"><i class="fa-solid fa-bullseye me-2 text-success"></i>Mục tiêu Donate (Goal)</a></li>
+                            <li><a class="dropdown-item" href="/Widgets/Config/Leaderboard"><i class="fa-solid fa-trophy me-2 text-info"></i>Bảng xếp hạng OBS</a></li>
+                        }
+                        else
+                        {
+                            @if (isViewer)
+                            {
+                                <li><a class="dropdown-item fw-semibold text-success" href="/Wallet/Deposit"><i class="fa-solid fa-wallet me-2"></i>Nạp tiền vào ví</a></li>
+                            }
+                            @if (DbContext.StreamerProfiles.Any(sp => sp.UserId == uid && sp.ApprovalStatus == DonateWeb.Models.Enums.StreamerApprovalStatus.Pending))
+                            {
+                                <li><a class="dropdown-item text-warning fw-semibold" href="/Streamer/Register"><i class="fa-solid fa-clock me-2"></i>Đăng ký Streamer <span class="badge bg-warning text-dark ms-1 small">Chờ duyệt</span></a></li>
+                            }
+                            else
+                            {
+                                <li><a class="dropdown-item text-success" href="/Streamer/Register"><i class="fa-solid fa-video me-2"></i>Đăng ký làm Streamer</a></li>
+                            }
+                        }
+
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="/Transactions"><i class="fa-solid fa-receipt me-2 text-muted"></i>Lịch sử giao dịch</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form asp-action="Logout" asp-controller="Auth" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="dropdown-item text-danger">
+                                    <i class="fa-solid fa-right-from-bracket me-2"></i>Đăng xuất
+                                </button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            }
+            else
+            {
+                <div class="d-flex align-items-center gap-2">
+                    <a href="/Auth/Login" class="btn btn-sm btn-outline-success rounded-pill px-3 fw-semibold">
+                        <i class="fa-solid fa-right-to-bracket me-1"></i> Đăng nhập
+                    </a>
+                    <a href="/Auth/Register" class="btn btn-sm btn-dark-green rounded-pill px-3 fw-semibold">
+                        Đăng ký
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+</header>

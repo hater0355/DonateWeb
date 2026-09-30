@@ -1,0 +1,532 @@
+@model DonateWeb.Areas.Widgets.ViewModels.AlertBoxConfigViewModel
+@{
+    ViewData["Title"] = "Cài đặt Alert Box (Thông báo Donate OBS)";
+}
+
+<div class="row g-4">
+    <!-- Tiêu đề và Hướng dẫn nhanh OBS -->
+    <div class="col-12">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <h3 class="fw-bold mb-1 text-white">
+                    <i class="fa-solid fa-bell text-warning me-2"></i> Cài Đặt Alert Box Livestream
+                </h3>
+                <p class="text-secondary mb-0">
+                    Tùy biến hình ảnh GIF, âm thanh MP3, font chữ, màu sắc và hiệu ứng popup khi có người hâm mộ donate cho kênh <strong>@Model.DisplayName</strong>.
+                </p>
+            </div>
+            <div>
+                <button type="button" id="btnTriggerTestObs" class="btn btn-warning fw-bold px-4 py-2 shadow-sm rounded-pill">
+                    <i class="fa-solid fa-paper-plane me-2"></i> Bắn Alert Thử Nghiệm Lên OBS
+                </button>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show mt-3 border-0 bg-success bg-opacity-25 text-success" role="alert">
+                <i class="fa-solid fa-circle-check me-2"></i> @Model.SuccessMessage
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show mt-3 border-0 bg-danger bg-opacity-25 text-danger" role="alert">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i> @Model.ErrorMessage
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <!-- Hộp URL OBS Browser Source -->
+        <div class="widget-card p-3 mt-3 border border-warning border-opacity-50">
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-warning text-dark fw-bold">URL OBS BROWSER SOURCE</span>
+                        <small class="text-muted">Kích thước khuyên dùng: <strong>Width: 800 | Height: 600</strong></small>
+                    </div>
+                    <div class="copy-box d-flex align-items-center justify-content-between">
+                        <span class="font-monospace text-warning small text-truncate me-2" id="obsOverlayUrlText">@Model.ObsOverlayUrl</span>
+                        <button type="button" class="btn btn-sm btn-outline-warning text-nowrap" onclick="copyToClipboard('@Model.ObsOverlayUrl')">
+                            <i class="fa-regular fa-copy me-1"></i> Sao chép URL
+                        </button>
+                    </div>
+                </div>
+                <div class="col-lg-4 mt-3 mt-lg-0 text-secondary small">
+                    <i class="fa-solid fa-circle-info text-info me-1"></i>
+                    <strong>Cách dùng:</strong> Trong OBS Studio, bấm <em>Add Source (+) &rarr; Browser</em>, dán URL ở trên, đặt kích thước 800x600 px và tích vào <em>"Shutdown source when not visible"</em>.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cột trái: Form cấu hình chi tiết -->
+    <div class="col-xl-7 col-lg-6">
+        <div class="widget-card p-4">
+            <h5 class="fw-bold mb-4 pb-2 border-bottom border-secondary text-white">
+                <i class="fa-solid fa-sliders text-emerald me-2"></i> Tùy Chỉnh Giao Diện & Âm Thanh
+            </h5>
+
+            <form asp-action="AlertBox" method="post" id="alertBoxForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="StreamerProfileId" />
+                <input type="hidden" asp-for="StreamerSlug" />
+                <input type="hidden" asp-for="DisplayName" />
+                <input type="hidden" asp-for="WidgetToken" />
+
+                <!-- 1. Loại Media & Hình ảnh / GIF / Video hiển thị -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label asp-for="ImageUrl" class="form-label fw-semibold text-light mb-0">Hình ảnh GIF / Video thông báo</label>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="mediaTypeOption" id="mediaTypeImg" value="image" @(Model.MediaType == "video" ? "" : "checked") onchange="onMediaTypeChanged('image')">
+                            <label class="btn btn-outline-secondary py-0 px-2" for="mediaTypeImg"><i class="fa-regular fa-image me-1"></i> Ảnh GIF</label>
+
+                            <input type="radio" class="btn-check" name="mediaTypeOption" id="mediaTypeVid" value="video" @(Model.MediaType == "video" ? "checked" : "") onchange="onMediaTypeChanged('video')">
+                            <label class="btn btn-outline-secondary py-0 px-2" for="mediaTypeVid"><i class="fa-solid fa-video me-1"></i> Video WebM/MP4</label>
+                        </div>
+                    </div>
+                    <input type="hidden" asp-for="MediaType" id="inputMediaType" />
+
+                    <div class="input-group">
+                        <span class="input-group-text bg-dark border-secondary text-secondary" id="mediaIconSpan">
+                            <i class="fa-regular fa-image"></i>
+                        </span>
+                        <input asp-for="ImageUrl" id="inputImageUrl" class="form-control widget-input" placeholder="https://example.com/alert.gif hoặc .webm" />
+                    </div>
+                    <span asp-validation-for="ImageUrl" class="text-danger small"></span>
+
+                    <!-- Preset GIF & Video mẫu chọn nhanh -->
+                    <div class="mt-2">
+                        <div class="d-flex flex-wrap gap-1 align-items-center mb-1">
+                            <small class="text-muted me-1">GIF mẫu:</small>
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 small" onclick="setPresetGif('https://media.giphy.com/media/l41lFw057lAJQMwg0/giphy.gif')">
+                                🐱 Mèo Lắc Đầu
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 small" onclick="setPresetGif('https://media.giphy.com/media/26tOZ42Mg6pbTUPHW/giphy.gif')">
+                                🎉 Pháo Hoa Ăn Mừng
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 small" onclick="setPresetGif('https://media.giphy.com/media/12tiQSHvbauGPU/giphy.gif')">
+                                💸 Mưa Tiền Rơi
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 small" onclick="setPresetGif('https://media.giphy.com/media/artj92V8o75VPL7AeQ/giphy.gif')">
+                                🕺 Nhảy Múa Vui Vẻ
+                            </button>
+                        </div>
+                        <div class="d-flex flex-wrap gap-1 align-items-center">
+                            <small class="text-muted me-1">Video mẫu:</small>
+                            <button type="button" class="btn btn-sm btn-outline-info py-0 px-2 small" onclick="setPresetVideo('https://assets.mixkit.co/videos/preview/mixkit-fireworks-in-the-night-sky-4148-large.mp4')">
+                                🎆 Pháo Hoa Video
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info py-0 px-2 small" onclick="setPresetVideo('https://assets.mixkit.co/videos/preview/mixkit-animated-confetti-falling-down-on-a-green-screen-31518-large.mp4')">
+                                🎊 Confetti Video
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info py-0 px-2 small" onclick="setPresetVideo('https://assets.mixkit.co/videos/preview/mixkit-gold-coins-falling-on-a-black-background-42994-large.mp4')">
+                                💰 Mưa Tiền Vàng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Âm thanh thông báo MP3 -->
+                <div class="mb-4">
+                    <label asp-for="SoundUrl" class="form-label fw-semibold text-light"></label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-dark border-secondary text-secondary">
+                            <i class="fa-solid fa-volume-high"></i>
+                        </span>
+                        <input asp-for="SoundUrl" id="inputSoundUrl" class="form-control widget-input" placeholder="https://example.com/sound.mp3" />
+                        <button type="button" class="btn btn-outline-info" id="btnPreviewSound">
+                            <i class="fa-solid fa-play me-1"></i> Nghe thử
+                        </button>
+                    </div>
+                    <span asp-validation-for="SoundUrl" class="text-danger small"></span>
+
+                    <!-- Preset Âm thanh mẫu chọn nhanh -->
+                    <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
+                        <small class="text-muted me-1">Âm thanh mẫu:</small>
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="setPresetSound('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')">
+                            🔔 Ding Dong Vui Vẻ
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="setPresetSound('https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3')">
+                            💰 Tiền Xu Chiến Thắng
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="setPresetSound('https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3')">
+                            🎺 Kèn Vinh Danh
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="setPresetSound('https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3')">
+                            ✨ Ma Thuật Tinh Vân
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 3. Âm lượng & Thời gian hiển thị -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label asp-for="SoundVolume" class="form-label fw-semibold text-light d-flex justify-content-between">
+                            <span>Âm Lượng Hiệu Ứng</span>
+                            <span class="text-info fw-bold" id="volumeValueLabel">@Model.SoundVolume%</span>
+                        </label>
+                        <input type="range" asp-for="SoundVolume" class="form-range" min="0" max="100" id="rangeSoundVolume" />
+                        <span asp-validation-for="SoundVolume" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="DurationSeconds" class="form-label fw-semibold text-light d-flex justify-content-between">
+                            <span>Thời Gian Hiển Thị</span>
+                            <span class="text-warning fw-bold" id="durationValueLabel">@Model.DurationSeconds giây</span>
+                        </label>
+                        <input type="range" asp-for="DurationSeconds" class="form-range" min="3" max="30" id="rangeDurationSeconds" />
+                        <span asp-validation-for="DurationSeconds" class="text-danger small"></span>
+                    </div>
+                </div>
+
+                <!-- 4. Màu chữ, Font chữ, Cỡ chữ -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <label asp-for="TextColor" class="form-label fw-semibold text-light">Màu Chữ Thông Báo</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="color" id="pickerTextColor" class="form-control form-control-color bg-dark border-secondary" value="@Model.TextColor" style="width: 50px; height: 38px;" />
+                            <input asp-for="TextColor" id="inputTextColor" class="form-control widget-input font-monospace" />
+                        </div>
+                        <span asp-validation-for="TextColor" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-4">
+                        <label asp-for="FontFamily" class="form-label fw-semibold text-light">Phông Chữ</label>
+                        <select asp-for="FontFamily" id="selectFontFamily" class="form-select widget-input">
+                            <option value="Inter">Inter (Hiện đại & Chuẩn)</option>
+                            <option value="Montserrat">Montserrat (Mạnh mẽ)</option>
+                            <option value="Roboto">Roboto (Rõ nét)</option>
+                            <option value="Bangers">Bangers (Hoạt hình Comic)</option>
+                            <option value="Press Start 2P">Press Start 2P (Retro 8-bit)</option>
+                        </select>
+                        <span asp-validation-for="FontFamily" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-4">
+                        <label asp-for="FontSize" class="form-label fw-semibold text-light">Cỡ Chữ (px)</label>
+                        <input type="number" asp-for="FontSize" id="inputFontSize" class="form-control widget-input" min="16" max="72" />
+                        <span asp-validation-for="FontSize" class="text-danger small"></span>
+                    </div>
+                </div>
+
+                <!-- 5. Hiệu ứng Animation In & Out -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label asp-for="AnimationIn" class="form-label fw-semibold text-light">Hiệu Ứng Xuất Hiện (In)</label>
+                        <select asp-for="AnimationIn" id="selectAnimationIn" class="form-select widget-input">
+                            <option value="fadeInDown">fadeInDown (Rơi nhẹ từ trên xuống)</option>
+                            <option value="bounceIn">bounceIn (Nảy tưng tưng)</option>
+                            <option value="zoomIn">zoomIn (Phóng to ấn tượng)</option>
+                            <option value="slideInUp">slideInUp (Trượt lên từ dưới)</option>
+                            <option value="rotateIn">rotateIn (Xoay tròn vào)</option>
+                            <option value="lightSpeedInRight">lightSpeedInRight (Lướt tia chớp)</option>
+                        </select>
+                        <span asp-validation-for="AnimationIn" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="AnimationOut" class="form-label fw-semibold text-light">Hiệu Ứng Biến Mất (Out)</label>
+                        <select asp-for="AnimationOut" id="selectAnimationOut" class="form-select widget-input">
+                            <option value="fadeOutUp">fadeOutUp (Mờ dần bay lên)</option>
+                            <option value="bounceOut">bounceOut (Thu nảy biến mất)</option>
+                            <option value="zoomOut">zoomOut (Thu nhỏ mất hút)</option>
+                            <option value="slideOutDown">slideOutDown (Trượt xuống dưới)</option>
+                            <option value="rotateOut">rotateOut (Xoay tròn thoát)</option>
+                            <option value="lightSpeedOutRight">lightSpeedOutRight (Vụt biến mất nhanh)</option>
+                        </select>
+                        <span asp-validation-for="AnimationOut" class="text-danger small"></span>
+                    </div>
+                </div>
+
+                <!-- 6. Mẫu câu thông báo & Điều kiện kích hoạt -->
+                <div class="mb-4">
+                    <label asp-for="MessageTemplate" class="form-label fw-semibold text-light"></label>
+                    <input asp-for="MessageTemplate" id="inputMessageTemplate" class="form-control widget-input" placeholder="{donor} vừa ủng hộ {amount} VNĐ!" />
+                    <span asp-validation-for="MessageTemplate" class="text-danger small"></span>
+                    <small class="text-muted d-block mt-1">
+                        Sử dụng các biến giữ chỗ: <code class="text-warning">{donor}</code> = Tên người gửi, <code class="text-warning">{amount}</code> = Số tiền donate, <code class="text-warning">{message}</code> = Lời nhắn.
+                    </small>
+                </div>
+
+                <div class="row g-3 mb-4 align-items-center">
+                    <div class="col-md-6">
+                        <label asp-for="MinAmountToAlert" class="form-label fw-semibold text-light">Mức Donate Tối Thiểu Phát Alert (VNĐ)</label>
+                        <input type="number" asp-for="MinAmountToAlert" class="form-control widget-input" step="1000" min="0" />
+                        <span asp-validation-for="MinAmountToAlert" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-6 pt-3">
+                        <div class="form-check form-switch fs-5">
+                            <input class="form-check-input" type="checkbox" asp-for="IsTtsEnabled" id="checkTts" />
+                            <label class="form-check-label fs-6 text-light ms-2" for="checkTts">
+                                Đọc tin nhắn tự động (Text-To-Speech)
+                            </label>
+                        </div>
+                        <small class="text-muted d-block">Tự động dùng giọng đọc tiếng Việt trên trình duyệt OBS để đọc lời nhắn của người ủng hộ.</small>
+                    </div>
+                </div>
+
+                <!-- Nút Lưu & Khôi phục -->
+                <div class="d-flex flex-wrap gap-3 pt-3 border-top border-secondary">
+                    <button type="submit" class="btn btn-success px-4 py-2 fw-bold">
+                        <i class="fa-solid fa-floppy-disk me-2"></i> Lưu Cấu Hình Alert
+                    </button>
+                    <button type="button" id="btnLivePreviewAnimate" class="btn btn-outline-info px-4 py-2">
+                        <i class="fa-solid fa-play me-2"></i> Xem Thử Ngay Tại Đây
+                    </button>
+                    <button type="button" class="btn btn-outline-danger ms-auto" data-bs-toggle="modal" data-bs-target="#confirmResetModal">
+                        <i class="fa-solid fa-rotate-left me-1"></i> Khôi phục mặc định
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Cột phải: Khung Xem Thử Trực Tiếp (Live Preview) -->
+    <div class="col-xl-5 col-lg-6">
+        <div class="widget-card p-4 h-100 d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-white mb-0">
+                    <i class="fa-solid fa-display text-info me-2"></i> Xem Thử Trực Tiếp (Preview)
+                </h5>
+                <span class="badge bg-secondary">Mô phỏng hiển thị trên stream</span>
+            </div>
+
+            <p class="text-muted small">
+                Khung bên dưới mô phỏng chính xác những gì người xem trên livestream sẽ thấy khi có thông báo Donate xuất hiện.
+            </p>
+
+            <!-- Khung sân khấu Preview mô phỏng màn hình OBS -->
+            <div class="preview-stage flex-grow-1" id="previewContainer">
+                <div id="previewAlertBox" class="text-center p-3 animate__animated">
+                    <!-- Ảnh GIF hoặc Video WebM/MP4 -->
+                    <div class="mb-3">
+                        <img id="previewImage" src="@Model.ImageUrl" alt="Alert GIF" style="max-height: 180px; max-width: 280px; object-fit: contain; border-radius: 8px; @(Model.MediaType == "video" ? "display: none;" : "")" />
+                        <video id="previewVideo" src="@(Model.MediaType == "video" ? Model.ImageUrl : "")" autoplay loop muted playsinline style="max-height: 180px; max-width: 280px; object-fit: contain; border-radius: 8px; @(Model.MediaType == "video" ? "" : "display: none;")"></video>
+                    </div>
+
+                    <!-- Dòng chữ thông báo chính -->
+                    <div id="previewTitle" class="fw-bold text-break text-shadow" style="color: @Model.TextColor; font-family: '@Model.FontFamily', sans-serif; font-size: @(Model.FontSize)px; text-shadow: 2px 2px 8px rgba(0,0,0,0.8);">
+                        Người hâm mộ vừa ủng hộ 50.000 VNĐ!
+                    </div>
+
+                    <!-- Lời nhắn kèm theo -->
+                    <div id="previewMessage" class="mt-2 px-3 py-2 rounded-3 text-white small" style="background: rgba(0,0,0,0.6); max-width: 380px; margin: 0 auto; border: 1px solid rgba(255,255,255,0.2);">
+                        <i class="fa-solid fa-comment-dots text-warning me-1"></i> "Chúc streamer buổi tối live vui vẻ và nhiều may mắn nhé!"
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-3 text-center text-muted small">
+                <i class="fa-solid fa-lightbulb text-warning me-1"></i>
+                <em>Bấm nút "Xem Thử Ngay Tại Đây" để chạy thử hoạt ảnh và âm thanh ngay trên trang này.</em>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal xác nhận khôi phục mặc định -->
+<div class="modal fade" id="confirmResetModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title text-warning">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i> Xác nhận khôi phục mặc định
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Bạn có chắc chắn muốn xóa toàn bộ tùy biến và khôi phục cài đặt Alert Box về cấu hình ban đầu của hệ thống?
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <form asp-action="ResetAlertBox" method="post" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-danger">Khôi phục mặc định</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Các phần tử input điều khiển
+        const inputImageUrl = document.getElementById('inputImageUrl');
+        const inputSoundUrl = document.getElementById('inputSoundUrl');
+        const rangeVolume = document.getElementById('rangeSoundVolume');
+        const rangeDuration = document.getElementById('rangeDurationSeconds');
+        const pickerColor = document.getElementById('pickerTextColor');
+        const inputColor = document.getElementById('inputTextColor');
+        const selectFont = document.getElementById('selectFontFamily');
+        const inputFontSize = document.getElementById('inputFontSize');
+        const selectAnimIn = document.getElementById('selectAnimationIn');
+        const selectAnimOut = document.getElementById('selectAnimationOut');
+        const inputTemplate = document.getElementById('inputMessageTemplate');
+
+        // Các phần tử hiển thị Preview
+        const previewAlertBox = document.getElementById('previewAlertBox');
+        const previewImage = document.getElementById('previewImage');
+        const previewVideo = document.getElementById('previewVideo');
+        const previewTitle = document.getElementById('previewTitle');
+        const volumeValueLabel = document.getElementById('volumeValueLabel');
+        const durationValueLabel = document.getElementById('durationValueLabel');
+        const inputMediaType = document.getElementById('inputMediaType');
+
+        let audioPlayer = new Audio();
+
+        // Xử lý chuyển đổi Loại Media (Ảnh GIF vs Video)
+        function onMediaTypeChanged(type) {
+            inputMediaType.value = type;
+            const iconSpan = document.getElementById('mediaIconSpan');
+            if (iconSpan) {
+                iconSpan.innerHTML = type === 'video' ? '<i class="fa-solid fa-video"></i>' : '<i class="fa-regular fa-image"></i>';
+            }
+            updateLivePreview();
+        }
+
+        // Đồng bộ thời gian thực vào Live Preview
+        function updateLivePreview() {
+            const url = (inputImageUrl.value || '').trim();
+            const isVideo = inputMediaType.value === 'video' || url.endsWith('.webm') || url.endsWith('.mp4');
+
+            if (isVideo) {
+                previewImage.style.display = 'none';
+                previewVideo.style.display = 'inline-block';
+                if (previewVideo.src !== url && url) {
+                    previewVideo.src = url;
+                    previewVideo.load();
+                    previewVideo.play().catch(() => {});
+                }
+            } else {
+                previewVideo.style.display = 'none';
+                previewVideo.pause();
+                previewImage.style.display = 'inline-block';
+                previewImage.src = url || 'https://media.giphy.com/media/l41lFw057lAJQMwg0/giphy.gif';
+            }
+            
+            const template = inputTemplate.value || '{donor} vừa ủng hộ {amount} VNĐ!';
+            previewTitle.innerText = template
+                .replace('{donor}', 'Người hâm mộ')
+                .replace('{amount}', '50.000')
+                .replace('{message}', 'Chúc streamer buổi tối live vui vẻ!');
+
+            previewTitle.style.color = inputColor.value;
+            previewTitle.style.fontFamily = selectFont.value + ', sans-serif';
+            previewTitle.style.fontSize = (inputFontSize.value || 28) + 'px';
+        }
+
+        // Lắng nghe sự kiện thay đổi input
+        inputImageUrl.addEventListener('input', updateLivePreview);
+        inputTemplate.addEventListener('input', updateLivePreview);
+        selectFont.addEventListener('change', updateLivePreview);
+        inputFontSize.addEventListener('input', updateLivePreview);
+
+        pickerColor.addEventListener('input', function () {
+            inputColor.value = pickerColor.value;
+            updateLivePreview();
+        });
+
+        inputColor.addEventListener('input', function () {
+            pickerColor.value = inputColor.value;
+            updateLivePreview();
+        });
+
+        rangeVolume.addEventListener('input', function () {
+            volumeValueLabel.innerText = rangeVolume.value + '%';
+        });
+
+        rangeDuration.addEventListener('input', function () {
+            durationValueLabel.innerText = rangeDuration.value + ' giây';
+        });
+
+        // Chọn nhanh Preset GIF
+        function setPresetGif(url) {
+            document.getElementById('mediaTypeImg').checked = true;
+            onMediaTypeChanged('image');
+            inputImageUrl.value = url;
+            updateLivePreview();
+        }
+
+        // Chọn nhanh Preset Video
+        function setPresetVideo(url) {
+            document.getElementById('mediaTypeVid').checked = true;
+            onMediaTypeChanged('video');
+            inputImageUrl.value = url;
+            updateLivePreview();
+        }
+
+        // Chọn nhanh Preset Sound
+        function setPresetSound(url) {
+            inputSoundUrl.value = url;
+            playPreviewSound(url);
+        }
+
+        // Phát thử âm thanh
+        function playPreviewSound(url) {
+            const soundToPlay = url || inputSoundUrl.value;
+            if (!soundToPlay) return;
+
+            audioPlayer.pause();
+            audioPlayer.src = soundToPlay;
+            audioPlayer.volume = Math.max(0, Math.min(1, rangeVolume.value / 100));
+            audioPlayer.play().catch(err => console.log("Audio play error:", err));
+        }
+
+        document.getElementById('btnPreviewSound').addEventListener('click', function () {
+            playPreviewSound();
+        });
+
+        // Chạy thử hoạt ảnh Preview
+        document.getElementById('btnLivePreviewAnimate').addEventListener('click', function () {
+            runPreviewAnimation();
+        });
+
+        function runPreviewAnimation() {
+            updateLivePreview();
+            playPreviewSound();
+
+            const animIn = selectAnimIn.value || 'fadeInDown';
+            const animOut = selectAnimOut.value || 'fadeOutUp';
+            const durationSec = parseInt(rangeDuration.value) || 6;
+
+            previewAlertBox.className = 'text-center p-3 animate__animated animate__' + animIn;
+            previewAlertBox.style.display = 'block';
+
+            // Sau thời gian hiển thị, chạy animation out
+            setTimeout(() => {
+                previewAlertBox.className = 'text-center p-3 animate__animated animate__' + animOut;
+                setTimeout(() => {
+                    previewAlertBox.className = 'text-center p-3 animate__animated animate__' + animIn;
+                }, 1000);
+            }, durationSec * 1000);
+        }
+
+        // Nút Bắn Test Alert lên OBS qua AJAX
+        document.getElementById('btnTriggerTestObs').addEventListener('click', async function () {
+            const btn = this;
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Đang bắn Alert...';
+
+            try {
+                const response = await fetch('/Widgets/Config/TriggerTestAlert', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert('Đã gửi Test Alert thành công! Hãy kiểm tra cửa sổ OBS Studio của bạn.');
+                } else {
+                    alert('Thông báo: ' + (result.message || 'Không thể gửi test alert'));
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Có lỗi xảy ra khi gọi API bắn alert.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        });
+
+        // Khởi động cập nhật preview ban đầu
+        updateLivePreview();
+    </script>
+}

@@ -1,0 +1,36 @@
+@{
+    ViewData["Title"] = "Từ chối truy cập";
+}
+
+<div class="d-flex justify-content-center align-items-center py-5">
+    <div class="card border-0 shadow-lg text-center p-5" style="max-width: 560px; width: 100%; border-radius: 16px; background-color: var(--bg-color);">
+        <div class="mb-4">
+            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger bg-opacity-10 text-danger" style="width: 80px; height: 80px;">
+                <i class="fa-solid fa-shield-halved fs-1"></i>
+            </div>
+        </div>
+
+        <h4 class="fw-bold text-dark-green mb-2">Truy Cập Bị Từ Chối (403)</h4>
+        <p class="text-muted mb-4">
+            Tài khoản của bạn hiện tại không có quyền truy cập vào phân hệ hoặc trang này.
+        </p>
+
+        <div class="d-flex justify-content-center gap-3 flex-wrap">
+            <a href="/" class="btn btn-dark-green rounded-pill px-4 fw-semibold">
+                <i class="fa-solid fa-house me-1"></i> Về Trang chủ
+            </a>
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <a href="/Profile" class="btn btn-outline-success rounded-pill px-4 fw-semibold">
+                    <i class="fa-solid fa-user me-1"></i> Hồ sơ của tôi
+                </a>
+            }
+            else
+            {
+                <a href="/Auth/Login" class="btn btn-outline-success rounded-pill px-4 fw-semibold">
+                    <i class="fa-solid fa-right-to-bracket me-1"></i> Đăng nhập
+                </a>
+            }
+        </div>
+    </div>
+</div>

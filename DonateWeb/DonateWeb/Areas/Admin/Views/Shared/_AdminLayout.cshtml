@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Trung tâm Quản trị Admin | ONLY FAN</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Font Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN để vẽ biểu đồ dòng tiền -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --admin-dark: #0f172a;
+            --admin-sidebar: #1e293b;
+            --admin-primary: #10b981;
+            --admin-primary-hover: #059669;
+            --admin-danger: #ef4444;
+            --admin-warning: #f59e0b;
+            --admin-info: #3b82f6;
+            --admin-card-bg: #ffffff;
+            --admin-border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* Sidebar Admin */
+        .admin-sidebar {
+            width: 260px;
+            min-height: 100vh;
+            background-color: var(--admin-sidebar);
+            color: #f8fafc;
+            transition: all 0.3s;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+        }
+
+        .admin-brand {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            font-size: 1.2rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #ffffff;
+            text-decoration: none;
+        }
+
+        .admin-nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0.85rem 1.5rem;
+            color: #94a3b8;
+            font-weight: 500;
+            font-size: 0.92rem;
+            text-decoration: none;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .admin-nav-link:hover {
+            color: #ffffff;
+            background-color: rgba(255,255,255,0.05);
+        }
+
+        .admin-nav-link.active {
+            color: #ffffff;
+            background-color: rgba(16, 185, 129, 0.12);
+            border-left-color: var(--admin-primary);
+            font-weight: 600;
+        }
+
+        .admin-nav-link i {
+            font-size: 1.1rem;
+            width: 22px;
+            text-align: center;
+        }
+
+        /* Content Area */
+        .admin-main-wrapper {
+            margin-left: 260px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .admin-header {
+            height: 70px;
+            background-color: #ffffff;
+            border-bottom: 1px solid var(--admin-border);
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 900;
+        }
+
+        .admin-content {
+            padding: 2rem;
+            flex-grow: 1;
+        }
+
+        /* Metric KPI Cards */
+        .stat-card {
+            background-color: var(--admin-card-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--admin-border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.05);
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+        }
+
+        .badge-dispute {
+            background-color: #f3e8ff;
+            color: #9333ea;
+            border: 1px solid #d8b4fe;
+        }
+
+        .badge-refund {
+            background-color: #f1f5f9;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+        }
+
+        /* Responsive */
+        @@media (max-width: 991px) {
+            .admin-sidebar {
+                margin-left: -260px;
+            }
+            .admin-sidebar.show {
+                margin-left: 0;
+            }
+            .admin-main-wrapper {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- SIDEBAR QUẢN TRỊ VIÊN -->
+    <aside class="admin-sidebar" id="adminSidebar">
+        <a href="/Admin" class="admin-brand">
+            <i class="fa-solid fa-shield-halved text-success"></i>
+            <span>ONLY FAN <span class="badge bg-danger ms-1" style="font-size: 0.65rem;">ADMIN</span></span>
+        </a>
+
+        <div class="px-3 py-2 text-uppercase text-muted small fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">
+            Nghiệp vụ Quản trị
+        </div>
+
+        <nav class="d-flex flex-column gap-1">
+            <!-- 1. Giám sát dòng tiền -->
+            <a href="/Admin" class="admin-nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "Index" ? "active" : "")">
+                <i class="fa-solid fa-chart-line text-success"></i>
+                <span>Giám sát dòng tiền</span>
+            </a>
+
+            <!-- 2. Quản lý trạng thái Streamer -->
+            <a href="/Admin/Streamers" class="admin-nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "Streamers" ? "active" : "")">
+                <i class="fa-solid fa-headset text-info"></i>
+                <span>Quản lý Streamer</span>
+            </a>
+
+            <!-- 3. Tra cứu log & Khiếu nại giao dịch -->
+            <a href="/Admin/Transactions" class="admin-nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "Transactions" || ViewContext.RouteData.Values["action"]?.ToString() == "TransactionDetail" ? "active" : "")">
+                <i class="fa-solid fa-file-shield text-warning"></i>
+                <span>Log & Khiếu nại (Dispute)</span>
+            </a>
+        </nav>
+
+        <div class="px-3 py-2 mt-4 text-uppercase text-muted small fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">
+            Điều hướng
+        </div>
+
+        <nav class="d-flex flex-column gap-1">
+            <a href="/" class="admin-nav-link" target="_blank">
+                <i class="fa-solid fa-globe text-primary"></i>
+                <span>Xem Website Donate</span>
+                <i class="fa-solid fa-arrow-up-right-from-square ms-auto small text-muted"></i>
+            </a>
+            <a href="/Profile" class="admin-nav-link">
+                <i class="fa-solid fa-user-gear"></i>
+                <span>Hồ sơ Admin</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- KHUNG NỘI DUNG CHÍNH (MAIN WRAPPER) -->
+    <div class="admin-main-wrapper">
+        <!-- TOP HEADER -->
+        <header class="admin-header">
+            <div class="d-flex align-items-center gap-3">
+                <button class="btn btn-sm btn-outline-secondary d-lg-none" id="toggleSidebarBtn">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <h5 class="mb-0 fw-bold text-dark">@ViewData["Title"]</h5>
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+                <div class="d-none d-md-flex align-items-center gap-2 px-3 py-1 bg-light rounded-pill border">
+                    <span class="badge bg-success rounded-circle p-1"> </span>
+                    <span class="small fw-semibold text-secondary">Hệ thống: Trực tuyến</span>
+                </div>
+
+                <div class="dropdown">
+                    <a href="#" class="d-flex align-items-center text-decoration-none dropdown-toggle text-dark" data-bs-toggle="dropdown">
+                        <img src="https://api.dicebear.com/7.x/bottts/svg?seed=Admin" class="rounded-circle border me-2" width="36" height="36" alt="Admin">
+                        <span class="fw-semibold small d-none d-md-inline">@User.Identity?.Name (Quản Trị Viên)</span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                        <li><a class="dropdown-item" href="/Profile"><i class="fa-solid fa-user me-2 text-muted"></i>Tài khoản</a></li>
+                        <li><a class="dropdown-item" href="/"><i class="fa-solid fa-house me-2 text-muted"></i>Về trang chủ</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form asp-area="" asp-action="Logout" asp-controller="Auth" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="dropdown-item text-danger">
+                                    <i class="fa-solid fa-right-from-bracket me-2"></i>Đăng xuất
+                                </button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </header>
+
+        <!-- NỘI DUNG VIEW CON (RENDER BODY) -->
+        <main class="admin-content">
+            <!-- Thông báo thành công / thất bại -->
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2 border-0 shadow-sm" role="alert">
+                    <i class="fa-solid fa-circle-check fs-5"></i>
+                    <div>@TempData["SuccessMessage"]</div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+
+            @if (TempData["ErrorMessage"] != null)
+            {
+                <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center gap-2 border-0 shadow-sm" role="alert">
+                    <i class="fa-solid fa-triangle-exclamation fs-5"></i>
+                    <div>@TempData["ErrorMessage"]</div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+
+            @RenderBody()
+        </main>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Toggle Sidebar trên màn hình di động
+        const toggleBtn = document.getElementById('toggleSidebarBtn');
+        const sidebar = document.getElementById('adminSidebar');
+        if (toggleBtn && sidebar) {
+            toggleBtn.addEventListener('click', () => {
+                sidebar.classList.toggle('show');
+            });
+        }
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

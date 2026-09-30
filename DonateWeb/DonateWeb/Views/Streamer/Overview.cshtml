@@ -1,0 +1,260 @@
+@using DonateWeb.Models.Entities
+@using DonateWeb.Models.Enums
+@{
+    ViewData["Title"] = "Tổng quan kênh Streamer";
+    var currentStreamer = ViewBag.Streamer as StreamerProfile;
+    var featuredStreamers = ViewBag.FeaturedStreamers as List<StreamerProfile> ?? new List<StreamerProfile>();
+    var isAdmin = User.IsInRole(UserRoles.Admin);
+    var isStreamer = currentStreamer != null;
+    var fullName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Người dùng";
+    var avatarUrl = User.FindFirst("AvatarUrl")?.Value ?? "/images/default-avatar.png";
+}
+
+<div class="row g-4 mb-4">
+    <div class="col-12 col-xl-5">
+        <div class="card card-custom h-100 p-3 d-flex flex-row align-items-center gap-3 bg-light-green shadow-sm">
+            @if (isStreamer)
+            {
+                <div class="avatar-placeholder rounded-circle overflow-hidden border border-success bg-white d-flex align-items-center justify-content-center flex-shrink-0" style="width:70px; height:70px;">
+                    @if (!string.IsNullOrEmpty(currentStreamer!.AvatarUrl) && currentStreamer.AvatarUrl != "/images/default-avatar.png")
+                    {
+                        <img src="@currentStreamer.AvatarUrl" alt="@currentStreamer.DisplayName" class="w-100 h-100 object-fit-cover" onerror="this.src='/images/default-avatar.png'" />
+                    }
+                    else
+                    {
+                        <i class="fa-solid fa-user fs-2 text-primary-green"></i>
+                    }
+                </div>
+                <div class="overflow-hidden flex-grow-1">
+                    <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                        <h6 class="mb-0 fw-bold text-dark-green fs-5 text-truncate">@currentStreamer.DisplayName</h6>
+                        @{
+                            var streamerId = currentStreamer.User?.AccountId ?? User.FindFirst("AccountId")?.Value;
+                        }
+                        @if (!string.IsNullOrEmpty(streamerId))
+                        {
+                            <span class="badge bg-success font-monospace px-2 py-1" style="font-size: 0.72rem; letter-spacing: 0.05em;" title="Mã ID Streamer">
+                                <i class="fa-solid fa-id-badge me-1"></i>ID: @streamerId
+                            </span>
+                        }
+                    </div>
+                    <small class="text-muted d-block text-truncate"><i class="fa-solid fa-link me-1"></i>Tên miền trang cá nhân: domain.com/@(currentStreamer.Slug)</small>
+                    <div class="mt-2 d-flex flex-wrap gap-1">
+                        <span class="badge bg-white text-dark-green border border-success rounded-pill px-2 py-1 small">
+                            <i class="fa-solid fa-check me-1"></i> STREAMER ĐÃ ĐĂNG KÝ
+                        </span>
+                        <span class="badge bg-success rounded-pill px-2 py-1 small">
+                            Rank #@currentStreamer.Rank
+                        </span>
+                        <span class="badge bg-light text-dark-green border rounded-pill px-2 py-1 small">
+                            Đã nhận: @currentStreamer.TotalReceived.ToString("N0") đ
+                        </span>
+                    </div>
+                </div>
+            }
+            else if (isAdmin)
+            {
+                <div class="avatar-placeholder rounded-circle overflow-hidden border border-danger bg-white d-flex align-items-center justify-content-center flex-shrink-0" style="width:70px; height:70px;">
+                    <i class="fa-solid fa-shield-halved fs-1 text-danger"></i>
+                </div>
+                <div class="overflow-hidden flex-grow-1">
+                    <h6 class="mb-0 fw-bold text-dark-green fs-5 text-truncate">@fullName</h6>
+                    <small class="text-muted d-block text-truncate">Quản trị viên toàn hệ thống</small>
+                    <div class="mt-2 d-flex flex-wrap gap-1">
+                        <span class="badge bg-danger rounded-pill px-2 py-1 small">
+                            <i class="fa-solid fa-crown me-1"></i> QUẢN TRỊ VIÊN
+                        </span>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="avatar-placeholder rounded-circle overflow-hidden border border-success bg-white d-flex align-items-center justify-content-center flex-shrink-0" style="width:70px; height:70px;">
+                    <img src="@avatarUrl" alt="@fullName" class="w-100 h-100 object-fit-cover" onerror="this.src='/images/default-avatar.png'" />
+                </div>
+                <div class="overflow-hidden flex-grow-1">
+                    <h6 class="mb-0 fw-bold text-dark-green fs-5 text-truncate">@fullName</h6>
+                    <small class="text-muted d-block text-truncate">Tài khoản Người xem (Viewer)</small>
+                    <div class="mt-2 d-flex flex-wrap gap-1">
+                        <span class="badge bg-secondary rounded-pill px-2 py-1 small">
+                            <i class="fa-solid fa-user me-1"></i> VIEWER
+                        </span>
+                        <span class="badge bg-light text-dark-green border rounded-pill px-2 py-1 small">
+                            Chưa có kênh Streamer
+                        </span>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+    <div class="col-12 col-xl-7">
+        <div class="campaign-banner rounded-3 p-4 d-flex flex-column justify-content-center h-100" style="background: linear-gradient(135deg, rgba(45,106,79,0.9), rgba(64,145,108,0.75)), #1f452f;">
+            <h3 class="text-white fw-bold mb-1">ESPORT GLORY CAMPAIGN</h3>
+            <p class="text-white-50 mb-3">Đồng hành cùng các streamer chinh phục đỉnh cao</p>
+            <div class="d-flex flex-wrap gap-2">
+                @if (isStreamer)
+                {
+                    @if (!string.IsNullOrEmpty(currentStreamer!.Slug))
+                    {
+                        <a href="/@currentStreamer.Slug" class="btn btn-sm btn-light text-dark-green fw-bold rounded-pill px-3">
+                            <i class="fa-solid fa-id-card me-1"></i> Trang cá nhân &amp; Cập nhật Bio (/@currentStreamer.Slug)
+                        </a>
+                    }
+                    <a href="/Streamer/Config" class="btn btn-sm btn-outline-light rounded-pill px-3">
+                        <i class="fa-solid fa-sliders me-1"></i> Cấu hình nâng cao
+                    </a>
+                    <button type="button" class="btn btn-sm btn-outline-danger text-white border-danger-subtle rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#overviewCancelStreamerModal" title="Hủy tư cách Streamer">
+                        <i class="fa-solid fa-user-xmark me-1"></i> Hủy Streamer
+                    </button>
+                }
+                else if (isAdmin)
+                {
+                    <a href="/Admin/Streamers" class="btn btn-sm btn-light text-danger fw-bold rounded-pill px-3">
+                        <i class="fa-solid fa-shield-halved me-1"></i> Quản lý Streamer trong Admin
+                    </a>
+                    <a href="/Streamer/Donate" class="btn btn-sm btn-outline-light rounded-pill px-3">
+                        <i class="fa-solid fa-heart me-1"></i> Xem danh sách Streamer
+                    </a>
+                }
+                else
+                {
+                    <a href="/Streamer/Register" class="btn btn-sm btn-light text-dark-green fw-bold rounded-pill px-3">
+                        <i class="fa-solid fa-video me-1"></i> Đăng ký làm Streamer
+                    </a>
+                    <a href="/Streamer/Donate" class="btn btn-sm btn-outline-light rounded-pill px-3">
+                        <i class="fa-solid fa-heart me-1"></i> Khám phá & Ủng hộ Streamer
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-bold text-dark-green mb-0">HỘI ĐỒNG KOL</h5>
+    @if (featuredStreamers.Any())
+    {
+        <span class="text-muted small">(@featuredStreamers.Count Streamer)</span>
+    }
+</div>
+
+<div class="row g-3 mb-4">
+    @if (featuredStreamers.Any())
+    {
+        @foreach (var kol in featuredStreamers)
+        {
+            <div class="col-12 col-md-4 col-lg-3">
+                <a href="/@kol.Slug" class="text-decoration-none">
+                    <div class="card card-custom p-3 bg-light-green d-flex flex-row align-items-center justify-content-between shadow-sm h-100" style="transition: 0.2s;">
+                        <div class="d-flex align-items-center gap-2 overflow-hidden">
+                            <div class="rounded-circle bg-white overflow-hidden text-secondary d-flex align-items-center justify-content-center flex-shrink-0" style="width:36px; height:36px;">
+                                @if (!string.IsNullOrEmpty(kol.AvatarUrl) && kol.AvatarUrl != "/images/default-avatar.png")
+                                {
+                                    <img src="@kol.AvatarUrl" alt="@kol.DisplayName" class="w-100 h-100 object-fit-cover" onerror="this.src='/images/default-avatar.png'" />
+                                }
+                                else
+                                {
+                                    <i class="fa-solid fa-user"></i>
+                                }
+                            </div>
+                            <div class="overflow-hidden">
+                                <div class="fw-bold text-dark-green text-truncate" style="font-size:0.9rem;">@kol.DisplayName</div>
+                                <small class="text-muted"><i class="fa-solid fa-fire text-success"></i> @kol.FollowerCount.ToString("N0")</small>
+                            </div>
+                        </div>
+                        <div class="text-success fw-bold flex-shrink-0 ms-2"><i class="fa-solid fa-leaf"></i> #@kol.Rank</div>
+                    </div>
+                </a>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="col-12">
+            <div class="card card-custom p-4 bg-white text-center text-muted">
+                <i class="fa-regular fa-folder-open fs-2 mb-2"></i>
+                <p class="mb-0 fw-medium">Chưa có Streamer nào khác trên hệ thống</p>
+            </div>
+        </div>
+    }
+</div>
+
+<h5 class="fw-bold text-dark-green mb-3">STORY</h5>
+<div class="story-container d-flex gap-3 overflow-auto pb-2 mb-4">
+    @if (featuredStreamers.Any())
+    {
+        @foreach (var st in featuredStreamers)
+        {
+            <a href="/@st.Slug" class="text-decoration-none">
+                <div class="card card-custom bg-light-green p-3 flex-shrink-0" style="width: 170px; height: 180px; transition: 0.2s;">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <div class="rounded-circle bg-white text-secondary overflow-hidden d-flex align-items-center justify-content-center flex-shrink-0" style="width:34px; height:34px;">
+                            @if (!string.IsNullOrEmpty(st.AvatarUrl) && st.AvatarUrl != "/images/default-avatar.png")
+                            {
+                                <img src="@st.AvatarUrl" alt="@st.DisplayName" class="w-100 h-100 object-fit-cover" onerror="this.src='/images/default-avatar.png'" />
+                            }
+                            else
+                            {
+                                <i class="fa-solid fa-user"></i>
+                            }
+                        </div>
+                        <div class="lh-sm overflow-hidden">
+                            <div class="fw-bold text-dark-green text-truncate" style="font-size:0.85rem;">@st.DisplayName</div>
+                            <small class="text-muted" style="font-size:0.75rem;"><i class="fa-solid fa-fire text-success"></i> @st.FollowerCount.ToString("N0")</small>
+                        </div>
+                    </div>
+                    <div class="mt-auto small text-success fw-semibold">
+                        <i class="fa-solid fa-leaf me-1"></i> Rank #@st.Rank
+                    </div>
+                </div>
+            </a>
+        }
+    }
+    else
+    {
+        <div class="w-100 p-3 card card-custom bg-white text-center text-muted">
+            <small>Chưa có Story nào cập nhật</small>
+        </div>
+    }
+</div>
+
+@if (isStreamer)
+{
+    <!-- Modal xác nhận Hủy Streamer -->
+    <div class="modal fade" id="overviewCancelStreamerModal" tabindex="-1" aria-labelledby="overviewCancelStreamerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <form asp-action="CancelStreamer" asp-controller="Streamer" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="overviewCancelStreamerModalLabel">
+                            <i class="fa-solid fa-triangle-exclamation me-2"></i>Xác nhận Hủy Kênh Streamer
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="alert alert-warning small border-0 d-flex gap-2 mb-3">
+                            <i class="fa-solid fa-circle-exclamation text-warning fs-5 flex-shrink-0 mt-1"></i>
+                            <div>
+                                <strong>Lưu ý quan trọng:</strong><br />
+                                Kênh Streamer <code>/@currentStreamer?.Slug</code> của bạn sẽ bị hủy. Các tiện ích OBS, cấu hình nhận donate và mục tiêu sẽ bị xóa.
+                            </div>
+                        </div>
+                        <p class="small text-muted mb-2">
+                            Tài khoản của bạn sẽ không bị mất và được chuyển về vai trò <strong>Viewer</strong>.
+                        </p>
+                        <p class="small text-dark fw-semibold mb-0">
+                            <i class="fa-solid fa-id-badge text-success me-1"></i> Mã ID của bạn sẽ tự động chuyển đổi chữ số đầu tiên từ <strong>1</strong> sang <strong>9</strong>.
+                        </p>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                        <button type="submit" class="btn btn-danger fw-semibold">
+                            <i class="fa-solid fa-user-xmark me-1"></i> Xác nhận Hủy Kênh
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}

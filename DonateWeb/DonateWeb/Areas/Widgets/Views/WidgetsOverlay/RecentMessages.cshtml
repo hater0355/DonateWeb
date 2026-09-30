@@ -1,0 +1,208 @@
+@model List<DonateWeb.Areas.Widgets.ViewModels.RecentDonationDto>
+@{
+    Layout = "_OverlayLayout";
+    var slug = ViewBag.StreamerSlug as string ?? "tenstreamer";
+}
+
+<style>
+    .recent-overlay-wrapper {
+        padding: 16px;
+        width: 100%;
+        max-width: 420px;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .recent-card {
+        background: rgba(15, 23, 42, 0.9);
+        border: 2px solid rgba(255, 255, 255, 0.15);
+        border-radius: 16px;
+        padding: 16px 20px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+    }
+
+    .recent-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .recent-title {
+        font-size: 17px;
+        font-weight: 800;
+        color: #10b981;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .recent-badge {
+        font-size: 11px;
+        font-weight: 700;
+        background: rgba(16, 185, 129, 0.2);
+        color: #10b981;
+        padding: 3px 8px;
+        border-radius: 8px;
+        border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    .recent-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .recent-item {
+        padding: 10px 14px;
+        background: rgba(30, 41, 59, 0.85);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        transition: all 0.3s ease;
+        animation: fadeIn 0.5s ease-out;
+    }
+
+    .recent-donor-line {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+    }
+
+    .recent-donor-name {
+        font-weight: 700;
+        font-size: 14px;
+        color: #ffffff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 180px;
+    }
+
+    .recent-amount {
+        font-weight: 800;
+        font-size: 14px;
+        color: #f59e0b;
+        white-space: nowrap;
+    }
+
+    .recent-message {
+        color: #cbd5e1;
+        font-size: 13px;
+        line-height: 1.4;
+        word-break: break-word;
+        font-style: italic;
+    }
+
+    .recent-time {
+        font-size: 11px;
+        color: #64748b;
+        text-align: right;
+        margin-top: 4px;
+    }
+
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+<!-- KHUNG OVERLAY DANH SÁCH TIN NHẮN DONATE GẦN NHẤT CHO OBS BROWSER SOURCE -->
+<div class="recent-overlay-wrapper">
+    <div class="recent-card">
+        <div class="recent-header">
+            <span class="recent-title">
+                <i class="fa-solid fa-comments"></i> TIN NHẮN GẦN NHẤT
+            </span>
+            <span class="recent-badge">TRỰC TIẾP</span>
+        </div>
+
+        <div class="recent-list" id="recentListContainer">
+            @if (Model != null && Model.Any())
+            {
+                @foreach (var item in Model)
+                {
+                    <div class="recent-item">
+                        <div class="recent-donor-line">
+                            <span class="recent-donor-name" title="@item.DonorName">
+                                <i class="fa-regular fa-user me-1 text-secondary"></i> @item.DonorName
+                            </span>
+                            <span class="recent-amount">+@item.FormattedAmount</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(item.Message))
+                        {
+                            <div class="recent-message">
+                                "@item.Message"
+                            </div>
+                        }
+                        <div class="recent-time">
+                            <i class="fa-regular fa-clock me-1"></i> @item.TimeAgo
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div style="text-align: center; color: #94a3b8; padding: 20px 0; font-size: 14px;">
+                    Chưa có tin nhắn Donate nào
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const streamerSlug = '@Html.Raw(slug)';
+        const recentContainer = document.getElementById('recentListContainer');
+
+        // Hàm cập nhật danh sách tin nhắn donate mới nhất tự động qua REST API
+        async function fetchRecentDonationsUpdate() {
+            if (!streamerSlug) return;
+
+            try {
+                const response = await fetch('/api/widgets/recent-donations/' + encodeURIComponent(streamerSlug) + '?limit=5');
+                const res = await response.json();
+
+                if (res.success && res.data && res.data.length > 0) {
+                    let html = '';
+                    res.data.forEach(item => {
+                        const messageHtml = item.message && item.message.trim() !== '' 
+                            ? `<div class="recent-message">"${escapeHtml(item.message)}"</div>`
+                            : '';
+
+                        html += `
+                            <div class="recent-item">
+                                <div class="recent-donor-line">
+                                    <span class="recent-donor-name" title="${escapeHtml(item.donorName)}">
+                                        <i class="fa-regular fa-user me-1 text-secondary"></i> ${escapeHtml(item.donorName)}
+                                    </span>
+                                    <span class="recent-amount">+${item.formattedAmount}</span>
+                                </div>
+                                ${messageHtml}
+                                <div class="recent-time">
+                                    <i class="fa-regular fa-clock me-1"></i> ${item.timeAgo}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    recentContainer.innerHTML = html;
+                }
+            } catch (err) {
+                console.log("Lỗi polling tin nhắn gần nhất:", err);
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+
+        // Tự động kiểm tra và làm mới danh sách tin nhắn mỗi 6 giây
+        setInterval(fetchRecentDonationsUpdate, 6000);
+    </script>
+}
