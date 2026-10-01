@@ -303,7 +303,7 @@
                             <button type="submit" class="btn btn-dark-green flex-grow-1 py-3 rounded-pill fw-bold fs-6 shadow-sm">
                                 <i class="fa-solid fa-floppy-disk me-2"></i> LƯU THÔNG TIN &amp; LỜI GIỚI THIỆU (BIO)
                             </button>
-                            <a href="/Streamer/Config" class="btn btn-outline-success py-3 px-4 rounded-pill fw-semibold" title="Cấu hình ngân hàng & mạng xã hội">
+                            <a href="/Streamer/Config" class="btn btn-outline-success py-3 px-4 rounded-pill fw-semibold" title="Cấu hình mã QR & mạng xã hội">
                                 <i class="fa-solid fa-sliders"></i>
                             </a>
                         </div>
@@ -436,27 +436,20 @@
                                     </div>
                                     <div class="col-12 col-sm-7">
                                         <div class="small fw-bold text-dark-green mb-2">
-                                            <i class="fa-solid fa-file-invoice-dollar text-primary me-1"></i> Thông tin mã QR đã tạo:
+                                            <i class="fa-solid fa-qrcode text-primary me-1"></i> Quét mã QR để ủng hộ:
                                         </div>
-                                        <div class="small mb-1">
-                                            <span class="text-muted">Ngân hàng:</span>
-                                            <strong class="text-dark-green">@(string.IsNullOrEmpty(Model.BankName) ? "MB Bank" : Model.BankName)</strong>
-                                        </div>
-                                        <div class="small mb-1">
-                                            <span class="text-muted">Số tài khoản:</span>
-                                            <strong class="text-dark-green">@(string.IsNullOrEmpty(Model.BankAccountNumber) ? "0987654321" : Model.BankAccountNumber)</strong>
-                                        </div>
-                                        <div class="small mb-1">
-                                            <span class="text-muted">Chủ TK:</span>
-                                            <strong class="text-dark-green">@(string.IsNullOrEmpty(Model.BankAccountName) ? Model.DisplayName.ToUpper() : Model.BankAccountName)</strong>
-                                        </div>
-                                        <div class="small mb-1">
-                                            <span class="text-muted">Số tiền trong QR:</span>
-                                            <strong id="inlineQrAmountText" class="text-danger fs-6">@Model.Amount.ToString("N0") VNĐ</strong>
+                                        <div class="small mb-2">
+                                            <span class="text-muted">Số tiền thanh toán:</span>
+                                            <strong id="inlineQrAmountText" class="text-danger fs-6 ms-1">@Model.Amount.ToString("N0") VNĐ</strong>
                                         </div>
                                         <div class="small">
-                                            <span class="text-muted d-block">Nội dung chuyển khoản trong QR:</span>
-                                            <code id="inlineQrContentText" class="bg-white px-2 py-1 rounded border text-success fw-bold d-block mt-1">@Model.TransferContent</code>
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <span class="text-muted">Nội dung chuyển khoản (bắt buộc):</span>
+                                                <button type="button" class="btn btn-sm btn-link text-success p-0 text-decoration-none fw-semibold" style="font-size: 0.75rem;" onclick="copyTransferContent('inlineQrContentText')">
+                                                    <i class="fa-regular fa-copy me-1"></i>Sao chép
+                                                </button>
+                                            </div>
+                                            <code id="inlineQrContentText" class="bg-white px-2 py-1 rounded border text-success fw-bold d-block">@Model.TransferContent</code>
                                         </div>
                                     </div>
                                 </div>
@@ -481,52 +474,68 @@
             }
         </div>
 
-        <!-- Cột phải: Thông tin QR / Chuyển khoản của Streamer -->
+        <!-- Cột phải: Khung Mã QR Donate Streamer (Đã xóa thông tin ngân hàng, chỉ giữ lại mã QR) -->
         <div class="col-12 col-lg-5">
             <div class="card card-custom p-4 bg-white border-0 shadow-sm h-100 d-flex flex-column">
-                <h6 class="fw-bold text-dark-green mb-3">
-                    <i class="fa-solid fa-building-columns text-success me-2"></i> THÔNG TIN NHẬN DONATE & MÃ QR
-                </h6>
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h6 class="fw-bold text-dark-green mb-0 text-uppercase">
+                        <i class="fa-solid fa-qrcode text-success me-2"></i> MÃ QR DONATE
+                    </h6>
+                    <span class="badge bg-light-green text-dark-green border small">
+                        <i class="fa-solid fa-bolt text-success me-1"></i> Quét nhanh
+                    </span>
+                </div>
 
-                <!-- [MỚI THÊM]: Hiển thị mã QR được sinh tự động bằng QRCoder (chứa số tiền + nội dung chuyển khoản) -->
-                @if (!string.IsNullOrEmpty(Model.GeneratedQrBase64) || !string.IsNullOrEmpty(Model.PaymentQrUrl))
-                {
-                    <div class="text-center p-3 bg-light rounded-3 border mb-3">
+                <!-- Khung hiển thị Mã QR chính -->
+                <div class="text-center p-3 bg-light rounded-3 border mb-3">
+                    <div class="bg-white p-2 rounded-3 border shadow-sm d-inline-block position-relative">
+                        @{
+                            var qrSource = !string.IsNullOrEmpty(Model.PaymentQrUrl) 
+                                ? Model.PaymentQrUrl 
+                                : (!string.IsNullOrEmpty(Model.GeneratedQrBase64) ? Model.GeneratedQrBase64 : null);
+                        }
                         <img id="sideGeneratedQrImg"
-                             src="@(!string.IsNullOrEmpty(Model.GeneratedQrBase64) ? Model.GeneratedQrBase64 : Model.PaymentQrUrl)"
-                             alt="Mã QR nhận donate"
-                             class="img-fluid rounded-2 shadow-sm bg-white p-2 border"
-                             style="max-height: 220px;" />
-                        <div class="small text-dark-green fw-semibold mt-2">
-                            <i class="fa-solid fa-camera text-success me-1"></i> Quét mã QR để chuyển khoản nhanh
-                        </div>
-                        <div class="small text-muted" style="font-size: 0.75rem;">
-                            Mã QR tự động cập nhật theo <strong>số tiền</strong> và <strong>nội dung</strong> bạn nhập
+                             src="@qrSource"
+                             alt="Mã QR nhận donate @Model.DisplayName"
+                             class="img-fluid rounded-2 @(string.IsNullOrEmpty(qrSource) ? "d-none" : "")"
+                             style="max-height: 220px; min-width: 180px; object-fit: contain;" />
+                        
+                        <div id="sideQrPlaceholder" class="p-4 d-flex flex-column align-items-center justify-content-center @(!string.IsNullOrEmpty(qrSource) ? "d-none" : "")" style="min-width: 190px; min-height: 190px;">
+                            <div class="p-3 rounded-circle bg-light-green mb-2">
+                                <i class="fa-solid fa-qrcode text-success display-4"></i>
+                            </div>
+                            <span class="fw-bold text-dark-green small">Mã QR Streamer</span>
+                            <span class="text-muted small mt-1" style="font-size: 0.75rem;">(Mã QR sẽ được cập nhật)</span>
                         </div>
                     </div>
-                }
+                    <div class="small text-dark-green fw-semibold mt-2">
+                        <i class="fa-solid fa-camera text-success me-1"></i> Quét mã QR bằng App Ngân hàng hoặc Ví điện tử
+                    </div>
+                    <div class="small text-muted" style="font-size: 0.75rem;">
+                        Hỗ trợ tất cả ứng dụng ngân hàng (VietQR) và Ví điện tử
+                    </div>
+                </div>
 
-                <div class="bg-light-green p-3 rounded-3 border flex-grow-1">
-                    <div class="mb-2">
-                        <small class="text-muted d-block">Ngân hàng:</small>
-                        <strong class="text-dark-green">@(string.IsNullOrEmpty(Model.BankName) ? "Ngân hàng Quân Đội (MB Bank)" : Model.BankName)</strong>
-                    </div>
-                    <div class="mb-2">
-                        <small class="text-muted d-block">Số tài khoản:</small>
-                        <strong class="text-dark-green fs-5">@(string.IsNullOrEmpty(Model.BankAccountNumber) ? "0987654321" : Model.BankAccountNumber)</strong>
-                    </div>
-                    <div class="mb-2">
-                        <small class="text-muted d-block">Tên chủ tài khoản:</small>
-                        <strong class="text-dark-green">@(string.IsNullOrEmpty(Model.BankAccountName) ? Model.DisplayName.ToUpper() : Model.BankAccountName)</strong>
-                    </div>
-                    <!-- [MỚI THÊM]: Hiển thị trực quan Số tiền & Nội dung chuyển khoản đã nhúng vào QR -->
-                    <div class="mb-2">
-                        <small class="text-muted d-block">Số tiền thanh toán (trong QR):</small>
-                        <strong id="sideQrAmountText" class="text-danger fs-6">@Model.Amount.ToString("N0") VNĐ</strong>
-                    </div>
+                <!-- Khung hiển thị Số tiền & Nội dung chuyển khoản cần quét -->
+                <div class="bg-light-green p-3 rounded-3 border flex-grow-1 d-flex flex-column justify-content-between">
                     <div>
-                        <small class="text-muted d-block">Nội dung chuyển khoản (trong QR):</small>
-                        <code id="sideQrContentText" class="bg-white p-1 rounded text-success fw-bold d-block">@Model.TransferContent</code>
+                        <div class="mb-3">
+                            <small class="text-muted d-block fw-semibold">Số tiền ủng hộ:</small>
+                            <strong id="sideQrAmountText" class="text-danger fs-5">@Model.Amount.ToString("N0") VNĐ</strong>
+                        </div>
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <small class="text-muted fw-semibold">Nội dung chuyển khoản (bắt buộc):</small>
+                                <button type="button" class="btn btn-sm btn-link text-success p-0 text-decoration-none fw-semibold" style="font-size: 0.78rem;" onclick="copyTransferContent('sideQrContentText')">
+                                    <i class="fa-regular fa-copy me-1"></i>Sao chép
+                                </button>
+                            </div>
+                            <code id="sideQrContentText" class="bg-white p-2 rounded text-success fw-bold d-block border">@Model.TransferContent</code>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-muted small" style="font-size: 0.75rem;">
+                        <i class="fa-solid fa-circle-info text-success me-1"></i>
+                        Vui lòng giữ đúng nội dung chuyển khoản để hệ thống tự động ghi nhận donate và phát thông báo trên livestream.
                     </div>
                 </div>
             </div>
@@ -673,12 +682,21 @@
             if (!response.ok) return;
 
             const data = await response.json();
-            if (data && data.success) {
+            if (data && (data.success || data.qrBase64)) {
                 // Cập nhật ảnh QR trên cả khung trong Form và cột bên phải
                 const inlineImg = document.getElementById('inlineGeneratedQrImg');
                 const sideImg = document.getElementById('sideGeneratedQrImg');
-                if (inlineImg && data.qrBase64) inlineImg.src = data.qrBase64;
-                if (sideImg && data.qrBase64) sideImg.src = data.qrBase64;
+                const sidePlaceholder = document.getElementById('sideQrPlaceholder');
+
+                if (inlineImg && data.qrBase64) {
+                    inlineImg.src = data.qrBase64;
+                    inlineImg.classList.remove('d-none');
+                }
+                if (sideImg && data.qrBase64) {
+                    sideImg.src = data.qrBase64;
+                    sideImg.classList.remove('d-none');
+                    if (sidePlaceholder) sidePlaceholder.classList.add('d-none');
+                }
 
                 // Cập nhật text số tiền và nội dung chuyển khoản
                 const inlineAmount = document.getElementById('inlineQrAmountText');
@@ -694,6 +712,38 @@
         } catch (err) {
             console.error('Lỗi khi cập nhật mã QR:', err);
         }
+    }
+
+    // Sao chép nội dung chuyển khoản nhanh
+    function copyTransferContent(elementId) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        const text = (el.innerText || el.textContent || '').trim();
+        if (!text) return;
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function() {
+                showCopyToast('Đã sao chép nội dung: ' + text);
+            }).catch(function() {
+                fallbackCopyText(text);
+            });
+        } else {
+            fallbackCopyText(text);
+        }
+    }
+
+    function fallbackCopyText(text) {
+        const tempInput = document.createElement('textarea');
+        tempInput.value = text;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        showCopyToast('Đã sao chép nội dung: ' + text);
+    }
+
+    function showCopyToast(msg) {
+        alert(msg);
     }
 
     // [MỚI THÊM]: Lắng nghe sự kiện thay đổi Số tiền, Tên người gửi, Lời nhắn để cập nhật QR tức thì

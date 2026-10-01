@@ -4,6 +4,35 @@ using DonateWeb.Models.Entities;
 namespace DonateWeb.ViewModels.Wallet
 {
     /// <summary>
+    /// ViewModel nhận dữ liệu yêu cầu tạo mã nạp tiền từ người dùng
+    /// </summary>
+    public class DepositRequestViewModel
+    {
+        [Required(ErrorMessage = "Vui lòng nhập số tiền muốn nạp.")]
+        [Range(10000, 500000000, ErrorMessage = "Số tiền nạp tối thiểu là 10.000 VNĐ và tối đa là 500.000.000 VNĐ.")]
+        public decimal Amount { get; set; } = 50000;
+    }
+
+    /// <summary>
+    /// ViewModel chứa thông tin chi tiết thanh toán mã VietQR động chuẩn Napas247
+    /// </summary>
+    public class DepositPaymentViewModel
+    {
+        public int TransactionId { get; set; }
+        public string TransactionCode { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public string Memo { get; set; } = string.Empty;
+        public string BankId { get; set; } = string.Empty;
+        public string BankName { get; set; } = string.Empty;
+        public string AccountNo { get; set; } = string.Empty;
+        public string AccountName { get; set; } = string.Empty;
+        public string QrUrl { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public DateTime ExpireAt { get; set; }
+        public int ExpireSeconds { get; set; } = 600; // 10 phút đếm ngược
+    }
+
+    /// <summary>
     /// ViewModel cho chức năng Nạp tiền (Deposit) dành cho Role Viewer
     /// </summary>
     public class DepositViewModel
@@ -24,6 +53,15 @@ namespace DonateWeb.ViewModels.Wallet
         public string FullName { get; set; } = string.Empty;
         public string? TransferContent { get; set; }
         public string? GeneratedQrBase64 { get; set; }
+
+        // Thông tin tài khoản thụ hưởng Admin
+        public string BankId { get; set; } = "MB";
+        public string BankName { get; set; } = "MB Bank (Ngân Hàng Quân Đội)";
+        public string AccountNo { get; set; } = "0987654321";
+        public string AccountName { get; set; } = "NGUYEN ANH HIEU";
+
+        // Thông tin chi tiết thanh toán khi đã tạo mã QR
+        public DepositPaymentViewModel? PaymentInfo { get; set; }
 
         public string? SuccessMessage { get; set; }
         public string? ErrorMessage { get; set; }

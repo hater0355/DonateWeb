@@ -72,5 +72,20 @@ namespace DonateWeb.ViewModels.Streamer
 
         [Display(Name = "Kênh Tiktok")]
         public string? TiktokUrl { get; set; }
+
+        // =========================================================================
+        // Thuộc tính phục vụ hiển thị & tải Mã QR trang cá nhân / donate của Streamer
+        // =========================================================================
+
+        /// <summary>
+        /// Đường dẫn trang donate của streamer (ví dụ: https://localhost:7111/tenstreamer hoặc https://localhost:7111/123456)
+        /// </summary>
+        [Display(Name = "Đường dẫn trang Donate")]
+        public string? DonatePageUrl { get; set; }
+
+        /// <summary>
+        /// Chuỗi Data URI Base64 PNG của mã QR trỏ đến trang Donate (để nhúng trực tiếp vào thẻ <img> và tải về)
+        /// </summary>
+        public string? QrCodeImageBase64 { get; set; }
     }
 }

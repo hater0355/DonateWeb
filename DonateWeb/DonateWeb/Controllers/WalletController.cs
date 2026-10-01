@@ -19,12 +19,18 @@ namespace DonateWeb.Controllers
         private readonly AppDbContext _context;
         private readonly IAuthService _authService;
         private readonly ILogger<WalletController> _logger;
+        private readonly IConfiguration _configuration;
 
-        public WalletController(AppDbContext context, IAuthService authService, ILogger<WalletController> logger)
+        public WalletController(
+            AppDbContext context,
+            IAuthService authService,
+            ILogger<WalletController> logger,
+            IConfiguration configuration)
         {
             _context = context;
             _authService = authService;
             _logger = logger;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -139,9 +145,25 @@ namespace DonateWeb.Controllers
         }
 
         // =========================================================================
-        // 1. CHỨC NĂNG NẠP TIỀN (DEPOSIT) DÀNH CHO ROLE VIEWER
+        // 1. CHỨC NĂNG NẠP TIỀN (DEPOSIT) DÀNH CHO ROLE VIEWER (VIETQR NAPAS247)
         // =========================================================================
 
+        /// <summary>
+        /// Lấy thông tin tài khoản ngân hàng thụ hưởng từ appsettings.json
+        /// </summary>
+        private (string BankId, string AccountNo, string AccountName, string BankName) GetBankConfig()
+        {
+            var bankId = _configuration["BankConfig:BankId"] ?? "MB";
+            var accountNo = _configuration["BankConfig:AccountNo"] ?? "0987654321";
+            var accountName = _configuration["BankConfig:AccountName"] ?? "NGUYEN ANH HIEU";
+            var bankName = _configuration["BankConfig:BankName"] ?? "MB Bank (Ngân Hàng Quân Đội)";
+            return (bankId, accountNo, accountName, bankName);
+        }
+
+        /// <summary>
+        /// GET: /Wallet/Deposit
+        /// Hiển thị form nạp tiền cho Viewer với các mốc nạp nhanh và số dư hiện tại
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> Deposit()
         {
@@ -167,18 +189,19 @@ namespace DonateWeb.Controllers
                 return RedirectToAction(nameof(Withdraw));
             }
 
-            var defaultAmount = 50000m;
-            var transferContent = $"NAPVI {user.Username.ToUpper()}";
+            var (bankId, accountNo, accountName, bankName) = GetBankConfig();
 
             var model = new DepositViewModel
             {
-                Amount = defaultAmount,
+                Amount = 50000m,
                 PaymentMethod = "Chuyển khoản ngân hàng (VietQR)",
                 CurrentBalance = user.WalletBalance,
                 Username = user.Username,
                 FullName = user.FullName,
-                TransferContent = transferContent,
-                GeneratedQrBase64 = GenerateDepositQrBase64(defaultAmount, transferContent),
+                BankId = bankId,
+                AccountNo = accountNo,
+                AccountName = accountName,
+                BankName = bankName,
                 RecentTransactions = await _context.WalletTransactions
                     .Where(wt => wt.UserId == userId && wt.TransactionType == "DEPOSIT")
                     .OrderByDescending(wt => wt.CreatedAt)
@@ -189,13 +212,17 @@ namespace DonateWeb.Controllers
             return View(model);
         }
 
+        /// <summary>
+        /// POST: /Wallet/CreateDeposit
+        /// Nhận số tiền nạp, tạo bản ghi WalletTransaction Pending, sinh mã Memo duy nhất và URL VietQR Napas247 động
+        /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Deposit(DepositViewModel model)
+        public async Task<IActionResult> CreateDeposit(DepositRequestViewModel request)
         {
             if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
             {
-                return RedirectToAction("Login", "Auth");
+                return Json(new { success = false, message = "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại." });
             }
 
             await EnsureWalletTablesExistAsync();
@@ -206,113 +233,210 @@ namespace DonateWeb.Controllers
 
             if (user == null)
             {
-                return RedirectToAction("Login", "Auth");
+                return Json(new { success = false, message = "Không tìm thấy thông tin tài khoản người dùng." });
             }
 
             if (User.IsInRole(UserRoles.Streamer) || user.StreamerProfile != null)
             {
-                TempData["ErrorMessage"] = "Chức năng Nạp tiền chỉ dành cho tài khoản Viewer.";
-                return RedirectToAction(nameof(Withdraw));
+                return Json(new { success = false, message = "Chức năng Nạp tiền chỉ dành cho tài khoản Người dùng (Viewer)." });
             }
 
-            var transferContent = $"NAPVI {user.Username.ToUpper()}";
-            model.Username = user.Username;
-            model.FullName = user.FullName;
-            model.CurrentBalance = user.WalletBalance;
-            model.TransferContent = transferContent;
-            model.GeneratedQrBase64 = GenerateDepositQrBase64(model.Amount > 0 ? model.Amount : 50000, transferContent);
-
-            // Kiểm tra logic số tiền nạp
-            if (model.Amount <= 0)
+            // Kiểm tra số tiền hợp lệ
+            if (request == null || request.Amount < 10000)
             {
-                ModelState.AddModelError(nameof(model.Amount), "Số tiền nạp phải lớn hơn 0 VNĐ.");
-            }
-            else if (model.Amount < 10000)
-            {
-                ModelState.AddModelError(nameof(model.Amount), "Số tiền nạp tối thiểu mỗi lần là 10.000 VNĐ.");
-            }
-            else if (model.Amount > 500000000)
-            {
-                ModelState.AddModelError(nameof(model.Amount), "Số tiền nạp tối đa mỗi giao dịch là 500.000.000 VNĐ.");
+                return Json(new { success = false, message = "Số tiền nạp tối thiểu mỗi lần là 10.000 VNĐ." });
             }
 
-            if (!ModelState.IsValid)
+            if (request.Amount > 500000000)
             {
-                model.ErrorMessage = ModelState[nameof(model.Amount)]?.Errors.FirstOrDefault()?.ErrorMessage
-                    ?? "Vui lòng kiểm tra lại thông tin số tiền nạp.";
-                model.RecentTransactions = await _context.WalletTransactions
-                    .Where(wt => wt.UserId == userId && wt.TransactionType == "DEPOSIT")
-                    .OrderByDescending(wt => wt.CreatedAt)
-                    .Take(10)
-                    .ToListAsync();
-                return View(model);
+                return Json(new { success = false, message = "Số tiền nạp tối đa mỗi giao dịch là 500.000.000 VNĐ." });
             }
 
-            // Sử dụng Database Transaction để đảm bảo cộng tiền vào số dư và lưu lịch sử đồng bộ, an toàn
-            await using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                var balanceBefore = user.WalletBalance;
-                user.WalletBalance += model.Amount;
-                var balanceAfter = user.WalletBalance;
-                user.UpdatedAt = DateTime.UtcNow;
-
+                // 1. Tạo TransactionCode duy nhất cho giao dịch
                 var txCode = $"DEP_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N")[..6].ToUpper()}";
 
+                // 2. Tạo bản ghi WalletTransaction với Status = 0 (Pending)
                 var walletTx = new WalletTransaction
                 {
                     UserId = user.Id,
                     TransactionCode = txCode,
                     TransactionType = "DEPOSIT",
-                    Amount = model.Amount,
-                    BalanceBefore = balanceBefore,
-                    BalanceAfter = balanceAfter,
-                    PaymentMethodName = string.IsNullOrWhiteSpace(model.PaymentMethod) ? "Chuyển khoản ngân hàng (VietQR)" : model.PaymentMethod.Trim(),
-                    Status = 1, // 1 = Thành công
-                    Note = string.IsNullOrWhiteSpace(model.Note)
-                        ? $"Nạp {model.Amount:N0} VNĐ vào ví qua {model.PaymentMethod}"
-                        : model.Note.Trim(),
+                    Amount = request.Amount,
+                    BalanceBefore = user.WalletBalance,
+                    BalanceAfter = user.WalletBalance, // Chưa cộng số dư khi ở trạng thái Chờ (Pending)
+                    PaymentMethodName = "Chuyển khoản VietQR",
+                    Status = 0, // 0 = Pending (Chờ chuyển khoản)
+                    Note = "Chờ quét mã VietQR",
                     CreatedAt = DateTime.UtcNow
                 };
 
                 _context.WalletTransactions.Add(walletTx);
                 await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
 
-                // Đồng bộ lại số dư trong Authentication Cookie để Header và toàn hệ thống cập nhật tức thì
-                await RefreshUserClaimsCookieAsync(user);
+                // 3. Sinh mã nội dung chuyển khoản duy nhất (Memo)
+                // Format chuẩn: "NAP " + TransactionId (ví dụ: "NAP 84920")
+                var memo = $"NAP {walletTx.Id}";
+                walletTx.Note = memo;
+                await _context.SaveChangesAsync();
 
-                TempData["SuccessMessage"] = $"Nạp thành công +{model.Amount:N0} VNĐ vào ví! Số dư hiện tại của bạn: {user.WalletBalance:N0} VNĐ (Mã GD: {txCode}).";
-                return RedirectToAction(nameof(Deposit));
+                // 4. Lấy thông tin tài khoản thụ hưởng từ appsettings.json
+                var (bankId, accountNo, accountName, bankName) = GetBankConfig();
+
+                // 5. URL encode đúng chuẩn RFC 3986 cho addInfo và accountName
+                var encodedMemo = Uri.EscapeDataString(memo);
+                var encodedAccountName = Uri.EscapeDataString(accountName);
+
+                // Tạo URL chuẩn img.vietqr.io với template compact2 chuyên nghiệp
+                var qrUrl = $"https://img.vietqr.io/image/{bankId}-{accountNo}-compact2.png?amount={(long)walletTx.Amount}&addInfo={encodedMemo}&accountName={encodedAccountName}";
+
+                // 6. Đóng gói dữ liệu trả về cho ViewModel
+                var paymentModel = new DepositPaymentViewModel
+                {
+                    TransactionId = walletTx.Id,
+                    TransactionCode = walletTx.TransactionCode,
+                    Amount = walletTx.Amount,
+                    Memo = memo,
+                    BankId = bankId,
+                    BankName = bankName,
+                    AccountNo = accountNo,
+                    AccountName = accountName,
+                    QrUrl = qrUrl,
+                    CreatedAt = walletTx.CreatedAt,
+                    ExpireAt = walletTx.CreatedAt.AddMinutes(10),
+                    ExpireSeconds = 600 // 10 phút đếm ngược
+                };
+
+                // Trả về JSON cho Client xử lý chuyển Bước 2 mượt mà
+                return Json(new
+                {
+                    success = true,
+                    data = paymentModel,
+                    message = "Tạo mã QR nạp tiền thành công."
+                });
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
-                _logger.LogError(ex, "Lỗi khi nạp tiền cho User ID {UserId}", userId);
-                model.ErrorMessage = "Đã xảy ra lỗi trong quá trình xử lý nạp tiền. Vui lòng thử lại.";
-                model.RecentTransactions = await _context.WalletTransactions
-                    .Where(wt => wt.UserId == userId && wt.TransactionType == "DEPOSIT")
-                    .OrderByDescending(wt => wt.CreatedAt)
-                    .Take(10)
-                    .ToListAsync();
-                return View(model);
+                _logger.LogError(ex, "Lỗi khi tạo mã QR nạp tiền cho UserId {UserId}", userId);
+                return Json(new
+                {
+                    success = false,
+                    message = "Đã xảy ra lỗi trong quá trình tạo mã QR nạp tiền. Vui lòng thử lại sau."
+                });
             }
         }
 
+        /// <summary>
+        /// GET: /Wallet/CheckDepositStatus?transactionId=...
+        /// Polling AJAX kiểm tra trạng thái giao dịch định kỳ (mỗi 3 giây)
+        /// Trả về JSON { isPaid: true/false }
+        /// </summary>
         [HttpGet]
-        public IActionResult GenerateDepositQrAjax(decimal amount)
+        public async Task<IActionResult> CheckDepositStatus(int transactionId)
         {
-            var username = User.Identity?.Name ?? "VIEWER";
-            var safeAmount = amount >= 10000 ? amount : 10000;
-            var transferContent = $"NAPVI {username.ToUpper()}";
-            var qrBase64 = GenerateDepositQrBase64(safeAmount, transferContent);
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+            {
+                return Unauthorized(new { success = false, isPaid = false, message = "Chưa đăng nhập." });
+            }
+
+            var transaction = await _context.WalletTransactions
+                .Include(wt => wt.User)
+                .FirstOrDefaultAsync(wt => wt.Id == transactionId && wt.UserId == userId);
+
+            if (transaction == null)
+            {
+                return NotFound(new { success = false, isPaid = false, message = "Không tìm thấy giao dịch nạp tiền." });
+            }
+
+            // Kiểm tra xem đơn đã quá hạn 10 phút chưa
+            var isExpired = false;
+            if (transaction.Status == 0 && DateTime.UtcNow > transaction.CreatedAt.AddMinutes(10))
+            {
+                isExpired = true;
+                transaction.Status = 2; // Failed / Expired
+                if (string.IsNullOrEmpty(transaction.Note) || !transaction.Note.Contains("[Hết hạn]"))
+                {
+                    transaction.Note = (transaction.Note ?? "") + " [Hết hạn thanh toán 10 phút]";
+                }
+                await _context.SaveChangesAsync();
+            }
+
+            var isPaid = transaction.Status == 1;
 
             return Json(new
             {
                 success = true,
-                qrBase64,
-                formattedAmount = safeAmount.ToString("N0") + " VNĐ",
-                transferContent
+                isPaid = isPaid,
+                status = transaction.Status,
+                isExpired = isExpired,
+                amount = transaction.Amount,
+                transactionCode = transaction.TransactionCode,
+                newBalance = isPaid ? transaction.User?.WalletBalance : null,
+                message = isPaid
+                    ? "Giao dịch đã được thanh toán thành công!"
+                    : (isExpired ? "Giao dịch đã hết hạn thanh toán (quá 10 phút)." : "Đang chờ thanh toán...")
+            });
+        }
+
+        /// <summary>
+        /// POST: /Wallet/SimulateSuccess?transactionId=...
+        /// Action hỗ trợ TEST / DEMO: Giả lập thanh toán thành công cho đơn đang Pending
+        /// Kích hoạt cộng tiền vào ví và cập nhật Cookie claims để kiểm tra hiệu ứng Polling
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SimulateSuccess(int transactionId)
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+            {
+                return Unauthorized(new { success = false, message = "Chưa đăng nhập." });
+            }
+
+            var tx = await _context.WalletTransactions
+                .Include(wt => wt.User)
+                .FirstOrDefaultAsync(wt => wt.Id == transactionId && wt.UserId == userId);
+
+            if (tx == null)
+            {
+                return NotFound(new { success = false, message = "Không tìm thấy giao dịch." });
+            }
+
+            if (tx.Status == 1)
+            {
+                return Json(new { success = true, isPaid = true, message = "Giao dịch này đã được thanh toán thành công." });
+            }
+
+            if (tx.Status == 2)
+            {
+                return BadRequest(new { success = false, message = "Giao dịch đã bị hết hạn hoặc hủy bỏ." });
+            }
+
+            var user = tx.User;
+            if (user == null)
+            {
+                return BadRequest(new { success = false, message = "Không tìm thấy thông tin tài khoản người dùng." });
+            }
+
+            // Tiến hành cộng tiền vào ví của người dùng
+            tx.BalanceBefore = user.WalletBalance;
+            user.WalletBalance += tx.Amount;
+            tx.BalanceAfter = user.WalletBalance;
+            tx.Status = 1; // 1 = Thành công
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            // Cập nhật lại Cookie Authentication để Header hiển thị ngay số dư mới
+            await RefreshUserClaimsCookieAsync(user);
+
+            return Json(new
+            {
+                success = true,
+                isPaid = true,
+                amount = tx.Amount,
+                newBalance = user.WalletBalance,
+                message = $"Mô phỏng thanh toán thành công! Đã nạp +{tx.Amount:N0} VNĐ vào ví tài khoản."
             });
         }
 

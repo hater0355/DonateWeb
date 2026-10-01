@@ -24,6 +24,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IStreamerService, StreamerService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IWidgetService, WidgetService>();
+builder.Services.AddScoped<IQrCodeService, QrCodeService>();
 
 // Đăng ký Phân hệ Bảo mật & Kiểm duyệt (Content Moderation, Rate Limiting & Webhook Security)
 builder.Services.AddSecurityAndModeration(builder.Configuration);

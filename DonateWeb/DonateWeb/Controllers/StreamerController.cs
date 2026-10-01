@@ -17,17 +17,20 @@ namespace DonateWeb.Controllers
         private readonly IStreamerService _streamerService;
         private readonly IAuthService _authService;
         private readonly IWebHostEnvironment _webHostEnvironment;
+        private readonly IQrCodeService _qrCodeService;
         private readonly ILogger<StreamerController> _logger;
 
         public StreamerController(
             IStreamerService streamerService,
             IAuthService authService,
             IWebHostEnvironment webHostEnvironment,
+            IQrCodeService qrCodeService,
             ILogger<StreamerController> logger)
         {
             _streamerService = streamerService;
             _authService = authService;
             _webHostEnvironment = webHostEnvironment;
+            _qrCodeService = qrCodeService;
             _logger = logger;
         }
 
@@ -88,6 +91,16 @@ namespace DonateWeb.Controllers
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
         }
 
+        /// <summary>
+        /// Tạo mã QR Code dạng chuỗi Data URI Base64 PNG từ URL trang donate hoặc bất kỳ văn bản nào
+        /// </summary>
+        /// <param name="url">Đường dẫn URL trang donate (ví dụ: https://localhost:7111/tenstreamer)</param>
+        /// <returns>Chuỗi Data URI Base64 dạng data:image/png;base64,... để gắn trực tiếp vào thẻ img</returns>
+        public string GenerateQrCodeBase64(string url)
+        {
+            return _qrCodeService.GenerateQrCodeBase64(url, 10);
+        }
+
         // =========================================================================
         // [MỚI THÊM] Hàm hỗ trợ sinh ảnh mã QR (Base64 PNG) chứa thông tin:
         // Ngân hàng, Số tài khoản, Chủ tài khoản, Số tiền (Amount) và Nội dung chuyển khoản
@@ -137,12 +150,10 @@ namespace DonateWeb.Controllers
 
             return Json(new
             {
+                success = true,
                 qrBase64,
                 transferContent,
-                formattedAmount = amount.ToString("N0") + " VNĐ",
-                bankName = string.IsNullOrWhiteSpace(streamer.BankName) ? "Ngân hàng Quân Đội (MB Bank)" : streamer.BankName,
-                bankAccountNumber = string.IsNullOrWhiteSpace(streamer.BankAccountNumber) ? "0987654321" : streamer.BankAccountNumber,
-                bankAccountName = string.IsNullOrWhiteSpace(streamer.BankAccountName) ? streamer.DisplayName.ToUpper() : streamer.BankAccountName
+                formattedAmount = amount.ToString("N0") + " VNĐ"
             });
         }
 
@@ -475,6 +486,15 @@ namespace DonateWeb.Controllers
                 return RedirectToAction("Register", "Streamer");
             }
 
+            // Xây dựng đường dẫn trang donate của streamer: https://localhost:7111/{ID hoặc Slug}
+            var scheme = Request.Scheme;
+            var host = Request.Host.Value;
+            var identifier = !string.IsNullOrWhiteSpace(streamer.Slug) ? streamer.Slug : streamer.Id.ToString();
+            var donatePageUrl = $"{scheme}://{host}/{identifier}";
+
+            // Sinh mã QR Base64 PNG chuẩn phân giải cao (Level Q) nhúng web và OBS
+            var qrCodeBase64 = GenerateQrCodeBase64(donatePageUrl);
+
             var model = new StreamerProfileConfigViewModel
             {
                 Id = streamer.Id,
@@ -493,7 +513,56 @@ namespace DonateWeb.Controllers
                 TwitchUrl = streamer.TwitchUrl,
                 DiscordUrl = streamer.DiscordUrl,
                 FacebookUrl = streamer.FacebookUrl,
-                TiktokUrl = streamer.TiktokUrl
+                TiktokUrl = streamer.TiktokUrl,
+                DonatePageUrl = donatePageUrl,
+                QrCodeImageBase64 = qrCodeBase64
+            };
+
+            return View(model);
+        }
+
+        /// <summary>
+        /// Xem thông tin chi tiết và mã QR của Streamer
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> Details(string? slug, string? id)
+        {
+            string? target = !string.IsNullOrWhiteSpace(slug) ? slug : id;
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                var currentStreamerSlug = User.FindFirst("StreamerSlug")?.Value;
+                target = currentStreamerSlug;
+            }
+
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                return RedirectToAction(nameof(Config));
+            }
+
+            var streamer = await _streamerService.GetBySlugAsync(target);
+            if (streamer == null)
+            {
+                return NotFound();
+            }
+
+            var scheme = Request.Scheme;
+            var host = Request.Host.Value;
+            var identifier = !string.IsNullOrWhiteSpace(streamer.Slug) ? streamer.Slug : streamer.Id.ToString();
+            var donatePageUrl = $"{scheme}://{host}/{identifier}";
+            var qrCodeBase64 = GenerateQrCodeBase64(donatePageUrl);
+
+            var model = new StreamerProfileConfigViewModel
+            {
+                Id = streamer.Id,
+                DisplayName = streamer.DisplayName,
+                Slug = streamer.Slug,
+                GreetingMessage = streamer.GreetingMessage,
+                Bio = streamer.Bio,
+                AvatarUrl = streamer.AvatarUrl,
+                BannerUrl = streamer.BannerUrl,
+                MinDonateAmount = streamer.MinDonateAmount,
+                DonatePageUrl = donatePageUrl,
+                QrCodeImageBase64 = qrCodeBase64
             };
 
             return View(model);

@@ -1,4 +1,132 @@
-﻿@page
-@model DonateWeb.Pages.Views.Streamer.DetailsModel
+@model DonateWeb.ViewModels.Streamer.StreamerProfileConfigViewModel
 @{
+    ViewData["Title"] = $"Mã QR Kênh Donate - {Model.DisplayName}";
+}
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6">
+            <!-- Thẻ chứa Mã QR Donate -->
+            <div class="card card-custom p-4 bg-white shadow border-0 rounded-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <img src="@(string.IsNullOrEmpty(Model.AvatarUrl) ? "/images/default-avatar.png" : Model.AvatarUrl)"
+                             alt="@Model.DisplayName"
+                             class="rounded-circle border border-2 border-success shadow-sm"
+                             style="width: 50px; height: 50px; object-fit: cover;" />
+                        <div>
+                            <h5 class="fw-bold text-dark-green mb-0">@Model.DisplayName</h5>
+                            <span class="text-muted small">ID: @Model.Slug</span>
+                        </div>
+                    </div>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill small fw-semibold">
+                        <i class="fa-solid fa-video me-1"></i> Chuẩn OBS
+                    </span>
+                </div>
+
+                <hr class="my-3 opacity-25" />
+
+                <!-- Khung hiển thị Mã QR -->
+                <div class="text-center p-4 bg-light rounded-4 border mb-3">
+                    <div class="bg-white p-3 rounded-3 border shadow-sm d-inline-block position-relative">
+                        <!-- Cách 1 (Backend QRCoder): Hiển thị chuỗi Base64 Data URI -->
+                        <img id="detailsQrImg"
+                             src="@Model.QrCodeImageBase64"
+                             alt="Mã QR Kênh Donate @Model.DisplayName"
+                             class="img-fluid rounded"
+                             style="max-width: 240px; height: auto;" />
+
+                        <!-- Cách 2 (Client-Side JS): Container render qrcode.min.js nếu cần -->
+                        <div id="clientSideDetailsQr" class="d-none"></div>
+                    </div>
+                    <div class="mt-3">
+                        <span class="badge bg-white text-dark-green border px-3 py-1 small rounded-pill">
+                            <i class="fa-solid fa-shield-halved text-success me-1"></i> Độ nét cao - ECC Level Q (25%)
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Đường link trang Donate & Nút sao chép -->
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-dark-green mb-1">
+                        <i class="fa-solid fa-link text-success me-1"></i> Đường dẫn trang donate:
+                    </label>
+                    <div class="input-group">
+                        <input type="text" id="detailsDonateUrl" class="form-control form-control-custom bg-light fw-semibold text-dark-green" value="@Model.DonatePageUrl" readonly />
+                        <button type="button" class="btn btn-outline-success px-3 fw-semibold" onclick="copyDetailsLink()" id="detailsCopyBtn" title="Sao chép liên kết">
+                            <i class="fa-regular fa-copy me-1" id="detailsCopyIcon"></i> <span id="detailsCopyText">Sao chép</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Các nút hành động chính -->
+                <div class="d-grid gap-2">
+                    <a href="@Model.QrCodeImageBase64"
+                       download="QR_Donate_@(Model.Slug).png"
+                       class="btn btn-dark-green py-3 fw-bold rounded-pill shadow-sm d-flex align-items-center justify-content-center gap-2">
+                        <i class="fa-solid fa-download fs-5"></i> Tải mã QR (File PNG cho OBS)
+                    </a>
+                    <a href="@Model.DonatePageUrl" target="_blank" class="btn btn-outline-secondary py-2 small fw-semibold rounded-pill">
+                        <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Mở trang donate trên trình duyệt
+                    </a>
+                </div>
+
+                <!-- Hướng dẫn sử dụng cho Streamer -->
+                <div class="mt-3 p-3 bg-light-green rounded-3 border border-success-subtle small text-dark-green" style="font-size: 0.8rem;">
+                    <i class="fa-solid fa-lightbulb text-warning me-1"></i>
+                    <strong>Hướng dẫn cho Streamer:</strong> Tải file ảnh PNG ở trên và chèn vào OBS Studio (nguồn <em>Image</em>) để người xem có thể quét trực tiếp từ điện thoại khi bạn đang phát trực tiếp!
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function copyDetailsLink() {
+        var input = document.getElementById('detailsDonateUrl');
+        var btn = document.getElementById('detailsCopyBtn');
+        var icon = document.getElementById('detailsCopyIcon');
+        var text = document.getElementById('detailsCopyText');
+        if (!input) return;
+
+        var url = input.value;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(function() {
+                onCopy();
+            }).catch(function() {
+                fallback(url);
+            });
+        } else {
+            fallback(url);
+        }
+
+        function onCopy() {
+            if (btn && icon && text) {
+                btn.classList.remove('btn-outline-success');
+                btn.classList.add('btn-success', 'text-white');
+                icon.className = 'fa-solid fa-check me-1';
+                text.textContent = 'Đã chép!';
+                setTimeout(function() {
+                    btn.classList.remove('btn-success', 'text-white');
+                    btn.classList.add('btn-outline-success');
+                    icon.className = 'fa-regular fa-copy me-1';
+                    text.textContent = 'Sao chép';
+                }, 2500);
+            }
+        }
+
+        function fallback(str) {
+            var temp = document.createElement('input');
+            temp.value = str;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            onCopy();
+        }
+    }
+</script>
+<!-- CDN qrcode.min.js phục vụ cách 2 (Client-side) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 }

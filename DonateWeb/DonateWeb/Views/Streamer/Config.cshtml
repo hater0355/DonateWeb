@@ -119,27 +119,118 @@
             </div>
         </div>
 
-        <!-- Col 2: Thanh toan & Mang xa hoi -->
+        <!-- Col 2: Thanh toan, Ma QR & Mang xa hoi -->
         <div class="col-12 col-lg-5">
+            <!-- ========================================================================= -->
+            <!-- KHUNG MÃ QR TRANG DONATE CỦA STREAMER (CHO OBS & QUÉT TRỰC TIẾP)          -->
+            <!-- ========================================================================= -->
             <div class="card card-custom p-4 bg-white shadow-sm border-0 mb-4">
-                <h6 class="fw-bold text-dark-green mb-3 text-uppercase">
-                    <i class="fa-solid fa-qrcode text-success me-2"></i> Thông tin nhận tiền & QR Code
-                </h6>
-                <div class="mb-3">
-                    <label asp-for="BankName" class="form-label small fw-semibold text-dark-green"></label>
-                    <input asp-for="BankName" class="form-control form-control-custom" placeholder="Ví dụ: MB Bank, Vietcombank, Techcombank" />
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <h6 class="fw-bold text-dark-green mb-0 text-uppercase">
+                        <i class="fa-solid fa-qrcode text-success me-2"></i> Mã QR Kênh Donate
+                    </h6>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 small fw-semibold">
+                        <i class="fa-solid fa-video me-1"></i> Chuẩn OBS Studio
+                    </span>
                 </div>
-                <div class="mb-3">
-                    <label asp-for="BankAccountNumber" class="form-label small fw-semibold text-dark-green"></label>
-                    <input asp-for="BankAccountNumber" class="form-control form-control-custom" placeholder="Số tài khoản ngân hàng" />
+                <p class="text-muted small mb-3">
+                    Quét mã để mở thẳng trang donate cá nhân của bạn. Bạn có thể sao chép link hoặc tải ảnh mã QR độ phân giải cao để chèn vào phần mềm livestream (OBS, Streamlabs).
+                </p>
+
+                <!-- Khung hiển thị QR code -->
+                <div class="text-center p-3 bg-light rounded-3 border mb-3">
+                    <div class="bg-white p-3 rounded-3 border shadow-sm d-inline-block position-relative">
+                        <!-- Cách 1 (Backend QRCoder): Hiển thị chuỗi Data URI Base64 dạng PNG -->
+                        <img id="streamerQrImg"
+                             src="@Model.QrCodeImageBase64"
+                             alt="Mã QR Trang Donate @Model.DisplayName"
+                             class="img-fluid rounded"
+                             style="max-width: 200px; height: auto;" />
+
+                        <!-- Cách 2 (Client-Side JS CDN qrcode.js): Vùng chứa render canvas dự phòng -->
+                        <div id="clientSideQrContainer" class="d-none"></div>
+                    </div>
+                    <div class="mt-2">
+                        <span class="badge bg-white text-dark-green border small">
+                            <i class="fa-solid fa-shield-halved text-success me-1"></i> Sửa lỗi Level Q (25%) nét cao
+                        </span>
+                    </div>
                 </div>
+
+                <!-- Hiển thị link trang donate + Nút Sao chép liên kết -->
                 <div class="mb-3">
-                    <label asp-for="BankAccountName" class="form-label small fw-semibold text-dark-green"></label>
-                    <input asp-for="BankAccountName" class="form-control form-control-custom" placeholder="Tên chủ tài khoản (in hoa không dấu)" />
+                    <label class="form-label small fw-semibold text-dark-green mb-1">
+                        <i class="fa-solid fa-link text-success me-1"></i> Đường dẫn trang donate của bạn:
+                    </label>
+                    <div class="input-group">
+                        <input type="text" id="donatePageUrlInput" class="form-control form-control-custom bg-light fw-semibold text-dark-green" value="@Model.DonatePageUrl" readonly />
+                        <button type="button" class="btn btn-outline-success px-3 fw-semibold" onclick="copyDonatePageLink()" id="copyDonateBtn" title="Sao chép liên kết">
+                            <i class="fa-regular fa-copy me-1" id="copyIcon"></i> <span id="copyText">Sao chép</span>
+                        </button>
+                    </div>
                 </div>
+
+                <!-- Các nút hành động: Tải ảnh QR (PNG) & Xem trang donate -->
+                <div class="d-grid gap-2">
+                    <a href="@Model.QrCodeImageBase64"
+                       download="QR_Donate_@(Model.Slug).png"
+                       id="downloadQrBtn"
+                       class="btn btn-dark-green py-2 fw-semibold rounded-3 shadow-sm d-flex align-items-center justify-content-center gap-2">
+                        <i class="fa-solid fa-download"></i> Tải mã QR (File PNG cho OBS)
+                    </a>
+                    <a href="@Model.DonatePageUrl" target="_blank" class="btn btn-outline-secondary py-2 small fw-semibold rounded-3">
+                        <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Mở thử trang donate của bạn
+                    </a>
+                </div>
+
+                <!-- Hướng dẫn chèn OBS -->
+                <div class="mt-3 p-2 bg-light-green rounded-2 border border-success-subtle small text-dark-green" style="font-size: 0.78rem;">
+                    <i class="fa-solid fa-lightbulb text-warning me-1"></i>
+                    <strong>Mẹo OBS:</strong> Trong OBS Studio, bấm <strong>+</strong> ở khung Sources &gt; Chọn <strong>Image (Hình ảnh)</strong> &gt; Chọn file QR vừa tải để chèn lên màn hình livestream!
+                </div>
+            </div>
+
+            <div class="card card-custom p-4 bg-white shadow-sm border-0 mb-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h6 class="fw-bold text-dark-green mb-0 text-uppercase">
+                        <i class="fa-solid fa-qrcode text-success me-2"></i> Mã QR Nhận Donate
+                    </h6>
+                    <span class="badge bg-light-green text-dark-green border small">Cấu hình QR</span>
+                </div>
+
+                <!-- Giữ ngầm thông tin ngân hàng cũ để đảm bảo dữ liệu không bị xung đột -->
+                <input type="hidden" asp-for="BankName" />
+                <input type="hidden" asp-for="BankAccountNumber" />
+                <input type="hidden" asp-for="BankAccountName" />
+
                 <div class="mb-3">
-                    <label asp-for="PaymentQrUrl" class="form-label small fw-semibold text-dark-green"></label>
-                    <input asp-for="PaymentQrUrl" class="form-control form-control-custom" placeholder="URL hình ảnh mã VietQR hoặc MoMo" />
+                    <label asp-for="PaymentQrUrl" class="form-label small fw-semibold text-dark-green">URL hình ảnh Mã QR Donate</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light"><i class="fa-solid fa-link text-muted"></i></span>
+                        <input asp-for="PaymentQrUrl" id="paymentQrUrlInput" class="form-control form-control-custom" placeholder="Dán link ảnh mã QR (Ví dụ: https://... hoặc /images/qr.png)" oninput="updateQrPreview()" />
+                    </div>
+                    <div class="form-text small text-muted mt-1">
+                        Dán đường dẫn ảnh mã QR cá nhân của bạn tại đây để hiển thị trực tiếp cho người xem khi quét donate.
+                    </div>
+                </div>
+
+                <!-- Preview QR Code -->
+                <div class="p-3 bg-light rounded-3 text-center border">
+                    <div class="small fw-semibold text-dark-green mb-2">Xem trước mã QR:</div>
+                    <div id="qrPreviewWrapper" class="d-inline-block p-2 bg-white rounded border shadow-sm">
+                        <img id="qrPreviewImg"
+                             src="@(!string.IsNullOrEmpty(Model.PaymentQrUrl) ? Model.PaymentQrUrl : "")"
+                             alt="QR Preview"
+                             class="img-fluid rounded @(string.IsNullOrEmpty(Model.PaymentQrUrl) ? "d-none" : "")"
+                             style="max-height: 180px; object-fit: contain;" />
+                        <div id="qrPlaceholderBox" class="p-4 d-flex flex-column align-items-center justify-content-center @(!string.IsNullOrEmpty(Model.PaymentQrUrl) ? "d-none" : "")" style="min-width: 170px; min-height: 170px;">
+                            <div class="p-3 rounded-circle bg-light-green mb-2">
+                                <i class="fa-solid fa-qrcode text-success fs-2"></i>
+                            </div>
+                            <span class="small fw-semibold text-dark-green">Chưa cài đặt mã QR</span>
+                            <span class="text-muted small mt-1" style="font-size: 0.72rem;">(Bạn có thể thiết lập mã QR sau)</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -262,5 +353,85 @@
         document.getElementById('bioHiddenInput').value =
             (html === '<p><br></p>' || html.trim() === '') ? '' : html;
     });
+
+    function updateQrPreview() {
+        var input = document.getElementById('paymentQrUrlInput');
+        var img = document.getElementById('qrPreviewImg');
+        var placeholder = document.getElementById('qrPlaceholderBox');
+        if (!input || !img || !placeholder) return;
+        var url = input.value.trim();
+        if (url) {
+            img.src = url;
+            img.classList.remove('d-none');
+            placeholder.classList.add('d-none');
+        } else {
+            img.classList.add('d-none');
+            placeholder.classList.remove('d-none');
+        }
+    }
+
+    // Sao chép link trang donate vào Clipboard
+    function copyDonatePageLink() {
+        var input = document.getElementById('donatePageUrlInput');
+        var copyBtn = document.getElementById('copyDonateBtn');
+        var copyIcon = document.getElementById('copyIcon');
+        var copyText = document.getElementById('copyText');
+        if (!input) return;
+
+        var url = input.value;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(function () {
+                onCopySuccess();
+            }).catch(function () {
+                fallbackCopy(url);
+            });
+        } else {
+            fallbackCopy(url);
+        }
+
+        function onCopySuccess() {
+            if (copyBtn && copyIcon && copyText) {
+                copyBtn.classList.remove('btn-outline-success');
+                copyBtn.classList.add('btn-success', 'text-white');
+                copyIcon.className = 'fa-solid fa-check me-1';
+                copyText.textContent = 'Đã chép!';
+                setTimeout(function () {
+                    copyBtn.classList.remove('btn-success', 'text-white');
+                    copyBtn.classList.add('btn-outline-success');
+                    copyIcon.className = 'fa-regular fa-copy me-1';
+                    copyText.textContent = 'Sao chép';
+                }, 2500);
+            }
+        }
+
+        function fallbackCopy(text) {
+            var temp = document.createElement('input');
+            temp.value = text;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            onCopySuccess();
+        }
+    }
+</script>
+
+<!-- Cách 2 (Dự phòng Client-side): Thư viện qrcode.min.js từ CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+    // Hàm minh họa render mã QR bằng JavaScript ở Client-side (Cách 2)
+    function renderQrClientSide(targetElementId, url) {
+        var container = document.getElementById(targetElementId);
+        if (!container || !url || typeof QRCode === 'undefined') return;
+        container.innerHTML = '';
+        new QRCode(container, {
+            text: url,
+            width: 200,
+            height: 200,
+            colorDark: "#1a3a28",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.Q
+        });
+    }
 </script>
 }

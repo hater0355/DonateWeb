@@ -3,8 +3,12 @@
   "WorkspaceRootPath": "C:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\Program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:DonateWeb\\Program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{3F177BD7-D6E1-EE99-314E-61F3A5B879D5}|DonateWeb\\DonateWeb.csproj|c:\\users\\admin\\onedrive\\desktop\\donateweb\\donateweb\\donateweb\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3F177BD7-D6E1-EE99-314E-61F3A5B879D5}|DonateWeb\\DonateWeb.csproj|solutionrelative:donateweb\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3F177BD7-D6E1-EE99-314E-61F3A5B879D5}|DonateWeb\\DonateWeb.csproj|c:\\users\\admin\\onedrive\\desktop\\donateweb\\donateweb\\donateweb\\donateweb.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}",
+      "RelativeMoniker": "D:0:0:{3F177BD7-D6E1-EE99-314E-61F3A5B879D5}|DonateWeb\\DonateWeb.csproj|solutionrelative:donateweb\\donateweb.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}"
     }
   ],
   "DocumentGroupContainers": [
@@ -14,7 +18,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 3,
           "Children": [
             {
               "$type": "Bookmark",
@@ -26,13 +30,25 @@
             },
             {
               "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "DonateWeb.csproj",
+              "DocumentMoniker": "C:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\DonateWeb.csproj",
+              "RelativeDocumentMoniker": "DonateWeb\\DonateWeb.csproj",
+              "ToolTip": "C:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\DonateWeb.csproj",
+              "RelativeToolTip": "DonateWeb\\DonateWeb.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2026-09-30T15:56:10.899Z"
+            },
+            {
+              "$type": "Document",
               "DocumentIndex": 0,
               "Title": "Program.cs",
               "DocumentMoniker": "C:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\Program.cs",
               "RelativeDocumentMoniker": "DonateWeb\\Program.cs",
               "ToolTip": "C:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\Program.cs",
               "RelativeToolTip": "DonateWeb\\Program.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAJgAAAAAAAAAAAAqwLAAAAAKAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-09-30T15:25:41.78Z",
               "EditorCaption": ""
