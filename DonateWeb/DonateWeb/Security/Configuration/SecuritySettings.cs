@@ -89,7 +89,7 @@ namespace DonateWeb.Security.Configuration
         /// <summary>
         /// Khóa bí mật (Secret Key) dùng để đối soát tính hợp lệ của Webhook hoặc tạo chữ ký HMAC-SHA256
         /// </summary>
-        public string SecretKey { get; set; } = "DonateWeb_Webhook_SecureSecretKey_2026!#@$";
+        public string SecretKey { get; set; } = string.Empty;
 
         /// <summary>
         /// Tên Header chứa Secret Key hoặc chữ ký xác thực (ví dụ: X-Webhook-Secret hoặc X-Signature)

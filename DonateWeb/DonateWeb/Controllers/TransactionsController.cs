@@ -39,12 +39,19 @@ namespace DonateWeb.Controllers
                         BalanceBefore DECIMAL(18,2) NOT NULL DEFAULT 0,
                         BalanceAfter DECIMAL(18,2) NOT NULL DEFAULT 0,
                         PaymentMethodName NVARCHAR(100) NULL,
+                        OrderCode BIGINT NULL,
                         [Status] INT NOT NULL DEFAULT 1,
                         Note NVARCHAR(500) NULL,
                         CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
                         CONSTRAINT PK_WalletTransactions PRIMARY KEY CLUSTERED (Id),
                         CONSTRAINT FK_WalletTransactions_Users FOREIGN KEY (UserId) REFERENCES dbo.Users (Id) ON DELETE CASCADE
                     );
+                END
+
+                IF OBJECT_ID('dbo.WalletTransactions', 'U') IS NOT NULL
+                   AND NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.WalletTransactions') AND name = 'OrderCode')
+                BEGIN
+                    ALTER TABLE dbo.WalletTransactions ADD OrderCode BIGINT NULL;
                 END
             ");
 

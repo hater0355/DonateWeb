@@ -17,7 +17,12 @@ namespace DonateWeb.Services
 
         public string GenerateToken(User user, IEnumerable<string> roles, string? streamerSlug = null)
         {
-            var secretKey = _configuration["Jwt:SecretKey"] ?? "DefaultFallbackSecretKeyForTestingOnlyDonateWeb32Characters!";
+            var secretKey = _configuration["Jwt:SecretKey"];
+            if (string.IsNullOrWhiteSpace(secretKey) || Encoding.UTF8.GetByteCount(secretKey) < 32)
+            {
+                throw new InvalidOperationException("JWT signing key is missing or too short. Configure Jwt__SecretKey with at least 32 UTF-8 bytes using a secret store.");
+            }
+
             var issuer = _configuration["Jwt:Issuer"] ?? "DonateWeb";
             var audience = _configuration["Jwt:Audience"] ?? "DonateWebUsers";
             var expiryHours = int.TryParse(_configuration["Jwt:ExpiryHours"], out var hours) ? hours : 24;

@@ -139,13 +139,6 @@ namespace DonateWeb.Controllers
             return RedirectToAction("Index", "Home");
         }
 
-        [HttpGet]
-        public async Task<IActionResult> LogoutGet()
-        {
-            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            return RedirectToAction("Index", "Home");
-        }
-
         // ==================== OAuth2 External Login (Google, Facebook, YouTube) ====================
 
         [HttpGet]

@@ -1,10 +1,10 @@
 @model DonateWeb.ViewModels.Wallet.DepositViewModel
 @{
-    ViewData["Title"] = "Nạp tiền vào ví cá nhân (VietQR)";
+    ViewData["Title"] = "Nạp tiền tự động qua PayOS";
 }
 
 <style>
-    /* Styling cho Banner số dư */
+    /* Styling Banner số dư */
     .wallet-hero-card {
         background: linear-gradient(135deg, #0d3b2e 0%, #1b4332 45%, #2d6a4f 100%);
         border-radius: 16px;
@@ -39,7 +39,7 @@
         gap: 10px;
         font-weight: 600;
         color: #6c757d;
-        padding: 8px 18px;
+        padding: 8px 20px;
         border-radius: 50px;
         background-color: #f8f9fa;
         border: 1px solid #e9ecef;
@@ -86,7 +86,7 @@
         color: #1b4332;
         font-weight: 600;
         border-radius: 10px;
-        padding: 10px 16px;
+        padding: 10px 18px;
         cursor: pointer;
         transition: all 0.2s ease;
     }
@@ -103,7 +103,7 @@
         position: relative;
         background: #ffffff;
         border-radius: 16px;
-        padding: 20px;
+        padding: 24px;
         box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
         border: 1px solid #edf2f7;
     }
@@ -114,10 +114,13 @@
         overflow: hidden;
         border: 2px solid #e2e8f0;
         background: #fff;
+        min-width: 260px;
+        min-height: 260px;
     }
     .qr-image-wrapper img {
         max-width: 100%;
-        height: auto;
+        width: 260px;
+        height: 260px;
         display: block;
         transition: transform 0.3s ease;
     }
@@ -143,7 +146,7 @@
         background-color: #f8fafc;
         border-radius: 12px;
         border: 1px solid #e2e8f0;
-        padding: 16px;
+        padding: 18px;
     }
     .payment-row {
         display: flex;
@@ -160,8 +163,8 @@
         color: #1b4332;
         border: none;
         border-radius: 6px;
-        padding: 3px 8px;
-        font-size: 0.8rem;
+        padding: 4px 10px;
+        font-size: 0.82rem;
         cursor: pointer;
         transition: all 0.2s;
     }
@@ -172,6 +175,21 @@
     .copy-btn.copied {
         background: #28a745 !important;
         color: #fff !important;
+    }
+
+    /* Nút mở cổng PayOS Checkout */
+    .btn-payos-checkout {
+        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+        color: #fff;
+        border: none;
+        font-weight: 700;
+        transition: all 0.3s ease;
+    }
+    .btn-payos-checkout:hover {
+        background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+        color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
     }
 
     /* Đồng hồ đếm ngược */
@@ -228,21 +246,24 @@
     }
 </style>
 
+<!-- Tích hợp thư viện SweetAlert2 cho thông báo nạp tiền thành công đẹp mắt -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+
 <div class="pb-5">
     <!-- Header tiêu đề -->
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
         <div>
             <h4 class="fw-bold text-dark-green mb-1 d-flex align-items-center gap-2">
-                <i class="fa-solid fa-wallet text-success"></i> NẠP TIỀN VÀO VÍ CÁ NHÂN
+                <i class="fa-solid fa-wallet text-success"></i> NẠP TIỀN TỰ ĐỘNG VÀO VÍ CÁ NHÂN
             </h4>
-            <p class="text-muted small mb-0">Thanh toán tự động bằng mã <strong>VietQR Napas247</strong> — Tiền vào ví tức thì sau 3 giây</p>
+            <p class="text-muted small mb-0">Cổng thanh toán tự động <strong>PayOS VietQR</strong> — Tiền vào ví tức thì sau khi quét mã</p>
         </div>
         <a href="/Streamer/Donate" class="btn btn-outline-success rounded-pill px-3 fw-semibold btn-sm">
             <i class="fa-solid fa-heart me-1"></i> Đi tới trang Donate Streamer
         </a>
     </div>
 
-    <!-- Banner Số dư hiện tại của Fan/Viewer -->
+    <!-- Banner Số dư hiện tại của Viewer -->
     <div class="wallet-hero-card p-4 mb-4">
         <div class="row align-items-center g-3">
             <div class="col-12 col-md-7">
@@ -265,7 +286,7 @@
         </div>
     </div>
 
-    <!-- Stepper chỉ báo tiến trình 2 bước -->
+    <!-- Stepper chỉ báo tiến trình 2 bước mượt mà -->
     <div class="stepper-container">
         <div class="stepper-step active" id="stepperStep1">
             <div class="stepper-badge" id="stepperBadge1">1</div>
@@ -274,7 +295,7 @@
         <div class="stepper-divider"></div>
         <div class="stepper-step" id="stepperStep2">
             <div class="stepper-badge" id="stepperBadge2">2</div>
-            <span>Quét mã VietQR thanh toán</span>
+            <span>Quét mã PayOS QR thanh toán</span>
         </div>
     </div>
 
@@ -288,112 +309,122 @@
                     <i class="fa-solid fa-money-bill-wave text-success me-2"></i> NHẬP SỐ TIỀN MUỐN NẠP
                 </h5>
 
-                <!-- Token xác thực AntiForgery -->
-                @Html.AntiForgeryToken()
+                <form id="depositForm" onsubmit="event.preventDefault(); handleCreateDeposit();">
+                    @Html.AntiForgeryToken()
 
-                <div class="mb-3">
-                    <label for="depositAmountInput" class="form-label fw-semibold text-dark-green">
-                        Số tiền cần nạp (VNĐ) <span class="text-danger">*</span>
-                    </label>
-                    <div class="input-group input-group-lg mb-2">
-                        <span class="input-group-text bg-light-green text-success border-end-0">
-                            <i class="fa-solid fa-coins"></i>
-                        </span>
-                        <input id="depositAmountInput"
-                               type="number"
-                               min="10000"
-                               max="500000000"
-                               step="1000"
-                               value="@((int)Model.Amount)"
-                               class="form-control fw-bold text-success fs-3"
-                               placeholder="Tối thiểu 10.000 VNĐ"
-                               required />
-                        <span class="input-group-text bg-light-green fw-bold text-dark-green">VNĐ</span>
-                    </div>
-                    <div id="amountValidationMsg" class="text-danger small d-none">
-                        Số tiền nạp tối thiểu là 10.000 VNĐ.
-                    </div>
-
-                    <!-- Mốc chọn nhanh mệnh giá -->
-                    <div class="mt-3">
-                        <small class="text-muted d-block mb-2 fw-semibold">Chọn nhanh mệnh giá:</small>
-                        <div class="d-flex flex-wrap gap-2">
-                            <button type="button" class="quick-deposit-btn" onclick="selectQuickAmount(20000, this)">20.000đ</button>
-                            <button type="button" class="quick-deposit-btn active" onclick="selectQuickAmount(50000, this)">50.000đ</button>
-                            <button type="button" class="quick-deposit-btn" onclick="selectQuickAmount(100000, this)">100.000đ</button>
-                            <button type="button" class="quick-deposit-btn" onclick="selectQuickAmount(200000, this)">200.000đ</button>
-                            <button type="button" class="quick-deposit-btn" onclick="selectQuickAmount(500000, this)">500.000đ</button>
-                            <button type="button" class="quick-deposit-btn" onclick="selectQuickAmount(1000000, this)">1.000.000đ</button>
+                    <div class="mb-3">
+                        <label for="depositAmountInput" class="form-label fw-semibold text-dark-green">
+                            Số tiền cần nạp (VNĐ) <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group input-group-lg mb-2">
+                            <span class="input-group-text bg-light-green text-success border-end-0">
+                                <i class="fa-solid fa-coins"></i>
+                            </span>
+                            <input id="depositAmountInput"
+                                   name="amount"
+                                   type="number"
+                                   min="10000"
+                                   max="500000000"
+                                   step="1000"
+                                   value="@((int)Model.Amount)"
+                                   class="form-control fw-bold text-success fs-3"
+                                   placeholder="Tối thiểu 10.000 VNĐ"
+                                   required />
+                            <span class="input-group-text bg-light-green fw-bold text-dark-green">VNĐ</span>
                         </div>
-                    </div>
-                </div>
+                        <div id="amountValidationMsg" class="text-danger small d-none">
+                            Số tiền nạp tối thiểu là 10.000 VNĐ.
+                        </div>
 
-                <!-- Phương thức thanh toán VietQR -->
-                <div class="mb-4 mt-2">
-                    <label class="form-label fw-semibold text-dark-green">Kênh thanh toán</label>
-                    <div class="border rounded-3 p-3 bg-light d-flex align-items-center justify-content-between flex-wrap gap-2">
-                        <div class="d-flex align-items-center gap-3">
-                            <div class="bg-white p-2 rounded-2 border shadow-sm text-center" style="width: 54px; height: 54px;">
-                                <i class="fa-solid fa-qrcode text-success fs-2"></i>
-                            </div>
-                            <div>
-                                <div class="fw-bold text-dark-green">Chuyển khoản liên ngân hàng 24/7 (VietQR Napas247)</div>
-                                <div class="small text-muted">Hỗ trợ quét qua app của 40+ ngân hàng Việt Nam & Ví điện tử (MB, VCB, Techcombank, VPBank, Momo...)</div>
+                        <!-- Mốc chọn nhanh mệnh giá theo yêu cầu: 20k, 50k, 100k, 200k, 500k -->
+                        <div class="mt-3">
+                            <small class="text-muted d-block mb-2 fw-semibold">Chọn nhanh mệnh giá:</small>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="button" class="quick-deposit-btn" onclick="selectQuickAmount(20000, this)">20.000đ</button>
+                                <button type="button" class="quick-deposit-btn active" onclick="selectQuickAmount(50000, this)">50.000đ</button>
+                                <button type="button" class="quick-deposit-btn" onclick="selectQuickAmount(100000, this)">100.000đ</button>
+                                <button type="button" class="quick-deposit-btn" onclick="selectQuickAmount(200000, this)">200.000đ</button>
+                                <button type="button" class="quick-deposit-btn" onclick="selectQuickAmount(500000, this)">500.000đ</button>
                             </div>
                         </div>
-                        <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill">
-                            <i class="fa-solid fa-bolt me-1"></i> Xử lý tự động 24/7
-                        </span>
                     </div>
-                </div>
 
-                <!-- Nút bấm Tạo mã QR -->
-                <button type="button" id="btnCreateQr" onclick="handleCreateDeposit()" class="btn btn-dark-green w-100 py-3 rounded-pill fw-bold fs-5 shadow-sm">
-                    <i class="fa-solid fa-qrcode me-2"></i> TẠO MÃ QR NẠP TIỀN
-                </button>
+                    <!-- Kênh thanh toán tự động PayOS -->
+                    <div class="mb-4 mt-3">
+                        <label class="form-label fw-semibold text-dark-green">Phương thức thanh toán</label>
+                        <div class="border rounded-3 p-3 bg-light d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="bg-white p-2 rounded-2 border shadow-sm text-center" style="width: 54px; height: 54px;">
+                                    <i class="fa-solid fa-qrcode text-success fs-2"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-dark-green">Cổng thanh toán PayOS (VietQR Napas247)</div>
+                                    <div class="small text-muted">Hỗ trợ quét qua app của mọi ngân hàng Việt Nam & Ví MoMo, ZaloPay, ViettelMoney...</div>
+                                </div>
+                            </div>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill">
+                                <i class="fa-solid fa-bolt me-1"></i> Tự động cộng tiền 24/7
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Nút bấm Tiếp tục tạo mã QR -->
+                    <button type="submit" id="btnCreateQr" class="btn btn-dark-green w-100 py-3 rounded-pill fw-bold fs-5 shadow-sm">
+                        <i class="fa-solid fa-arrow-right me-2"></i> TIẾP TỤC TẠO MÃ QR
+                    </button>
+                </form>
             </div>
         </div>
     </div>
 
     <!-- ========================================================================= -->
-    <!-- BƯỚC 2: QUÉT MÃ QR & THANH TOÁN (Ẩn ban đầu, hiện sau khi tạo đơn) -->
+    <!-- BƯỚC 2: QUÉT MÃ QR & THANH TOÁN PAYOS (Ẩn ban đầu, hiện sau khi tạo đơn) -->
     <!-- ========================================================================= -->
     <div id="step2Container" class="row g-4 d-none">
-        <!-- Cột trái: Ảnh mã VietQR thanh toán -->
+        <!-- Cột trái: Ảnh mã PayOS QR thanh toán -->
         <div class="col-12 col-lg-5">
             <div class="qr-card-container text-center h-100 d-flex flex-column justify-content-between">
                 <div>
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">
-                            <i class="fa-solid fa-shield-halved me-1"></i> VietQR Napas247
+                            <i class="fa-solid fa-shield-halved me-1"></i> PayOS VietQR 24/7
                         </span>
                         <span class="badge bg-light text-dark border rounded-pill px-2 py-1 small">
-                            Mã GD: <strong id="displayTxCode">#</strong>
+                            Đơn hàng: <strong id="displayOrderCode">#</strong>
                         </span>
                     </div>
 
-                    <div class="qr-image-wrapper p-2 mb-3 shadow-sm">
+                    <div class="qr-image-wrapper p-2 mb-3 shadow-sm mx-auto">
                         <!-- Quét Lazer Animation -->
                         <div class="qr-scan-line"></div>
-                        <img id="vietQrImage"
+                        <img id="payOsQrImage"
                              src="/images/placeholder-qr.png"
-                             alt="Mã VietQR thanh toán"
-                             class="img-fluid rounded"
-                             style="min-height: 280px; object-fit: contain;" />
+                             alt="Mã PayOS QR thanh toán"
+                             class="img-fluid rounded" />
                     </div>
 
-                    <div class="small text-muted mb-2">
+                    <div class="small text-muted mb-3">
                         <i class="fa-solid fa-mobile-screen-button text-success me-1"></i>
                         Mở App Ngân hàng hoặc Ví điện tử bất kỳ & chọn tính năng <strong>Quét mã QR</strong>
+                    </div>
+
+                    <!-- Nút Mở trang thanh toán payOS -->
+                    <div class="mb-3">
+                        <a id="btnPayOsCheckout"
+                           href="#"
+                           target="_blank"
+                           class="btn btn-payos-checkout w-100 py-2 rounded-pill shadow-sm">
+                            <i class="fa-solid fa-arrow-up-right-from-square me-2"></i> Mở trang thanh toán payOS
+                        </a>
                     </div>
                 </div>
 
                 <div class="d-flex gap-2 justify-content-center pt-2 border-top">
-                    <a id="btnDownloadQr" href="#" target="_blank" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
-                        <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Xem ảnh gốc
-                    </a>
                     <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="backToStep1()">
                         <i class="fa-solid fa-arrow-left me-1"></i> Chọn lại số tiền
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" onclick="downloadQrImage()">
+                        <i class="fa-solid fa-download me-1"></i> Tải ảnh QR
                     </button>
                 </div>
             </div>
@@ -423,7 +454,7 @@
                         <div class="payment-row">
                             <span class="text-muted small">Ngân hàng thụ hưởng:</span>
                             <div class="text-end">
-                                <strong id="displayBankName" class="text-dark-green">MB Bank (Ngân Hàng Quân Đội)</strong>
+                                <strong id="displayBankName" class="text-dark-green">Ngân hàng Quân Đội (MB Bank)</strong>
                             </div>
                         </div>
 
@@ -431,7 +462,7 @@
                         <div class="payment-row">
                             <span class="text-muted small">Số tài khoản nhận:</span>
                             <div class="d-flex align-items-center gap-2">
-                                <span id="displayAccountNo" class="fs-5 fw-bold text-dark-green font-monospace">0987654321</span>
+                                <span id="displayAccountNo" class="fs-5 fw-bold text-dark-green font-monospace">---</span>
                                 <button type="button" class="copy-btn" onclick="copyValue('displayAccountNo', this)" title="Sao chép số tài khoản">
                                     <i class="fa-regular fa-copy me-1"></i> <span>Sao chép</span>
                                 </button>
@@ -442,7 +473,7 @@
                         <div class="payment-row">
                             <span class="text-muted small">Tên chủ tài khoản:</span>
                             <div class="text-end">
-                                <strong id="displayAccountName" class="text-dark text-uppercase">NGUYEN ANH HIEU</strong>
+                                <strong id="displayAccountName" class="text-dark text-uppercase">---</strong>
                             </div>
                         </div>
 
@@ -450,7 +481,7 @@
                         <div class="payment-row">
                             <span class="text-muted small">Số tiền cần chuyển:</span>
                             <div class="d-flex align-items-center gap-2">
-                                <span id="displayAmount" class="fs-4 fw-extrabold text-danger">50.000 VNĐ</span>
+                                <span id="displayAmount" class="fs-4 fw-extrabold text-danger">0 VNĐ</span>
                                 <button type="button" class="copy-btn" onclick="copyAmountValue(this)" title="Sao chép số tiền">
                                     <i class="fa-regular fa-copy me-1"></i> <span>Sao chép</span>
                                 </button>
@@ -461,7 +492,7 @@
                         <div class="payment-row bg-white rounded-3 p-3 border border-success border-opacity-50 mt-2">
                             <div>
                                 <span class="text-muted small d-block mb-1">
-                                    Nội dung chuyển khoản (Bắt buộc giữ nguyên):
+                                    Nội dung chuyển khoản (Bắt buộc chính xác):
                                 </span>
                                 <code id="displayMemo" class="fs-4 fw-bold text-success font-monospace">NAP 00000</code>
                             </div>
@@ -477,7 +508,7 @@
                     <div class="alert alert-warning rounded-3 py-2 px-3 small mb-3 border-0 d-flex align-items-start gap-2">
                         <i class="fa-solid fa-circle-exclamation text-warning fs-5 mt-1"></i>
                         <div>
-                            <strong>Lưu ý quan trọng:</strong> Quý khách vui lòng điền <strong>chính xác Nội dung chuyển khoản</strong> để hệ thống nhận diện và tự động cộng tiền sau 3-5 giây.
+                            <strong>Lưu ý:</strong> Vui lòng giữ đúng <strong>Nội dung chuyển khoản</strong> để hệ thống tự động cộng tiền sau 2.5 giây.
                         </div>
                     </div>
                 </div>
@@ -488,7 +519,7 @@
                         <div class="d-flex align-items-center gap-2">
                             <span class="polling-indicator"></span>
                             <span id="pollingStatusText" class="small fw-semibold text-muted">
-                                Đang chờ hệ thống ghi nhận chuyển khoản (kiểm tra mỗi 3s)...
+                                Đang chờ hệ thống ghi nhận chuyển khoản (tự động kiểm tra mỗi 2.5s)...
                             </span>
                         </div>
                         <button type="button" class="btn btn-sm btn-outline-success rounded-pill fw-semibold" onclick="checkStatusNow()">
@@ -496,15 +527,17 @@
                         </button>
                     </div>
 
-                    <!-- Nút Mô phỏng thanh toán (Test Demo tiện lợi cho tester/giáo viên) -->
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill" onclick="backToStep1()">
                             <i class="fa-solid fa-arrow-left me-1"></i> Hủy & Quay lại
                         </button>
 
+                        @if (ViewBag.EnablePaymentSimulation == true)
+                        {
                         <button type="button" class="btn btn-outline-warning btn-sm rounded-pill fw-semibold" onclick="simulateTestSuccess()" title="Dành cho môi trường Test: Giả lập ngân hàng đã nhận được tiền">
                             <i class="fa-solid fa-vial me-1"></i> [Test Demo] Mô phỏng thanh toán thành công
                         </button>
+                        }
                     </div>
                 </div>
             </div>
@@ -519,7 +552,7 @@
             <i class="fa-solid fa-check"></i>
         </div>
         <h3 class="fw-bold text-success mb-2">GIAO DỊCH NẠP TIỀN THÀNH CÔNG!</h3>
-        <p class="text-muted mb-4 fs-6">Hệ thống đã ghi nhận khoản thanh toán và cộng trực tiếp vào ví cá nhân của bạn.</p>
+        <p class="text-muted mb-4 fs-6">Hệ thống PayOS đã xác nhận thanh toán và cộng trực tiếp vào ví cá nhân của bạn.</p>
 
         <div class="d-inline-block bg-light-green p-4 rounded-3 border border-success border-opacity-25 mx-auto mb-4 text-start" style="min-width: 320px;">
             <div class="d-flex justify-content-between py-1 small">
@@ -527,8 +560,8 @@
                 <strong id="successAmount" class="text-success fs-6">+0 VNĐ</strong>
             </div>
             <div class="d-flex justify-content-between py-1 small">
-                <span class="text-muted">Mã giao dịch:</span>
-                <code id="successTxCode" class="fw-bold text-dark">#</code>
+                <span class="text-muted">Mã đơn hàng:</span>
+                <code id="successOrderCode" class="fw-bold text-dark">#</code>
             </div>
             <div class="d-flex justify-content-between py-1 small">
                 <span class="text-muted">Số dư ví mới:</span>
@@ -537,10 +570,12 @@
         </div>
 
         <div>
-            <div class="small text-muted mb-3">Tự động tải lại trang sau <strong id="redirectCountdown" class="text-success">3</strong> giây...</div>
-            <button type="button" class="btn btn-dark-green rounded-pill px-4 py-2 fw-semibold" onclick="location.reload()">
-                <i class="fa-solid fa-arrow-rotate-right me-1"></i> Hoàn tất ngay
+            <button type="button" class="btn btn-dark-green rounded-pill px-4 py-2 fw-semibold me-2" onclick="location.reload()">
+                <i class="fa-solid fa-arrow-rotate-right me-1"></i> Tiếp tục nạp tiền
             </button>
+            <a href="/Streamer/Donate" class="btn btn-outline-success rounded-pill px-4 py-2 fw-semibold">
+                <i class="fa-solid fa-heart me-1"></i> Ủng hộ Streamer
+            </a>
         </div>
     </div>
 
@@ -577,7 +612,7 @@
                             <tr>
                                 <td class="fw-semibold small text-dark-green"><code>@item.TransactionCode</code></td>
                                 <td class="small text-muted">@item.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</td>
-                                <td class="small">@item.PaymentMethodName</td>
+                                <td class="small">@(item.PaymentMethodName ?? "PayOS VietQR")</td>
                                 <td class="fw-bold text-success">+@item.Amount.ToString("N0") VNĐ</td>
                                 <td class="small text-muted">@(item.Note ?? "Nạp tiền vào ví")</td>
                                 <td>
@@ -619,16 +654,20 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
     <script>
-        // Biến toàn cục lưu trạng thái giao dịch
+        // Khởi tạo các biến toàn cục quản lý tiến trình
         const initialBalance = @Model.CurrentBalance.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        let currentOrderCode = null;
         let currentTransactionId = null;
         let currentRawAmount = 50000;
         let pollingInterval = null;
         let countdownInterval = null;
         let remainingSeconds = 600; // 10 phút
+        let paymentHubConnection = null;
 
-        // Hàm chọn nhanh số tiền nạp
+        // Chọn nhanh số tiền nạp (20k, 50k, 100k, 200k, 500k)
         function selectQuickAmount(val, btnEl) {
             const input = document.getElementById('depositAmountInput');
             if (input) {
@@ -662,30 +701,33 @@
             }
         }
 
-        // Bước 1: Gửi yêu cầu Tạo mã VietQR nạp tiền
+        // Bước 1: Gọi AJAX CreateDeposit tạo đơn PayOS
         async function handleCreateDeposit() {
             const input = document.getElementById('depositAmountInput');
             const btn = document.getElementById('btnCreateQr');
             const amount = parseFloat(input.value) || 0;
 
             if (amount < 10000) {
-                alert('Vui lòng nhập số tiền nạp tối thiểu là 10.000 VNĐ.');
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Số tiền chưa hợp lệ',
+                    text: 'Số tiền nạp tối thiểu là 10.000 VNĐ.',
+                    confirmButtonColor: '#2d6a4f'
+                });
                 input.focus();
                 return;
             }
 
-            // Đổi trạng thái nút sang Loading
             const originalBtnHtml = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Đang tạo mã VietQR...';
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Đang kết nối PayOS tạo mã QR...';
 
             try {
-                // Lấy AntiForgeryToken từ form
                 const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
                 const token = tokenInput ? tokenInput.value : '';
 
                 const formData = new URLSearchParams();
-                formData.append('Amount', amount);
+                formData.append('amount', amount);
                 if (token) {
                     formData.append('__RequestVerificationToken', token);
                 }
@@ -694,8 +736,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'RequestVerificationToken': token
+                        'X-Requested-With': 'XMLHttpRequest'
                     },
                     body: formData.toString()
                 });
@@ -703,37 +744,63 @@
                 const result = await response.json();
 
                 if (!response.ok || !result.success) {
-                    alert(result.message || 'Không thể tạo mã QR nạp tiền. Vui lòng thử lại sau.');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Tạo mã thất bại',
+                        text: result.message || 'Không thể tạo đơn thanh toán PayOS. Vui lòng kiểm tra lại.',
+                        confirmButtonColor: '#2d6a4f'
+                    });
                     btn.disabled = false;
                     btn.innerHTML = originalBtnHtml;
                     return;
                 }
 
-                // Chuyển sang Bước 2 hiển thị mã QR & thông tin
-                displayStep2Payment(result.data);
+                // Chuyển sang Bước 2 hiển thị mã PayOS QR & thông tin
+                displayStep2Payment(result);
 
             } catch (err) {
                 console.error('Lỗi khi gọi API CreateDeposit:', err);
-                alert('Đã xảy ra lỗi kết nối với máy chủ. Vui lòng thử lại.');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Lỗi kết nối',
+                    text: 'Không thể kết nối đến máy chủ. Vui lòng thử lại sau ít phút.',
+                    confirmButtonColor: '#2d6a4f'
+                });
                 btn.disabled = false;
                 btn.innerHTML = originalBtnHtml;
             }
         }
 
-        // Bước 2: Hiển thị giao diện quét mã QR thanh toán
-        function displayStep2Payment(data) {
-            currentTransactionId = data.transactionId;
-            currentRawAmount = data.amount;
+        // Bước 2: Hiển thị giao diện quét mã QR PayOS và thông tin thanh toán
+        function displayStep2Payment(result) {
+            const data = result.data || {};
+            currentOrderCode = result.orderCode || data.orderCode;
+            currentTransactionId = result.transactionId || data.transactionId;
+            currentRawAmount = result.amount || data.amount;
 
-            // Điền thông tin vào các trường hiển thị
-            document.getElementById('displayTxCode').textContent = data.transactionCode;
-            document.getElementById('vietQrImage').src = data.qrUrl;
-            document.getElementById('btnDownloadQr').href = data.qrUrl;
-            document.getElementById('displayBankName').textContent = data.bankName;
-            document.getElementById('displayAccountNo').textContent = data.accountNo;
-            document.getElementById('displayAccountName').textContent = data.accountName;
-            document.getElementById('displayAmount').textContent = Number(data.amount).toLocaleString('vi-VN') + ' VNĐ';
-            document.getElementById('displayMemo').textContent = data.memo;
+            // Xử lý mã QR PayOS: nếu là URL thì dùng trực tiếp, nếu là chuỗi VietQR EMVCo thì tạo ảnh qua API
+            let qrSource = result.qrCode || data.qrCode || data.qrUrl;
+            if (qrSource && !qrSource.startsWith('http') && !qrSource.startsWith('data:image')) {
+                // Chuỗi VietQR payload định dạng chuỗi: 000201...
+                qrSource = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrSource)}`;
+            }
+
+            document.getElementById('displayOrderCode').textContent = '#' + currentOrderCode;
+            document.getElementById('payOsQrImage').src = qrSource;
+
+            // Nút mở trang thanh toán payOS
+            const checkoutUrl = result.checkoutUrl || data.checkoutUrl || '#';
+            const btnCheckout = document.getElementById('btnPayOsCheckout');
+            if (btnCheckout) {
+                btnCheckout.href = checkoutUrl;
+            }
+
+            // Điền thông tin chuyển khoản
+            if (data.bankName) document.getElementById('displayBankName').textContent = data.bankName;
+            if (data.accountNo) document.getElementById('displayAccountNo').textContent = data.accountNo;
+            if (data.accountName) document.getElementById('displayAccountName').textContent = data.accountName;
+            document.getElementById('displayAmount').textContent = Number(currentRawAmount).toLocaleString('vi-VN') + ' VNĐ';
+            document.getElementById('displayMemo').textContent = result.description || data.memo || `NAP ${currentOrderCode}`;
 
             // Cập nhật Stepper sang Bước 2
             document.getElementById('stepperStep1').classList.remove('active');
@@ -745,41 +812,44 @@
             document.getElementById('step1Container').classList.add('d-none');
             document.getElementById('step2Container').classList.remove('d-none');
 
-            // Khởi động đồng hồ đếm ngược 10 phút (600 giây)
-            remainingSeconds = data.expireSeconds || 600;
+            // Khởi động đồng hồ đếm ngược 10 phút
+            remainingSeconds = 600;
             startCountdown();
 
-            // Bắt đầu Polling định kỳ mỗi 3 giây kiểm tra trạng thái
+            // Khởi tạo SignalR Real-time
+            initSignalRPayment(currentOrderCode);
+
+            // Bắt đầu Polling định kỳ mỗi 2.5 giây theo đúng yêu cầu
             startPollingStatus();
 
-            // Cuộn mượt lên đầu trang
             window.scrollTo({ top: 120, behavior: 'smooth' });
         }
 
         // Quay lại Bước 1
         function backToStep1() {
-            // Dừng timer và polling
             clearInterval(pollingInterval);
             clearInterval(countdownInterval);
             pollingInterval = null;
             countdownInterval = null;
-            currentTransactionId = null;
+            currentOrderCode = null;
 
-            // Reset stepper
+            if (paymentHubConnection) {
+                paymentHubConnection.stop();
+                paymentHubConnection = null;
+            }
+
             document.getElementById('stepperStep1').classList.add('active');
             document.getElementById('stepperStep1').classList.remove('completed');
             document.getElementById('stepperBadge1').innerHTML = '1';
             document.getElementById('stepperStep2').classList.remove('active');
 
-            // Hiển thị lại Bước 1
             document.getElementById('step2Container').classList.add('d-none');
             document.getElementById('step1Container').classList.remove('d-none');
 
-            // Khôi phục nút tạo QR
             const btn = document.getElementById('btnCreateQr');
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-qrcode me-2"></i> TẠO MÃ QR NẠP TIỀN';
+                btn.innerHTML = '<i class="fa-solid fa-arrow-right me-2"></i> TIẾP TỤC TẠO MÃ QR';
             }
         }
 
@@ -799,8 +869,14 @@
                     timerEl.textContent = 'HẾT HẠN';
                     timerEl.classList.remove('text-warning');
                     timerEl.classList.add('text-danger');
-                    alert('Thời gian thanh toán cho mã QR này đã hết hạn. Vui lòng tạo mã mới để tiếp tục nạp tiền.');
-                    backToStep1();
+                    Swal.fire({
+                        icon: 'info',
+                        title: 'Đơn hàng hết hạn',
+                        text: 'Thời gian thanh toán cho đơn hàng đã hết. Vui lòng tạo mã mới để tiếp tục.',
+                        confirmButtonColor: '#2d6a4f'
+                    }).then(() => {
+                        backToStep1();
+                    });
                 } else {
                     remainingSeconds--;
                 }
@@ -810,126 +886,195 @@
             countdownInterval = setInterval(updateDisplay, 1000);
         }
 
-        // Polling kiểm tra trạng thái mỗi 3 giây
-        function startPollingStatus() {
-            clearInterval(pollingInterval);
-            if (!currentTransactionId) return;
-
-            pollingInterval = setInterval(async () => {
-                await checkDepositStatusAjax(currentTransactionId);
-            }, 3000);
-        }
-
-        // Gọi API kiểm tra trạng thái giao dịch
-        async function checkDepositStatusAjax(txId) {
-            if (!txId) return;
+        // Khởi tạo SignalR Real-time lắng nghe sự kiện PaymentSuccess
+        function initSignalRPayment(orderCode) {
+            if (typeof signalR === 'undefined') return;
 
             try {
-                const res = await fetch(`/Wallet/CheckDepositStatus?transactionId=${encodeURIComponent(txId)}`);
+                if (paymentHubConnection) {
+                    paymentHubConnection.stop();
+                    paymentHubConnection = null;
+                }
+
+                paymentHubConnection = new signalR.HubConnectionBuilder()
+                    .withUrl('/paymentHub')
+                    .withAutomaticReconnect([0, 2000, 5000, 10000])
+                    .build();
+
+                paymentHubConnection.on('PaymentSuccess', function (res) {
+                    console.log('[SignalR] Nhận sự kiện PaymentSuccess:', res);
+                    if (res && (res.orderCode == orderCode || res.transactionId == currentTransactionId)) {
+                        handlePaymentSuccess(res);
+                    }
+                });
+
+                paymentHubConnection.start().then(function () {
+                    console.log('[SignalR] Đã kết nối PaymentHub.');
+                    if (orderCode) {
+                        paymentHubConnection.invoke('JoinTransactionGroup', orderCode.toString());
+                        paymentHubConnection.invoke('JoinTransactionGroup', 'Tx_' + orderCode);
+                    }
+                }).catch(function (err) {
+                    console.warn('[SignalR] Kết nối Hub lỗi, hệ thống vẫn duy trì Polling 2.5s:', err);
+                });
+
+            } catch (err) {
+                console.error('[SignalR] Lỗi khởi tạo:', err);
+            }
+        }
+
+        // Tự động chạy polling gọi /Wallet/CheckStatus?orderCode=... mỗi 2.5 giây
+        function startPollingStatus() {
+            clearInterval(pollingInterval);
+            if (!currentOrderCode) return;
+
+            pollingInterval = setInterval(async () => {
+                await checkStatusAjax(currentOrderCode);
+            }, 2500); // 2.5 giây theo yêu cầu
+        }
+
+        // Gọi API kiểm tra trạng thái đơn hàng
+        async function checkStatusAjax(orderCode) {
+            if (!orderCode) return;
+
+            try {
+                const res = await fetch(`/Wallet/CheckStatus?orderCode=${encodeURIComponent(orderCode)}`);
                 if (!res.ok) return;
 
                 const data = await res.json();
                 if (data && data.isPaid) {
-                    // Dừng Polling và Countdown
-                    clearInterval(pollingInterval);
-                    clearInterval(countdownInterval);
-                    pollingInterval = null;
-                    countdownInterval = null;
-
-                    // Kích hoạt giao diện chúc mừng thành công
-                    triggerSuccessView(data);
+                    handlePaymentSuccess(data);
                 }
             } catch (e) {
                 console.error('Lỗi khi polling trạng thái:', e);
             }
         }
 
-        // Nút kiểm tra ngay lập tức (không cần chờ 3s)
+        // Kiểm tra ngay khi bấm nút
         async function checkStatusNow() {
-            if (!currentTransactionId) return;
+            if (!currentOrderCode) return;
             const statusText = document.getElementById('pollingStatusText');
-            if (statusText) statusText.textContent = 'Đang kiểm tra giao dịch với ngân hàng...';
+            if (statusText) statusText.textContent = 'Đang kiểm tra trực tiếp với cổng PayOS...';
 
-            await checkDepositStatusAjax(currentTransactionId);
+            await checkStatusAjax(currentOrderCode);
 
             setTimeout(() => {
                 if (statusText && pollingInterval) {
-                    statusText.textContent = 'Đang chờ hệ thống ghi nhận chuyển khoản (kiểm tra mỗi 3s)...';
+                    statusText.textContent = 'Đang chờ hệ thống ghi nhận chuyển khoản (tự động kiểm tra mỗi 2.5s)...';
                 }
-            }, 1200);
+            }, 1000);
         }
 
-        // Mô phỏng thanh toán thành công (Dành cho Test / Demo)
-        async function simulateTestSuccess() {
-            if (!currentTransactionId) return;
+        // Xử lý khi thanh toán thành công
+        function handlePaymentSuccess(data) {
+            clearInterval(pollingInterval);
+            clearInterval(countdownInterval);
+            pollingInterval = null;
+            countdownInterval = null;
 
-            if (!confirm('Bạn có muốn mô phỏng hệ thống nhận được tiền cho giao dịch này không?')) {
+            const paidAmount = data.amount || currentRawAmount;
+            const newBalance = data.newBalance;
+
+            // 1. Tự động cập nhật số dư trên Header
+            const headerBalanceEl = document.getElementById('headerWalletBalance');
+            if (headerBalanceEl && newBalance !== undefined && newBalance !== null) {
+                headerBalanceEl.textContent = `Ví: ${Number(newBalance).toLocaleString('vi-VN')} VNĐ`;
+            }
+
+            // 2. Cập nhật số dư ở Banner
+            const bannerBalanceEl = document.getElementById('currentBalanceDisplay');
+            if (bannerBalanceEl && newBalance !== undefined && newBalance !== null) {
+                bannerBalanceEl.textContent = Number(newBalance).toLocaleString('vi-VN');
+            }
+
+            // 3. Ẩn bước 2 và hiển thị thẻ chúc mừng
+            document.getElementById('step2Container').classList.add('d-none');
+            document.getElementById('successAmount').textContent = '+' + Number(paidAmount).toLocaleString('vi-VN') + ' VNĐ';
+            document.getElementById('successOrderCode').textContent = '#' + (data.orderCode || currentOrderCode);
+            if (newBalance) {
+                document.getElementById('successNewBalance').textContent = Number(newBalance).toLocaleString('vi-VN') + ' VNĐ';
+            }
+            document.getElementById('successCelebrationCard').classList.remove('d-none');
+            window.scrollTo({ top: 100, behavior: 'smooth' });
+
+            // 4. Hiển thị thông báo SweetAlert2 chuyên nghiệp
+            Swal.fire({
+                icon: 'success',
+                title: 'Nạp tiền thành công!',
+                html: `Hệ thống PayOS đã xác nhận thanh toán:<br><br>
+                       <div class="p-3 bg-light rounded text-start">
+                           <div class="d-flex justify-content-between mb-1">
+                               <span>Số tiền nạp:</span>
+                               <strong class="text-success fs-5">+${Number(paidAmount).toLocaleString('vi-VN')} VNĐ</strong>
+                           </div>
+                           <div class="d-flex justify-content-between mb-1">
+                               <span>Mã đơn hàng:</span>
+                               <strong class="text-dark">#${data.orderCode || currentOrderCode}</strong>
+                           </div>
+                           ${newBalance ? `
+                           <div class="d-flex justify-content-between">
+                               <span>Số dư mới:</span>
+                               <strong class="text-dark-green fs-5">${Number(newBalance).toLocaleString('vi-VN')} VNĐ</strong>
+                           </div>` : ''}
+                       </div>`,
+                confirmButtonText: 'Tuyệt vời',
+                confirmButtonColor: '#2d6a4f'
+            });
+        }
+
+        // Tải ảnh mã QR
+        function downloadQrImage() {
+            const img = document.getElementById('payOsQrImage');
+            if (!img || !img.src) return;
+            const link = document.createElement('a');
+            link.href = img.src;
+            link.download = `PayOS_QR_${currentOrderCode || 'Deposit'}.png`;
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        @if (ViewBag.EnablePaymentSimulation == true)
+        {
+            <text>
+        // Giả lập thanh toán thành công (dành cho Test Demo)
+        async function simulateTestSuccess() {
+            if (!currentOrderCode) return;
+
+            if (!confirm('Bạn có muốn mô phỏng nhận tiền thành công từ PayOS cho đơn #' + currentOrderCode + ' không?')) {
                 return;
             }
 
             try {
-                const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
-                const token = tokenInput ? tokenInput.value : '';
-
-                const res = await fetch(`/Wallet/SimulateSuccess?transactionId=${encodeURIComponent(currentTransactionId)}`, {
+                const res = await fetch(`/Wallet/SimulateSuccess?orderCode=${encodeURIComponent(currentOrderCode)}`, {
                     method: 'POST',
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest',
-                        'RequestVerificationToken': token
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
                     }
                 });
 
                 const data = await res.json();
                 if (data.success && data.isPaid) {
-                    clearInterval(pollingInterval);
-                    clearInterval(countdownInterval);
-                    triggerSuccessView(data);
+                    handlePaymentSuccess(data);
                 } else {
-                    alert(data.message || 'Mô phỏng không thành công.');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Mô phỏng thất bại',
+                        text: data.message || 'Không thể thực hiện mô phỏng.',
+                        confirmButtonColor: '#2d6a4f'
+                    });
                 }
             } catch (err) {
                 console.error(err);
-                alert('Lỗi khi gọi API mô phỏng.');
+                alert('Lỗi kết nối khi gọi mô phỏng.');
             }
         }
-
-        // Kích hoạt giao diện thành công
-        function triggerSuccessView(data) {
-            // Ẩn bước 2
-            document.getElementById('step2Container').classList.add('d-none');
-
-            // Cập nhật số dư ở Banner phía trên
-            const balanceEl = document.getElementById('currentBalanceDisplay');
-            if (balanceEl && data.newBalance !== undefined && data.newBalance !== null) {
-                balanceEl.textContent = Number(data.newBalance).toLocaleString('vi-VN');
-            }
-
-            // Điền thông tin vào thẻ chúc mừng
-            document.getElementById('successAmount').textContent = '+' + Number(data.amount || currentRawAmount).toLocaleString('vi-VN') + ' VNĐ';
-            document.getElementById('successTxCode').textContent = data.transactionCode || `#${currentTransactionId}`;
-            if (data.newBalance) {
-                document.getElementById('successNewBalance').textContent = Number(data.newBalance).toLocaleString('vi-VN') + ' VNĐ';
-            }
-
-            // Hiển thị thẻ chúc mừng
-            const successCard = document.getElementById('successCelebrationCard');
-            successCard.classList.remove('d-none');
-            window.scrollTo({ top: 100, behavior: 'smooth' });
-
-            // Đếm ngược 3 giây tự động reload
-            let redirectCount = 3;
-            const redirectEl = document.getElementById('redirectCountdown');
-            const redirectTimer = setInterval(() => {
-                redirectCount--;
-                if (redirectEl) redirectEl.textContent = redirectCount;
-                if (redirectCount <= 0) {
-                    clearInterval(redirectTimer);
-                    location.reload();
-                }
-            }, 1000);
+            </text>
         }
 
-        // Hàm sao chép vào Clipboard có visual feedback
+        // Sao chép giá trị vào Clipboard
         function copyValue(elementId, btnElement) {
             const el = document.getElementById(elementId);
             if (!el) return;
@@ -975,7 +1120,6 @@
             }, 2000);
         }
 
-        // Sự kiện khi tải trang
         document.addEventListener('DOMContentLoaded', function () {
             const input = document.getElementById('depositAmountInput');
             if (input) {

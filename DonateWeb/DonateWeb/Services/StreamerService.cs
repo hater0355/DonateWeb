@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 using DonateWeb.Data;
 using DonateWeb.Models.Entities;
 using DonateWeb.Models.Enums;
@@ -144,6 +145,11 @@ namespace DonateWeb.Services
                 return (false, $"Số tiền Donate tối thiểu cho kênh của {profile.DisplayName} là {profile.MinDonateAmount:N0} VNĐ.", null);
             }
 
+            if (model.Amount < 1000m || model.Amount > 100000000m || model.Amount != decimal.Truncate(model.Amount))
+            {
+                return (false, "Số tiền Donate phải là số nguyên từ 1.000 đến 100.000.000 VNĐ.", null);
+            }
+
             // =================================================================================
             // [MỚI THÊM / CHỈNH SỬA] Hoàn thiện logic xử lý chỉ 2 phương thức thanh toán cho Viewer:
             // 1. PaymentMethod.Wallet (1): Donate từ số dư có sẵn trong tài khoản
@@ -152,6 +158,12 @@ namespace DonateWeb.Services
             if (model.PaymentMethod != PaymentMethod.Wallet && model.PaymentMethod != PaymentMethod.BankTransfer)
             {
                 return (false, "Phương thức thanh toán không hợp lệ. Chỉ hỗ trợ Chuyển khoản ngân hàng hoặc Donate từ số dư tài khoản.", null);
+            }
+
+            // Bank transfers must be created as pending orders and confirmed by a verified webhook.
+            if (model.PaymentMethod == PaymentMethod.BankTransfer)
+            {
+                return (false, "Chuyển khoản ngân hàng cần được xác nhận qua đơn thanh toán. Vui lòng tạo đơn QR để tiếp tục.", null);
             }
 
             // Phương thức 1: Donate từ số dư có sẵn trong tài khoản (PaymentMethod.Wallet)
@@ -169,70 +181,85 @@ namespace DonateWeb.Services
                     return (false, "Tài khoản người Donate không tồn tại.", null);
                 }
 
-                if (donorUser.WalletBalance < model.Amount)
+                await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted);
+                var debited = await _context.Users
+                    .Where(user => user.Id == donorUser.Id && user.WalletBalance >= model.Amount)
+                    .ExecuteUpdateAsync(update => update.SetProperty(
+                        user => user.WalletBalance,
+                        user => user.WalletBalance - model.Amount));
+
+                await _context.Entry(donorUser).ReloadAsync();
+                if (debited == 0)
                 {
                     return (false, $"Số dư có sẵn trong tài khoản của bạn không đủ ({donorUser.WalletBalance:N0} VNĐ). Vui lòng nạp thêm hoặc chọn Chuyển khoản ngân hàng.", null);
                 }
 
-                // Trừ trực tiếp số dư có sẵn của Viewer
-                donorUser.WalletBalance -= model.Amount;
-
-                // Cộng doanh thu cho Streamer (và cộng vào ví của tài khoản Streamer nếu có)
-                profile.TotalReceived += model.Amount;
-                var streamerUser = await _context.Users.FindAsync(profile.UserId);
-                if (streamerUser != null && streamerUser.Id != donorUser.Id)
+                var profileUpdated = await _context.StreamerProfiles
+                    .Where(streamerProfile => streamerProfile.Id == profile.Id)
+                    .ExecuteUpdateAsync(update => update.SetProperty(
+                        streamerProfile => streamerProfile.TotalReceived,
+                        streamerProfile => streamerProfile.TotalReceived + model.Amount));
+                if (profileUpdated == 0)
                 {
-                    streamerUser.WalletBalance += model.Amount;
+                    return (false, "Hồ sơ streamer không còn tồn tại.", null);
                 }
-            }
-            // Phương thức 2: Chuyển khoản ngân hàng qua mã QR (PaymentMethod.BankTransfer)
-            else if (model.PaymentMethod == PaymentMethod.BankTransfer)
-            {
-                // Ghi nhận số tiền quyên góp qua chuyển khoản ngân hàng cho Streamer
-                profile.TotalReceived += model.Amount;
-                var streamerUser = await _context.Users.FindAsync(profile.UserId);
-                if (streamerUser != null)
-                {
-                    streamerUser.WalletBalance += model.Amount;
-                }
-            }
 
-            // BẢO MẬT & KIỂM DUYỆT: Lọc từ ngữ thô tục, phân biệt chủng tộc, xúc phạm danh dự và link độc hại
+                await _context.Entry(profile).ReloadAsync();
+                if (profile.UserId != donorUser.Id)
+                {
+                    var credited = await _context.Users
+                        .Where(user => user.Id == profile.UserId)
+                        .ExecuteUpdateAsync(update => update.SetProperty(
+                            user => user.WalletBalance,
+                            user => user.WalletBalance + model.Amount));
+
+                    if (credited > 0 && _context.Users.Local.FirstOrDefault(user => user.Id == profile.UserId) is { } trackedStreamer)
+                    {
+                        await _context.Entry(trackedStreamer).ReloadAsync();
+                    }
+                }
+
+                var savedDonation = await PersistDonationAsync(model, donorUserId, profile);
+                await transaction.CommitAsync();
+                return (true, string.Empty, savedDonation);
+            }
+            return (false, "Phương thức thanh toán không hợp lệ.", null);
+        }
+
+        private async Task<Donation> PersistDonationAsync(StreamerDonateViewModel model, int? donorUserId, StreamerProfile profile)
+        {
             var moderation = _moderationService.ModerateContent(model.Message, model.DonorName);
-            var sanitizedMessage = moderation.SanitizedText;
             var safeDonorName = string.IsNullOrWhiteSpace(model.DonorName)
                 ? "Người hâm mộ ẩn danh"
                 : _moderationService.SanitizeForStream(model.DonorName.Trim());
-
+            var transactionCode = $"DON_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N")[..6].ToUpper()}";
             var donation = new Donation
             {
                 StreamerProfileId = profile.Id,
                 DonorUserId = donorUserId,
                 DonorName = safeDonorName,
                 Amount = model.Amount,
-                Message = sanitizedMessage,
+                Message = moderation.SanitizedText,
                 PaymentMethod = model.PaymentMethod,
                 Status = DonationStatus.Success,
-                TransactionCode = $"DON_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N")[..6].ToUpper()}",
+                TransactionCode = transactionCode,
                 CreatedAt = DateTime.UtcNow
             };
 
             _context.Donations.Add(donation);
             await _context.SaveChangesAsync();
-
-            var paymentMethodLabel = model.PaymentMethod == PaymentMethod.Wallet ? "Ví DonateWeb" : "Chuyển khoản QR";
             _context.TransactionAuditLogs.Add(new TransactionAuditLog
             {
                 DonationId = donation.Id,
                 TransactionCode = donation.TransactionCode,
                 ActionType = "CREATE_DONATION",
-                Note = $"Giao dịch Donate {donation.Amount:N0} VNĐ từ '{donation.DonorName}' cho kênh '{profile.DisplayName}' qua {paymentMethodLabel}.",
+                Note = $"Giao dịch Donate {donation.Amount:N0} VNĐ từ '{donation.DonorName}' cho kênh '{profile.DisplayName}' qua Ví DonateWeb.",
                 PerformedBy = donation.DonorName,
                 CreatedAt = DateTime.UtcNow
             });
             await _context.SaveChangesAsync();
 
-            return (true, string.Empty, donation);
+            return donation;
         }
 
         public async Task<(bool Success, string Error, StreamerProfile? Profile)> RegisterStreamerAsync(int? currentUserId, StreamerRegisterViewModel model)

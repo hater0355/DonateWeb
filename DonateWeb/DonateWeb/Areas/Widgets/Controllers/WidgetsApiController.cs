@@ -1,4 +1,9 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using DonateWeb.Data;
+using DonateWeb.Models.Enums;
 using DonateWeb.Areas.Widgets.Services;
 
 namespace DonateWeb.Areas.Widgets.Controllers
@@ -8,11 +13,13 @@ namespace DonateWeb.Areas.Widgets.Controllers
     {
         private readonly IWidgetService _widgetService;
         private readonly ILogger<WidgetsApiController> _logger;
+        private readonly AppDbContext _context;
 
-        public WidgetsApiController(IWidgetService widgetService, ILogger<WidgetsApiController> logger)
+        public WidgetsApiController(IWidgetService widgetService, ILogger<WidgetsApiController> logger, AppDbContext context)
         {
             _widgetService = widgetService;
             _logger = logger;
+            _context = context;
         }
 
         /// <summary>
@@ -37,11 +44,28 @@ namespace DonateWeb.Areas.Widgets.Controllers
         /// Kích hoạt một thông báo Alert thử nghiệm lên OBS Browser Source
         /// POST api/widgets/alertbox/test/{slug}
         /// </summary>
+        [Authorize(Roles = UserRoles.Streamer)]
         [HttpPost("api/widgets/alertbox/test/{slug}")]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> TriggerTestAlert(string slug)
         {
-            var targetSlug = string.IsNullOrWhiteSpace(slug) ? "tenstreamer" : slug.Trim().ToLower();
-            await _widgetService.TriggerTestAlertAsync(targetSlug);
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+            {
+                return Forbid();
+            }
+
+            var ownedSlug = await _context.StreamerProfiles
+                .Where(profile => profile.UserId == userId)
+                .Select(profile => profile.Slug)
+                .FirstOrDefaultAsync();
+
+            if (string.IsNullOrWhiteSpace(ownedSlug) ||
+                !string.Equals(ownedSlug, slug.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return Forbid();
+            }
+
+            await _widgetService.TriggerTestAlertAsync(ownedSlug.Trim().ToLowerInvariant());
 
             return Ok(new
             {

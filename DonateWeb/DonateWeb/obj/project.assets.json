@@ -877,6 +877,19 @@
           }
         }
       },
+      "payOS/2.1.0": {
+        "type": "package",
+        "compile": {
+          "lib/net9.0/PayOS.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net9.0/PayOS.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "QRCoder/1.6.0": {
         "type": "package",
         "compile": {
@@ -2861,6 +2874,32 @@
         "packageIcon.png"
       ]
     },
+    "payOS/2.1.0": {
+      "sha512": "fsDWb3tfeu6vtawWtQVb34Rbd6sIxzGHUjOa/ASjd/r+/GUaqWUD2d6SzAeCnXghjYO7x0mkfm3TDoYfm26SYQ==",
+      "type": "package",
+      "path": "payos/2.1.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "CHANGELOG.md",
+        "README.md",
+        "lib/net5.0/PayOS.dll",
+        "lib/net5.0/PayOS.xml",
+        "lib/net6.0/PayOS.dll",
+        "lib/net6.0/PayOS.xml",
+        "lib/net7.0/PayOS.dll",
+        "lib/net7.0/PayOS.xml",
+        "lib/net8.0/PayOS.dll",
+        "lib/net8.0/PayOS.xml",
+        "lib/net9.0/PayOS.dll",
+        "lib/net9.0/PayOS.xml",
+        "lib/netstandard2.0/PayOS.dll",
+        "lib/netstandard2.0/PayOS.xml",
+        "payOS.png",
+        "payos.2.1.0.nupkg.sha512",
+        "payos.nuspec"
+      ]
+    },
     "QRCoder/1.6.0": {
       "sha512": "XmPA81eo+oRxBuyVdswsSkTGTE1d3thfF11Z1PdD7oB56A6HU4G4AAOdySmGRMb/cljwlFTMWUtosGEnwpS6GA==",
       "type": "package",
@@ -3247,7 +3286,8 @@
       "Microsoft.EntityFrameworkCore.Design >= 10.0.12",
       "Microsoft.EntityFrameworkCore.SqlServer >= 10.0.12",
       "QRCoder >= 1.6.0",
-      "System.IdentityModel.Tokens.Jwt >= 8.6.0"
+      "System.IdentityModel.Tokens.Jwt >= 8.6.0",
+      "payOS >= 2.1.0"
     ]
   },
   "packageFolders": {
@@ -3257,11 +3297,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\DonateWeb.csproj",
+      "projectUniqueName": "c:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\DonateWeb.csproj",
       "projectName": "DonateWeb",
-      "projectPath": "C:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\DonateWeb.csproj",
+      "projectPath": "c:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\DonateWeb.csproj",
       "packagesPath": "C:\\Users\\Admin\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\obj\\",
+      "outputPath": "c:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -3332,6 +3372,10 @@
           "System.IdentityModel.Tokens.Jwt": {
             "target": "Package",
             "version": "[8.6.0, )"
+          },
+          "payOS": {
+            "target": "Package",
+            "version": "[2.1.0, )"
           }
         },
         "imports": [

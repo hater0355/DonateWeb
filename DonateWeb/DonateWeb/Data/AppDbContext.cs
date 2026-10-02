@@ -18,6 +18,7 @@ namespace DonateWeb.Data
         public DbSet<Donation> Donations => Set<Donation>();
         public DbSet<TransactionAuditLog> TransactionAuditLogs => Set<TransactionAuditLog>();
         public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
+        public DbSet<WalletTransactionAuditLog> WalletTransactionAuditLogs => Set<WalletTransactionAuditLog>();
         public DbSet<WithdrawalRequest> WithdrawalRequests => Set<WithdrawalRequest>();
 
         // Các bảng thuộc phân hệ Widget & Tùy biến Streamer (OBS)
@@ -118,7 +119,19 @@ namespace DonateWeb.Data
                       .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasIndex(wt => wt.TransactionCode).IsUnique();
+                entity.HasIndex(wt => wt.OrderCode).IsUnique().HasFilter("[OrderCode] IS NOT NULL");
                 entity.HasIndex(wt => new { wt.UserId, wt.CreatedAt });
+            });
+
+            modelBuilder.Entity<WalletTransactionAuditLog>(entity =>
+            {
+                entity.HasOne(log => log.WalletTransaction)
+                      .WithMany(transaction => transaction.AuditLogs)
+                      .HasForeignKey(log => log.WalletTransactionId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(log => log.WalletTransactionId);
+                entity.HasIndex(log => log.CreatedAt);
             });
 
             // WithdrawalRequest - Foreign key với User & StreamerProfile (Yêu cầu rút tiền của Streamer)

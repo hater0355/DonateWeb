@@ -1,41 +1,51 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using DonateWeb.Data;
+using DonateWeb.Models.Enums;
 using DonateWeb.Areas.Widgets.Services;
 using DonateWeb.Areas.Widgets.ViewModels;
 
 namespace DonateWeb.Areas.Widgets.Controllers
 {
-    [Area("Widgets")]
-    [Route("Widgets/Config")]
+[Area("Widgets")]
+[Authorize(Roles = UserRoles.Streamer)]
+[Route("Widgets/Config")]
     [Route("Widgets/WidgetsConfig")]
     public class WidgetsConfigController : Controller
     {
         private readonly IWidgetService _widgetService;
         private readonly ILogger<WidgetsConfigController> _logger;
+        private readonly AppDbContext _context;
 
-        public WidgetsConfigController(IWidgetService widgetService, ILogger<WidgetsConfigController> logger)
+        public WidgetsConfigController(IWidgetService widgetService, ILogger<WidgetsConfigController> logger, AppDbContext context)
         {
             _widgetService = widgetService;
             _logger = logger;
+            _context = context;
         }
 
-        private string GetCurrentStreamerSlug()
+        private async Task<string?> GetOwnedStreamerSlugAsync(string? requestedSlug = null)
         {
-            if (User.Identity?.IsAuthenticated == true)
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
             {
-                var slug = User.FindFirst("StreamerSlug")?.Value;
-                if (!string.IsNullOrWhiteSpace(slug))
-                {
-                    return slug.Trim().ToLower();
-                }
-
-                var username = User.Identity.Name;
-                if (!string.IsNullOrWhiteSpace(username))
-                {
-                    return username.Trim().ToLower();
-                }
+                return null;
             }
-            return "tenstreamer";
+
+            var slug = await _context.StreamerProfiles
+                .Where(profile => profile.UserId == userId)
+                .Select(profile => profile.Slug)
+                .FirstOrDefaultAsync();
+
+            if (string.IsNullOrWhiteSpace(slug) ||
+                (!string.IsNullOrWhiteSpace(requestedSlug) &&
+                 !string.Equals(slug, requestedSlug.Trim(), StringComparison.OrdinalIgnoreCase)))
+            {
+                return null;
+            }
+
+            return slug.Trim().ToLowerInvariant();
         }
 
         private string GetBaseUrl()
@@ -51,7 +61,8 @@ namespace DonateWeb.Areas.Widgets.Controllers
         [HttpGet("AlertBox")]
         public async Task<IActionResult> AlertBox(string? slug)
         {
-            var targetSlug = string.IsNullOrWhiteSpace(slug) ? GetCurrentStreamerSlug() : slug;
+            var targetSlug = await GetOwnedStreamerSlugAsync(slug);
+            if (targetSlug == null) return Forbid();
             var model = await _widgetService.GetAlertBoxConfigAsync(targetSlug, GetBaseUrl());
 
             if (TempData["SuccessMessage"] != null)
@@ -66,10 +77,9 @@ namespace DonateWeb.Areas.Widgets.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AlertBox(AlertBoxConfigViewModel model)
         {
-            if (string.IsNullOrWhiteSpace(model.StreamerSlug))
-            {
-                model.StreamerSlug = GetCurrentStreamerSlug();
-            }
+            var ownedSlug = await GetOwnedStreamerSlugAsync(model.StreamerSlug);
+            if (ownedSlug == null) return Forbid();
+            model.StreamerSlug = ownedSlug;
 
             model.ObsOverlayUrl = $"{GetBaseUrl()}/Widgets/Overlay/AlertBox/{model.StreamerSlug}";
 
@@ -88,16 +98,19 @@ namespace DonateWeb.Areas.Widgets.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ResetAlertBox()
         {
-            var slug = GetCurrentStreamerSlug();
+            var slug = await GetOwnedStreamerSlugAsync();
+            if (slug == null) return Forbid();
             await _widgetService.ResetAlertBoxConfigAsync(slug);
             TempData["SuccessMessage"] = "Đã khôi phục cài đặt Alert Box về mặc định!";
             return RedirectToAction(nameof(AlertBox));
         }
 
         [HttpPost("TriggerTestAlert")]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> TriggerTestAlert()
         {
-            var slug = GetCurrentStreamerSlug();
+            var slug = await GetOwnedStreamerSlugAsync();
+            if (slug == null) return Forbid();
             await _widgetService.TriggerTestAlertAsync(slug);
             return Json(new { success = true, message = "Đã phát thông báo thử nghiệm lên OBS thành công!" });
         }
@@ -109,7 +122,8 @@ namespace DonateWeb.Areas.Widgets.Controllers
         [HttpGet("Goals")]
         public async Task<IActionResult> Goals(string? slug)
         {
-            var targetSlug = string.IsNullOrWhiteSpace(slug) ? GetCurrentStreamerSlug() : slug;
+            var targetSlug = await GetOwnedStreamerSlugAsync(slug);
+            if (targetSlug == null) return Forbid();
             var model = await _widgetService.GetGoalManagementAsync(targetSlug, GetBaseUrl());
 
             if (TempData["SuccessMessage"] != null)
@@ -128,7 +142,8 @@ namespace DonateWeb.Areas.Widgets.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SaveGoal(GoalManagementViewModel model)
         {
-            var slug = GetCurrentStreamerSlug();
+            var slug = await GetOwnedStreamerSlugAsync();
+            if (slug == null) return Forbid();
 
             if (model.NewGoal == null || string.IsNullOrWhiteSpace(model.NewGoal.Title))
             {
@@ -145,7 +160,8 @@ namespace DonateWeb.Areas.Widgets.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ToggleGoal(int id)
         {
-            var slug = GetCurrentStreamerSlug();
+            var slug = await GetOwnedStreamerSlugAsync();
+            if (slug == null) return Forbid();
             var success = await _widgetService.ToggleGoalAsync(slug, id);
             if (success)
             {
@@ -158,7 +174,8 @@ namespace DonateWeb.Areas.Widgets.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteGoal(int id)
         {
-            var slug = GetCurrentStreamerSlug();
+            var slug = await GetOwnedStreamerSlugAsync();
+            if (slug == null) return Forbid();
             var success = await _widgetService.DeleteGoalAsync(slug, id);
             if (success)
             {
@@ -174,7 +191,8 @@ namespace DonateWeb.Areas.Widgets.Controllers
         [HttpGet("Leaderboard")]
         public async Task<IActionResult> Leaderboard(string? period, string? slug)
         {
-            var targetSlug = string.IsNullOrWhiteSpace(slug) ? GetCurrentStreamerSlug() : slug;
+            var targetSlug = await GetOwnedStreamerSlugAsync(slug);
+            if (targetSlug == null) return Forbid();
             var model = await _widgetService.GetLeaderboardViewModelAsync(targetSlug, period ?? "all", GetBaseUrl());
             return View(model);
         }

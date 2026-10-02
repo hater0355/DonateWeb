@@ -338,6 +338,7 @@ namespace DonateWeb.Data
                             BalanceBefore DECIMAL(18,2) NOT NULL DEFAULT 0,
                             BalanceAfter DECIMAL(18,2) NOT NULL DEFAULT 0,
                             PaymentMethodName NVARCHAR(100) NULL,
+                            OrderCode BIGINT NULL,
                             [Status] INT NOT NULL DEFAULT 1,
                             Note NVARCHAR(500) NULL,
                             CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -346,6 +347,34 @@ namespace DonateWeb.Data
                         );
                         CREATE UNIQUE NONCLUSTERED INDEX IX_WalletTransactions_TransactionCode ON dbo.WalletTransactions (TransactionCode);
                         CREATE NONCLUSTERED INDEX IX_WalletTransactions_UserId_CreatedAt ON dbo.WalletTransactions (UserId, CreatedAt);
+                    END
+
+                    IF OBJECT_ID('dbo.WalletTransactions', 'U') IS NOT NULL
+                    BEGIN
+                        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.WalletTransactions') AND name = 'OrderCode')
+                            ALTER TABLE dbo.WalletTransactions ADD OrderCode BIGINT NULL;
+
+                        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.WalletTransactions') AND name = 'IX_WalletTransactions_OrderCode')
+                            EXEC(N'CREATE UNIQUE NONCLUSTERED INDEX IX_WalletTransactions_OrderCode ON dbo.WalletTransactions (OrderCode) WHERE [OrderCode] IS NOT NULL;');
+                    END
+
+                    IF OBJECT_ID('dbo.WalletTransactionAuditLogs', 'U') IS NULL
+                    BEGIN
+                        CREATE TABLE dbo.WalletTransactionAuditLogs (
+                            Id INT IDENTITY(1,1) NOT NULL,
+                            WalletTransactionId INT NOT NULL,
+                            ActionType NVARCHAR(50) NOT NULL,
+                            ExpectedAmount DECIMAL(18,2) NOT NULL,
+                            ReceivedAmount DECIMAL(18,2) NULL,
+                            ReferenceCode NVARCHAR(100) NULL,
+                            Note NVARCHAR(1000) NULL,
+                            PerformedBy NVARCHAR(100) NOT NULL DEFAULT 'PayOS:Webhook',
+                            CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                            CONSTRAINT PK_WalletTransactionAuditLogs PRIMARY KEY CLUSTERED (Id),
+                            CONSTRAINT FK_WalletTransactionAuditLogs_WalletTransactions FOREIGN KEY (WalletTransactionId) REFERENCES dbo.WalletTransactions (Id) ON DELETE CASCADE
+                        );
+                        CREATE NONCLUSTERED INDEX IX_WalletTransactionAuditLogs_WalletTransactionId ON dbo.WalletTransactionAuditLogs (WalletTransactionId);
+                        CREATE NONCLUSTERED INDEX IX_WalletTransactionAuditLogs_CreatedAt ON dbo.WalletTransactionAuditLogs (CreatedAt);
                     END
 
                     -- Bảng WithdrawalRequests (Yêu cầu rút tiền dành cho Streamer)

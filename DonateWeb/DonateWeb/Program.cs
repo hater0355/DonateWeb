@@ -29,6 +29,20 @@ builder.Services.AddScoped<IQrCodeService, QrCodeService>();
 // Đăng ký Phân hệ Bảo mật & Kiểm duyệt (Content Moderation, Rate Limiting & Webhook Security)
 builder.Services.AddSecurityAndModeration(builder.Configuration);
 
+// Đăng ký dịch vụ SignalR cho cập nhật thời gian thực (OBS Alert, Thông báo thanh toán)
+builder.Services.AddSignalR();
+
+// Đăng ký PayOS Client SDK dạng Singleton
+var payOSClientId = builder.Configuration["PayOS:ClientId"];
+var payOSApiKey = builder.Configuration["PayOS:ApiKey"];
+var payOSChecksumKey = builder.Configuration["PayOS:ChecksumKey"];
+if (string.IsNullOrWhiteSpace(payOSClientId) || string.IsNullOrWhiteSpace(payOSApiKey) || string.IsNullOrWhiteSpace(payOSChecksumKey))
+{
+    throw new InvalidOperationException("PayOS is not configured. Set PayOS__ClientId, PayOS__ApiKey, and PayOS__ChecksumKey using environment variables or a secret store.");
+}
+var payOS = new DonateWeb.Services.PayOS(payOSClientId, payOSApiKey, payOSChecksumKey);
+builder.Services.AddSingleton<DonateWeb.Services.IPayOSService>(payOS);
+
 // 3. Cấu hình Authentication (Cookie & OAuth2 Bên thứ 3: Google, Facebook, YouTube)
 var authBuilder = builder.Services.AddAuthentication(options =>
 {
@@ -148,6 +162,9 @@ app.UseRouting();
 // Bật Authentication trước Authorization
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Ánh xạ SignalR Hub
+app.MapHub<DonateWeb.Hubs.PaymentHub>("/paymentHub");
 
 // Ánh xạ các API Controllers (bao gồm PaymentWebhookController và WidgetsApiController)
 app.MapControllers();

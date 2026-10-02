@@ -10,7 +10,7 @@ namespace DonateWeb.ViewModels.Wallet
     {
         [Required(ErrorMessage = "Vui lòng nhập số tiền muốn nạp.")]
         [Range(10000, 500000000, ErrorMessage = "Số tiền nạp tối thiểu là 10.000 VNĐ và tối đa là 500.000.000 VNĐ.")]
-        public decimal Amount { get; set; } = 50000;
+        public decimal Amount { get; set; }
     }
 
     /// <summary>
@@ -19,6 +19,7 @@ namespace DonateWeb.ViewModels.Wallet
     public class DepositPaymentViewModel
     {
         public int TransactionId { get; set; }
+        public long OrderCode { get; set; }
         public string TransactionCode { get; set; } = string.Empty;
         public decimal Amount { get; set; }
         public string Memo { get; set; } = string.Empty;
@@ -27,6 +28,8 @@ namespace DonateWeb.ViewModels.Wallet
         public string AccountNo { get; set; } = string.Empty;
         public string AccountName { get; set; } = string.Empty;
         public string QrUrl { get; set; } = string.Empty;
+        public string QrCode { get; set; } = string.Empty;
+        public string CheckoutUrl { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public DateTime ExpireAt { get; set; }
         public int ExpireSeconds { get; set; } = 600; // 10 phút đếm ngược

@@ -3,10 +3,13 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using QRCoder; // [MỚI THÊM] Thư viện QRCoder để sinh mã QR thanh toán chứa số tiền và nội dung chuyển khoản
+using DonateWeb.Data;
 using DonateWeb.Models.Entities;
 using DonateWeb.Models.Enums;
 using DonateWeb.Security.RateLimiting;
+using DonateWeb.Security.Uploads;
 using DonateWeb.Services;
 using DonateWeb.ViewModels.Streamer;
 
@@ -18,6 +21,8 @@ namespace DonateWeb.Controllers
         private readonly IAuthService _authService;
         private readonly IWebHostEnvironment _webHostEnvironment;
         private readonly IQrCodeService _qrCodeService;
+        private readonly AppDbContext _context;
+        private readonly IConfiguration _configuration;
         private readonly ILogger<StreamerController> _logger;
 
         public StreamerController(
@@ -25,12 +30,16 @@ namespace DonateWeb.Controllers
             IAuthService authService,
             IWebHostEnvironment webHostEnvironment,
             IQrCodeService qrCodeService,
+            AppDbContext context,
+            IConfiguration configuration,
             ILogger<StreamerController> logger)
         {
             _streamerService = streamerService;
             _authService = authService;
             _webHostEnvironment = webHostEnvironment;
             _qrCodeService = qrCodeService;
+            _context = context;
+            _configuration = configuration;
             _logger = logger;
         }
 
@@ -40,32 +49,14 @@ namespace DonateWeb.Controllers
         /// </summary>
         private async Task<string?> SaveAvatarFileAsync(IFormFile? avatarFile, int userId)
         {
-            if (avatarFile == null || avatarFile.Length == 0)
+            var (path, error) = await AvatarUploadService.SaveAsync(avatarFile, _webHostEnvironment.WebRootPath, userId, HttpContext.RequestAborted);
+            if (error != null)
             {
+                ModelState.AddModelError(nameof(avatarFile), error);
                 return null;
             }
 
-            var uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, "images", "avatars");
-            if (!Directory.Exists(uploadsFolder))
-            {
-                Directory.CreateDirectory(uploadsFolder);
-            }
-
-            var extension = Path.GetExtension(avatarFile.FileName);
-            if (string.IsNullOrWhiteSpace(extension))
-            {
-                extension = ".png";
-            }
-
-            var uniqueFileName = $"avatar_{userId}_{Guid.NewGuid():N}{extension}";
-            var physicalFilePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-            using (var fileStream = new FileStream(physicalFilePath, FileMode.Create))
-            {
-                await avatarFile.CopyToAsync(fileStream);
-            }
-
-            return $"/images/avatars/{uniqueFileName}";
+            return path;
         }
 
         private async Task RefreshUserCookieClaimsAsync(int userId)
@@ -287,6 +278,11 @@ namespace DonateWeb.Controllers
 
             // Lưu file ảnh đại diện vào wwwroot/images/avatars nếu người dùng có chọn file mới
             var uploadedAvatarPath = await SaveAvatarFileAsync(avatarFile, userId);
+            if (!ModelState.IsValid)
+            {
+                TempData["ErrorMessage"] = ModelState.Values.SelectMany(value => value.Errors).First().ErrorMessage;
+                return Redirect("/" + streamer.Slug);
+            }
 
             var configModel = new StreamerProfileConfigViewModel
             {
@@ -449,6 +445,136 @@ namespace DonateWeb.Controllers
         }
 
         /// <summary>
+        /// POST: /Streamer/CreateBankDonation
+        /// Tạo đơn Donate ở trạng thái Pending, sinh mã Memo VietQR dạng "DN{id}" để người dùng quét mã.
+        /// Khi PayOS báo webhook, trạng thái sẽ tự động chuyển thành Success.
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateBankDonation([FromForm] string slug, [FromForm] string? donorName, [FromForm] decimal amount, [FromForm] string? message)
+        {
+            var streamer = await _streamerService.GetBySlugAsync(slug);
+            if (streamer == null)
+            {
+                return Json(new { success = false, message = "Không tìm thấy streamer." });
+            }
+
+            if (!streamer.IsActive)
+            {
+                return Json(new { success = false, message = "Kênh streamer này hiện đang bị khóa." });
+            }
+
+            if (streamer.ApprovalStatus != StreamerApprovalStatus.Approved)
+            {
+                return Json(new { success = false, message = "Kênh streamer chưa được phê duyệt để nhận donate." });
+            }
+
+            if (amount < 1000m || amount > 100000000m || amount != decimal.Truncate(amount))
+            {
+                return Json(new { success = false, message = "Số tiền donate phải là số nguyên từ 1.000 đến 100.000.000 VNĐ." });
+            }
+
+            if (amount < streamer.MinDonateAmount)
+            {
+                return Json(new { success = false, message = $"Số tiền ủng hộ tối thiểu là {streamer.MinDonateAmount:N0} VNĐ." });
+            }
+
+            int? currentUserId = null;
+            if (User.Identity?.IsAuthenticated == true && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var uid))
+            {
+                currentUserId = uid;
+            }
+
+            var cleanDonorName = string.IsNullOrWhiteSpace(donorName) ? "Người ủng hộ ẩn danh" : donorName.Trim();
+
+            // 1. Tạo đơn Donate ở trạng thái Pending
+            var donation = new Donation
+            {
+                StreamerProfileId = streamer.Id,
+                DonorUserId = currentUserId,
+                DonorName = cleanDonorName,
+                Amount = amount,
+                Message = message?.Trim(),
+                PaymentMethod = PaymentMethod.BankTransfer,
+                Status = DonationStatus.Pending,
+                TransactionCode = $"DON_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N")[..4].ToUpper()}",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.Donations.Add(donation);
+            await _context.SaveChangesAsync();
+
+            // 2. Gán memo chuẩn dạng "DN" + donation.Id (Ví dụ: DN84920)
+            var memo = $"DN{donation.Id}";
+            donation.TransactionCode = memo;
+            await _context.SaveChangesAsync();
+
+            // 3. Lấy thông tin tài khoản ngân hàng (Ưu tiên tài khoản riêng của Streamer, fallback tài khoản hệ thống)
+            var bankId = !string.IsNullOrWhiteSpace(streamer.BankName) ? streamer.BankName : (_configuration["BankConfig:BankId"] ?? "MB");
+            var accountNo = !string.IsNullOrWhiteSpace(streamer.BankAccountNumber) ? streamer.BankAccountNumber : (_configuration["BankConfig:AccountNo"] ?? "0354031024");
+            var accountName = !string.IsNullOrWhiteSpace(streamer.BankAccountName) ? streamer.BankAccountName : (_configuration["BankConfig:AccountName"] ?? "NGUYEN ANH HIEU");
+
+            var encodedMemo = Uri.EscapeDataString(memo);
+            var encodedAccountName = Uri.EscapeDataString(accountName);
+            var vietQrUrl = $"https://img.vietqr.io/image/{bankId}-{accountNo}-compact2.png?amount={(long)amount}&addInfo={encodedMemo}&accountName={encodedAccountName}";
+
+            return Json(new
+            {
+                success = true,
+                donationId = donation.Id,
+                transactionCode = memo,
+                memo = memo,
+                amount = donation.Amount,
+                formattedAmount = $"{donation.Amount:N0} VNĐ",
+                bankId = bankId,
+                accountNo = accountNo,
+                accountName = accountName,
+                qrUrl = vietQrUrl,
+                streamerName = streamer.DisplayName,
+                expireSeconds = 600
+            });
+        }
+
+        /// <summary>
+        /// GET: /Streamer/CheckDonationStatus?donationId=...&transactionCode=...
+        /// Polling AJAX kiểm tra trạng thái của đơn Donate
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> CheckDonationStatus([FromQuery] int? donationId, [FromQuery] string? transactionCode)
+        {
+            var query = _context.Donations.Include(d => d.StreamerProfile).AsQueryable();
+
+            Donation? donation = null;
+            if (donationId.HasValue && donationId.Value > 0)
+            {
+                donation = await query.FirstOrDefaultAsync(d => d.Id == donationId.Value);
+            }
+            else if (!string.IsNullOrWhiteSpace(transactionCode))
+            {
+                var clean = transactionCode.Trim();
+                donation = await query.FirstOrDefaultAsync(d => d.TransactionCode == clean);
+            }
+
+            if (donation == null)
+            {
+                return NotFound(new { success = false, isPaid = false, message = "Không tìm thấy đơn donate." });
+            }
+
+            var isPaid = donation.Status == DonationStatus.Success;
+
+            return Json(new
+            {
+                success = true,
+                isPaid = isPaid,
+                status = donation.Status.ToString(),
+                amount = donation.Amount,
+                transactionCode = donation.TransactionCode,
+                streamerName = donation.StreamerProfile?.DisplayName,
+                message = isPaid ? "Ủng hộ streamer thành công!" : "Đang chờ chuyển khoản..."
+            });
+        }
+
+        /// <summary>
         /// Bảng điều khiển tổng quan dành cho Streamer (cho phép cả Viewer và Admin xem khám phá)
         /// </summary>
         [Authorize]
@@ -596,6 +722,12 @@ namespace DonateWeb.Controllers
 
             var fileToSave = avatarFile ?? model.AvatarFile;
             var uploadedAvatarPath = await SaveAvatarFileAsync(fileToSave, userId);
+            if (!ModelState.IsValid)
+            {
+                model.AvatarUrl = streamer.AvatarUrl;
+                return View(model);
+            }
+
             model.AvatarUrl = !string.IsNullOrWhiteSpace(uploadedAvatarPath)
                 ? uploadedAvatarPath
                 : streamer.AvatarUrl;

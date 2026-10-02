@@ -323,9 +323,9 @@
                         </span>
                     </div>
 
-                    <form asp-action="Donate" asp-controller="Streamer" method="post">
+                    <form asp-action="Donate" asp-controller="Streamer" method="post" id="donateForm">
                         @Html.AntiForgeryToken()
-                        <input type="hidden" asp-for="Slug" />
+                        <input type="hidden" asp-for="Slug" id="donateSlugInput" />
                         <input type="hidden" asp-for="StreamerProfileId" />
 
                         <!-- Tên người ủng hộ -->
@@ -592,8 +592,138 @@
         </div>
     </div>
 
+    <!-- ========================================================================= -->
+    <!-- MODAL THANH TOÁN VIETQR REAL-TIME (TỰ ĐỘNG NHẬN DIỆN QUA PAYOS & SIGNALR) -->
+    <!-- ========================================================================= -->
+    <div class="modal fade" id="vietQrPaymentModal" tabindex="-1" aria-labelledby="vietQrPaymentModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
+                <!-- Header -->
+                <div class="modal-header text-white px-4 py-3" style="background: linear-gradient(135deg, #0d3b2e 0%, #1b4332 50%, #2d6a4f 100%);">
+                    <h5 class="modal-title fw-bold" id="vietQrPaymentModalLabel">
+                        <i class="fa-solid fa-qrcode text-warning me-2"></i> QUÉT MÃ VIETQR ỦNG HỘ STREAMER
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" onclick="stopDonateListening()"></button>
+                </div>
+
+                <div class="modal-body p-4">
+                    <!-- TRẠNG THÁI 1: ĐANG CHỜ QUÉT MÃ THANH TOÁN -->
+                    <div id="modalWaitingPaymentState">
+                        <div class="row g-4 align-items-center">
+                            <!-- Khung chứa ảnh QR Napas247 -->
+                            <div class="col-12 col-md-5 text-center">
+                                <div class="p-3 bg-light rounded-4 border position-relative d-inline-block shadow-sm">
+                                    <div class="position-relative" style="overflow: hidden; border-radius: 12px; background: #fff;">
+                                        <img id="modalVietQrImage" src="" alt="Mã VietQR Thanh Toán" class="img-fluid" style="max-height: 250px; min-width: 200px;" />
+                                    </div>
+                                </div>
+                                <div class="mt-2 small text-dark-green fw-semibold">
+                                    <i class="fa-solid fa-mobile-screen me-1 text-success"></i> Mở App Ngân hàng quét mã
+                                </div>
+                                <div class="small text-muted" style="font-size: 0.75rem;">
+                                    Tự động điền đúng Số tiền &amp; Nội dung
+                                </div>
+                            </div>
+
+                            <!-- Chi tiết đơn thanh toán -->
+                            <div class="col-12 col-md-7">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="badge bg-light-green text-dark-green border px-3 py-2 fw-semibold">
+                                        <i class="fa-solid fa-user text-success me-1"></i> Streamer: <strong id="modalStreamerNameDisplay">@Model.DisplayName</strong>
+                                    </span>
+                                    <div class="d-flex align-items-center gap-1 text-danger fw-bold">
+                                        <i class="fa-regular fa-clock"></i>
+                                        <span id="modalCountdownDisplay">10:00</span>
+                                    </div>
+                                </div>
+
+                                <div class="p-3 rounded-3 bg-light border mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                        <span class="text-muted small">Số tiền ủng hộ:</span>
+                                        <strong id="modalAmountDisplay" class="fs-5 text-danger">0 VNĐ</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                        <span class="text-muted small">Ngân hàng thụ hưởng:</span>
+                                        <span id="modalBankNameDisplay" class="fw-semibold text-dark-green small">MB Bank</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                        <span class="text-muted small">Số tài khoản:</span>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <strong id="modalAccountNoDisplay" class="text-primary font-monospace">0354031024</strong>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="copyModalField('modalAccountNoDisplay', this)" title="Sao chép">
+                                                <i class="fa-regular fa-copy"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                        <span class="text-muted small">Chủ tài khoản:</span>
+                                        <span id="modalAccountNameDisplay" class="fw-semibold text-dark small text-uppercase">NGUYEN ANH HIEU</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="text-muted small d-block">Nội dung chuyển khoản (bắt buộc):</span>
+                                            <strong id="modalMemoDisplay" class="text-success font-monospace fs-6">DN...</strong>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-success py-1 px-3 rounded-pill fw-semibold" onclick="copyModalField('modalMemoDisplay', this)">
+                                            <i class="fa-regular fa-copy me-1"></i> Sao chép
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Trạng thái đang lắng nghe Webhook PayOS qua SignalR -->
+                                <div class="p-2 rounded-3 bg-light-green border border-success border-opacity-25 d-flex align-items-center gap-2">
+                                    <div class="spinner-border spinner-border-sm text-success" role="status"></div>
+                                    <span class="small text-dark-green fw-semibold" id="modalListeningStatusText">
+                                        Đang tự động lắng nghe giao dịch chuyển khoản từ PayOS (Real-time)...
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TRẠNG THÁI 2: THANH TOÁN THÀNH CÔNG (TỰ ĐỘNG CHUYỂN SANG KHÔNG CẦN F5) -->
+                    <div id="modalSuccessPaymentState" class="d-none text-center py-4">
+                        <div class="mb-3">
+                            <div class="d-inline-flex p-3 rounded-circle bg-success bg-opacity-10 text-success mb-2">
+                                <i class="fa-solid fa-circle-check display-3 text-success"></i>
+                            </div>
+                            <h4 class="fw-bold text-success mb-1">ỦNG HỘ STREAMER THÀNH CÔNG!</h4>
+                            <p class="text-muted small mb-3">Khoản quyên góp của bạn đã được hệ thống xác nhận tự động qua PayOS.</p>
+                        </div>
+
+                        <div class="p-3 rounded-4 bg-light-green border border-success border-opacity-50 mx-auto mb-4" style="max-width: 480px;">
+                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                <span class="text-muted small">Số tiền đã ủng hộ:</span>
+                                <strong id="successModalAmount" class="text-success fs-5">0 VNĐ</strong>
+                            </div>
+                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                <span class="text-muted small">Streamer nhận:</span>
+                                <strong id="successModalStreamer" class="text-dark-green">@Model.DisplayName</strong>
+                            </div>
+                            <div class="d-flex justify-content-between py-1">
+                                <span class="text-muted small">Mã giao dịch:</span>
+                                <strong id="successModalTxCode" class="text-muted font-monospace">DN...</strong>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info py-2 small d-inline-block mb-3 border-0 bg-opacity-25">
+                            <i class="fa-solid fa-bullhorn text-primary me-1"></i> Thông báo donate và lời nhắn đang được phát trực tiếp trên màn hình livestream của Streamer!
+                        </div>
+
+                        <div>
+                            <button type="button" class="btn btn-dark-green px-5 py-2 rounded-pill fw-bold" data-bs-dismiss="modal" onclick="location.reload()">
+                                <i class="fa-solid fa-check me-2"></i> HOÀN TẤT
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
 <script>
     // =========================================================================
     // [MỚI THÊM]: Script xử lý chọn phương thức thanh toán và tự động sinh mã QR
@@ -602,6 +732,14 @@
     const currentWalletBalance = @Model.CurrentWalletBalance.ToString(System.Globalization.CultureInfo.InvariantCulture);
     const streamerSlug = '@Model.Slug';
     let qrUpdateTimer = null;
+
+    // Biến quản lý phiên thanh toán Donate VietQR Real-time
+    let donateHubConnection = null;
+    let donatePollingInterval = null;
+    let donateCountdownInterval = null;
+    let currentDonationId = null;
+    let currentDonationCode = null;
+    let donateRemainingSeconds = 600;
 
     function setAmount(val) {
         const amountInput = document.getElementById('donateAmountInput');
@@ -766,7 +904,303 @@
         }
 
         handlePaymentMethodChange();
+
+        // Gắn sự kiện submit cho form donate
+        const donateForm = document.getElementById('donateForm');
+        if (donateForm) {
+            donateForm.addEventListener('submit', function (e) {
+                const bankRadio = document.getElementById('paymentBankRadio');
+                // Nếu người dùng chọn phương thức Chuyển khoản ngân hàng (VietQR)
+                if (bankRadio && bankRadio.checked) {
+                    e.preventDefault();
+                    handleBankDonateSubmit();
+                }
+            });
+        }
     });
+
+    // =========================================================================
+    // XỬ LÝ QUÉT MÃ VIETQR REAL-TIME QUA PAYOS & SIGNALR
+    // =========================================================================
+
+    // Gửi yêu cầu tạo đơn donate Pending và mở Modal VietQR
+    async function handleBankDonateSubmit() {
+        const submitBtn = document.getElementById('submitDonateBtn');
+        const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+
+        const amountInput = document.getElementById('donateAmountInput');
+        const donorInput = document.getElementById('DonorName');
+        const messageInput = document.getElementById('Message');
+        const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+
+        const amount = parseFloat(amountInput ? amountInput.value : 0) || 0;
+        const donorName = donorInput ? donorInput.value.trim() : '';
+        const message = messageInput ? messageInput.value.trim() : '';
+
+        if (!donorName) {
+            alert('Vui lòng nhập Tên của bạn / Biệt danh để streamer biết ai ủng hộ.');
+            if (donorInput) donorInput.focus();
+            return;
+        }
+
+        if (amount < @Model.MinDonateAmount) {
+            alert('Số tiền ủng hộ tối thiểu là @Model.MinDonateAmount.ToString("N0") VNĐ.');
+            if (amountInput) amountInput.focus();
+            return;
+        }
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Đang tạo mã VietQR...';
+        }
+
+        try {
+            const formData = new URLSearchParams();
+            formData.append('slug', streamerSlug);
+            formData.append('donorName', donorName);
+            formData.append('amount', amount);
+            formData.append('message', message);
+            if (tokenInput) formData.append('__RequestVerificationToken', tokenInput.value);
+
+            const response = await fetch('/Streamer/CreateBankDonation', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData.toString()
+            });
+
+            const result = await response.json();
+
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
+            }
+
+            if (!response.ok || !result.success) {
+                alert(result.message || 'Không thể khởi tạo mã VietQR. Vui lòng thử lại sau.');
+                return;
+            }
+
+            // Mở Modal hiển thị mã VietQR Real-time
+            openVietQrModal(result);
+
+        } catch (err) {
+            console.error('Lỗi khi gọi API CreateBankDonation:', err);
+            alert('Đã xảy ra lỗi kết nối với máy chủ. Vui lòng thử lại.');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
+            }
+        }
+    }
+
+    // Mở Modal VietQR và kích hoạt cơ chế lắng nghe Real-time kép (SignalR + Polling AJAX Fallback)
+    function openVietQrModal(data) {
+        currentDonationId = data.donationId;
+        currentDonationCode = data.transactionCode;
+        donateRemainingSeconds = data.expireSeconds || 600;
+
+        // Điền dữ liệu vào Modal
+        document.getElementById('modalVietQrImage').src = data.qrUrl;
+        document.getElementById('modalAmountDisplay').textContent = data.formattedAmount;
+        document.getElementById('modalBankNameDisplay').textContent = data.bankId;
+        document.getElementById('modalAccountNoDisplay').textContent = data.accountNo;
+        document.getElementById('modalAccountNameDisplay').textContent = data.accountName;
+        document.getElementById('modalMemoDisplay').textContent = data.memo;
+        document.getElementById('modalStreamerNameDisplay').textContent = data.streamerName || '@Model.DisplayName';
+
+        // Đảm bảo trạng thái ban đầu là đang chờ quét mã
+        document.getElementById('modalWaitingPaymentState').classList.remove('d-none');
+        document.getElementById('modalSuccessPaymentState').classList.add('d-none');
+
+        // Khởi chạy đếm ngược 10 phút
+        startDonateCountdown();
+
+        // 1. Kích hoạt kết nối SignalR Real-time Hub (0 delay)
+        initSignalRDonation(data.transactionCode, data.donationId);
+
+        // 2. Kích hoạt Polling AJAX dự phòng mỗi 3 giây
+        startDonatePolling(data.donationId, data.transactionCode);
+
+        // Hiển thị Bootstrap Modal
+        const modalEl = document.getElementById('vietQrPaymentModal');
+        const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modalInstance.show();
+    }
+
+    // Khởi tạo kết nối SignalR lắng nghe sự kiện DonationSuccess khi Webhook PayOS xử lý thành công
+    function initSignalRDonation(txCode, donationId) {
+        if (typeof signalR === 'undefined') {
+            console.warn('[SignalR] Thư viện SignalR chưa nạp, sử dụng Polling AJAX Fallback.');
+            return;
+        }
+
+        try {
+            if (donateHubConnection) {
+                donateHubConnection.stop();
+                donateHubConnection = null;
+            }
+
+            donateHubConnection = new signalR.HubConnectionBuilder()
+                .withUrl('/paymentHub')
+                .withAutomaticReconnect([0, 2000, 5000, 10000])
+                .build();
+
+            // Lắng nghe sự kiện DonationSuccess từ PaymentWebhookController
+            donateHubConnection.on('DonationSuccess', function (res) {
+                console.log('[SignalR Real-time] Nhận sự kiện DonationSuccess từ PayOS Webhook:', res);
+                if (res && (res.transactionCode === txCode || res.donationId == donationId)) {
+                    showDonationSuccessUI(res);
+                }
+            });
+
+            donateHubConnection.start().then(function () {
+                console.log('[SignalR Real-time] Đã kết nối PaymentHub cho giao dịch donate:', txCode);
+                // Tham gia nhóm giao dịch
+                donateHubConnection.invoke('JoinTransactionGroup', txCode);
+                if (donationId) {
+                    donateHubConnection.invoke('JoinTransactionGroup', donationId.toString());
+                }
+            }).catch(function (err) {
+                console.warn('[SignalR] Lỗi kết nối Hub, tiếp tục với Polling AJAX:', err);
+            });
+
+        } catch (err) {
+            console.error('[SignalR] Ngoại lệ khi tạo SignalR Connection:', err);
+        }
+    }
+
+    // Polling AJAX dự phòng kiểm tra trạng thái mỗi 3 giây
+    function startDonatePolling(donationId, txCode) {
+        clearInterval(donatePollingInterval);
+
+        donatePollingInterval = setInterval(async () => {
+            if (!currentDonationId) return;
+
+            try {
+                const res = await fetch(`/Streamer/CheckDonationStatus?donationId=${encodeURIComponent(donationId)}&transactionCode=${encodeURIComponent(txCode)}`);
+                if (!res.ok) return;
+
+                const data = await res.json();
+                if (data && data.isPaid) {
+                    console.log('[Polling AJAX] Đã phát hiện giao dịch donate thành công từ API:', data);
+                    showDonationSuccessUI(data);
+                }
+            } catch (e) {
+                console.error('Lỗi khi polling trạng thái donate:', e);
+            }
+        }, 3000);
+    }
+
+    // Hiển thị giao diện "Thanh toán & Gửi Donate thành công" tự động mà không cần F5
+    function showDonationSuccessUI(data) {
+        // Dừng toàn bộ timer, polling và ngắt kết nối SignalR
+        stopDonateListening();
+
+        // Ẩn giao diện quét mã, hiển thị giao diện chúc mừng
+        const waitingState = document.getElementById('modalWaitingPaymentState');
+        const successState = document.getElementById('modalSuccessPaymentState');
+        if (waitingState) waitingState.classList.add('d-none');
+        if (successState) successState.classList.remove('d-none');
+
+        // Cập nhật thông tin vào màn hình chúc mừng
+        const amountEl = document.getElementById('successModalAmount');
+        const streamerEl = document.getElementById('successModalStreamer');
+        const txCodeEl = document.getElementById('successModalTxCode');
+
+        if (amountEl && data.amount) amountEl.textContent = '+' + Number(data.amount).toLocaleString('vi-VN') + ' VNĐ';
+        if (streamerEl && data.streamerName) streamerEl.textContent = data.streamerName;
+        if (txCodeEl) txCodeEl.textContent = data.transactionCode || currentDonationCode || 'Thành công';
+
+        // Tự động phát âm thanh thông báo vui tươi nếu trình duyệt cho phép
+        try {
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3');
+            audio.volume = 0.6;
+            audio.play().catch(() => {});
+        } catch (e) {}
+    }
+
+    // Đồng hồ đếm ngược 10 phút trong modal
+    function startDonateCountdown() {
+        clearInterval(donateCountdownInterval);
+        const timerEl = document.getElementById('modalCountdownDisplay');
+
+        function update() {
+            const m = Math.floor(donateRemainingSeconds / 60);
+            const s = donateRemainingSeconds % 60;
+            if (timerEl) timerEl.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+
+            if (donateRemainingSeconds <= 0) {
+                clearInterval(donateCountdownInterval);
+                clearInterval(donatePollingInterval);
+                if (timerEl) timerEl.textContent = 'HẾT HẠN';
+                alert('Mã VietQR này đã hết hạn hiệu lực 10 phút. Vui lòng bấm tạo mã mới để tiếp tục.');
+                stopDonateListening();
+                const modalEl = document.getElementById('vietQrPaymentModal');
+                const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                if (modalInstance) modalInstance.hide();
+            } else {
+                donateRemainingSeconds--;
+            }
+        }
+
+        update();
+        donateCountdownInterval = setInterval(update, 1000);
+    }
+
+    // Dừng toàn bộ tiến trình lắng nghe thanh toán
+    function stopDonateListening() {
+        if (donatePollingInterval) clearInterval(donatePollingInterval);
+        if (donateCountdownInterval) clearInterval(donateCountdownInterval);
+        donatePollingInterval = null;
+        donateCountdownInterval = null;
+        currentDonationId = null;
+        currentDonationCode = null;
+
+        if (donateHubConnection) {
+            donateHubConnection.stop();
+            donateHubConnection = null;
+        }
+    }
+
+    // Hàm sao chép thông tin trong modal
+    function copyModalField(fieldId, btnElement) {
+        const el = document.getElementById(fieldId);
+        if (!el) return;
+        const text = (el.innerText || el.textContent || '').trim();
+        if (!text) return;
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                showModalCopiedFeedback(btnElement);
+            }).catch(() => {
+                fallbackCopyModal(text, btnElement);
+            });
+        } else {
+            fallbackCopyModal(text, btnElement);
+        }
+    }
+
+    function fallbackCopyModal(text, btnElement) {
+        const temp = document.createElement('textarea');
+        temp.value = text;
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand('copy');
+        document.body.removeChild(temp);
+        showModalCopiedFeedback(btnElement);
+    }
+
+    function showModalCopiedFeedback(btnElement) {
+        if (!btnElement) return;
+        const orig = btnElement.innerHTML;
+        btnElement.innerHTML = '<i class="fa-solid fa-check me-1"></i> Đã chép!';
+        setTimeout(() => {
+            btnElement.innerHTML = orig;
+        }, 2000);
+    }
 </script>
 
 @if (isStreamerAccount)

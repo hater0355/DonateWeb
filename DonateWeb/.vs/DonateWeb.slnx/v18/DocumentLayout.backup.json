@@ -9,6 +9,14 @@
     {
       "AbsoluteMoniker": "D:0:0:{3F177BD7-D6E1-EE99-314E-61F3A5B879D5}|DonateWeb\\DonateWeb.csproj|c:\\users\\admin\\onedrive\\desktop\\donateweb\\donateweb\\donateweb\\donateweb.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}",
       "RelativeMoniker": "D:0:0:{3F177BD7-D6E1-EE99-314E-61F3A5B879D5}|DonateWeb\\DonateWeb.csproj|solutionrelative:donateweb\\donateweb.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3F177BD7-D6E1-EE99-314E-61F3A5B879D5}|DonateWeb\\DonateWeb.csproj|c:\\users\\admin\\onedrive\\desktop\\donateweb\\donateweb\\donateweb\\donatewebdb_script.sql||{CC5D8DF0-88F4-4BB2-9DBB-B48CEE65C30A}",
+      "RelativeMoniker": "D:0:0:{3F177BD7-D6E1-EE99-314E-61F3A5B879D5}|DonateWeb\\DonateWeb.csproj|solutionrelative:donateweb\\donatewebdb_script.sql||{CC5D8DF0-88F4-4BB2-9DBB-B48CEE65C30A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3F177BD7-D6E1-EE99-314E-61F3A5B879D5}|DonateWeb\\DonateWeb.csproj|c:\\users\\admin\\onedrive\\desktop\\donateweb\\donateweb\\donateweb\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{3F177BD7-D6E1-EE99-314E-61F3A5B879D5}|DonateWeb\\DonateWeb.csproj|solutionrelative:donateweb\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
     }
   ],
   "DocumentGroupContainers": [
@@ -18,7 +26,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 3,
+          "SelectedChildIndex": 5,
           "Children": [
             {
               "$type": "Bookmark",
@@ -30,13 +38,36 @@
             },
             {
               "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "DonateWebDB_Script.sql",
+              "DocumentMoniker": "C:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\DonateWebDB_Script.sql",
+              "RelativeDocumentMoniker": "DonateWeb\\DonateWebDB_Script.sql",
+              "ToolTip": "C:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\DonateWebDB_Script.sql",
+              "RelativeToolTip": "DonateWeb\\DonateWebDB_Script.sql",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
+              "WhenOpened": "2026-10-01T19:01:12.341Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "appsettings.json",
+              "DocumentMoniker": "C:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\appsettings.json",
+              "RelativeDocumentMoniker": "DonateWeb\\appsettings.json",
+              "ToolTip": "C:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\appsettings.json",
+              "RelativeToolTip": "DonateWeb\\appsettings.json",
+              "ViewState": "AgIAACYAAAAAAAAAAAAAAE0AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-10-01T17:52:24.727Z"
+            },
+            {
+              "$type": "Document",
               "DocumentIndex": 1,
               "Title": "DonateWeb.csproj",
               "DocumentMoniker": "C:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\DonateWeb.csproj",
               "RelativeDocumentMoniker": "DonateWeb\\DonateWeb.csproj",
               "ToolTip": "C:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\DonateWeb.csproj",
               "RelativeToolTip": "DonateWeb\\DonateWeb.csproj",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAAYAAAAAAAAAAAAAABcAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
               "WhenOpened": "2026-09-30T15:56:10.899Z"
             },
@@ -48,7 +79,7 @@
               "RelativeDocumentMoniker": "DonateWeb\\Program.cs",
               "ToolTip": "C:\\Users\\Admin\\OneDrive\\Desktop\\DonateWeb\\DonateWeb\\DonateWeb\\Program.cs",
               "RelativeToolTip": "DonateWeb\\Program.cs",
-              "ViewState": "AgIAAJYAAAAAAAAAAAAowLAAAAAKAAAAAAAAAA==",
+              "ViewState": "AgIAABwAAAAAAAAAAAAawCgAAAAEAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-09-30T15:25:41.78Z",
               "EditorCaption": ""

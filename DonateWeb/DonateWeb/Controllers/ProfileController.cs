@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using DonateWeb.Data;
+using DonateWeb.Security.Uploads;
 using DonateWeb.ViewModels;
 
 namespace DonateWeb.Controllers
@@ -87,33 +88,23 @@ namespace DonateWeb.Controllers
                 return RedirectToAction("Login", "Auth");
             }
 
+            var fileToUpload = avatarFile ?? model.AvatarFile;
+            var (uploadedAvatarPath, uploadError) = await AvatarUploadService.SaveAsync(
+                fileToUpload,
+                _webHostEnvironment.WebRootPath,
+                userId,
+                HttpContext.RequestAborted);
+            if (uploadError != null)
+            {
+                TempData["ErrorMessage"] = uploadError;
+                return RedirectToAction(nameof(Index));
+            }
+
             user.FullName = model.FullName?.Trim() ?? user.FullName;
             user.PhoneNumber = model.PhoneNumber?.Trim();
-
-            var fileToUpload = avatarFile ?? model.AvatarFile;
-            if (fileToUpload != null && fileToUpload.Length > 0)
+            if (uploadedAvatarPath != null)
             {
-                var uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, "images", "avatars");
-                if (!Directory.Exists(uploadsFolder))
-                {
-                    Directory.CreateDirectory(uploadsFolder);
-                }
-
-                var extension = Path.GetExtension(fileToUpload.FileName);
-                if (string.IsNullOrWhiteSpace(extension))
-                {
-                    extension = ".png";
-                }
-
-                var uniqueFileName = $"avatar_{userId}_{Guid.NewGuid():N}{extension}";
-                var physicalFilePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-                using (var fileStream = new FileStream(physicalFilePath, FileMode.Create))
-                {
-                    await fileToUpload.CopyToAsync(fileStream);
-                }
-
-                user.AvatarUrl = $"/images/avatars/{uniqueFileName}";
+                user.AvatarUrl = uploadedAvatarPath;
             }
 
             if (user.StreamerProfile != null)

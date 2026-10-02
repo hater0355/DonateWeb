@@ -1,5 +1,21 @@
 [
   {
+    "ContainingType": "DonateWeb.Security.Webhook.PaymentWebhookController",
+    "Method": "HandlePayOSWebhook",
+    "RelativePath": "api/payment/webhook",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "body",
+        "Type": "DonateWeb.Services.WebhookType",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
     "ContainingType": "DonateWeb.Security.Controllers.SecurityTestApiController",
     "Method": "GenerateHmac",
     "RelativePath": "api/security/test/hmac-generate",
@@ -79,6 +95,22 @@
         "Name": "payload",
         "Type": "DonateWeb.Security.Webhook.PaymentWebhookPayload",
         "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "DonateWeb.Security.Webhook.PaymentWebhookController",
+    "Method": "CheckStatus",
+    "RelativePath": "api/webhook/payment/check-status",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "code",
+        "Type": "System.String",
+        "IsRequired": false
       }
     ],
     "ReturnTypes": []

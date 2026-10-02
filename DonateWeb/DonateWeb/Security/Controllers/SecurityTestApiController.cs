@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Hosting;
 using DonateWeb.Security.ContentModeration;
 using DonateWeb.Security.RateLimiting;
 using DonateWeb.Security.Webhook;
@@ -20,15 +21,18 @@ namespace DonateWeb.Security.Controllers
         private readonly IContentModerationService _moderationService;
         private readonly IIpRateLimiterService _rateLimiter;
         private readonly IWebhookSecurityService _webhookSecurity;
+        private readonly IWebHostEnvironment _environment;
 
         public SecurityTestApiController(
             IContentModerationService moderationService,
             IIpRateLimiterService rateLimiter,
-            IWebhookSecurityService webhookSecurity)
+            IWebhookSecurityService webhookSecurity,
+            IWebHostEnvironment environment)
         {
             _moderationService = moderationService;
             _rateLimiter = rateLimiter;
             _webhookSecurity = webhookSecurity;
+            _environment = environment;
         }
 
         /// <summary>
@@ -111,6 +115,11 @@ namespace DonateWeb.Security.Controllers
         [HttpPost("hmac-generate")]
         public IActionResult GenerateHmac([FromBody] TestHmacRequest request)
         {
+            if (!_environment.IsDevelopment())
+            {
+                return NotFound();
+            }
+
             var payload = request?.Payload ?? string.Empty;
             var signature = _webhookSecurity.ComputeHmacSha256(payload);
 

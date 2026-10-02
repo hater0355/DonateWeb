@@ -29,6 +29,7 @@
 <audio id="alertAudioPlayer" preload="auto"></audio>
 
 @section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
     <script>
         // Cấu hình ban đầu từ ViewModel
         const streamerSlug = '@Html.Raw(Model.StreamerSlug)';
@@ -65,8 +66,45 @@
                 console.error("Lỗi khởi tạo trạng thái alert:", err);
             }
 
-            // Bắt đầu vòng lặp polling
+            // Kết nối SignalR Real-time Hub nhận diện tức thì (0 delay)
+            initObsSignalR();
+
+            // Bắt đầu vòng lặp polling dự phòng
             pollLoop();
+        }
+
+        // Khởi tạo kết nối SignalR Real-time cho OBS Studio Alert Box
+        function initObsSignalR() {
+            if (typeof signalR === 'undefined') return;
+
+            try {
+                const hubConn = new signalR.HubConnectionBuilder()
+                    .withUrl('/paymentHub')
+                    .withAutomaticReconnect([0, 2000, 5000, 10000])
+                    .build();
+
+                // Lắng nghe sự kiện ReceiveAlert từ PaymentWebhookController khi Webhook PayOS kích hoạt
+                hubConn.on('ReceiveAlert', function (alertData) {
+                    console.log('[OBS SignalR Real-time] Nhận Alert mới từ PayOS Webhook:', alertData);
+                    if (alertData) {
+                        if (alertData.donationId > 0) {
+                            lastDonationId = Math.max(lastDonationId, alertData.donationId);
+                        }
+                        alertQueue.push(alertData);
+                        processQueue();
+                    }
+                });
+
+                hubConn.start().then(function () {
+                    console.log('[OBS SignalR] Kết nối PaymentHub thành công cho Streamer:', streamerSlug);
+                    hubConn.invoke('JoinStreamerGroup', streamerSlug);
+                }).catch(function (err) {
+                    console.warn('[OBS SignalR] Không thể kết nối Hub, tiếp tục với Polling 2.5s:', err);
+                });
+
+            } catch (e) {
+                console.error('[OBS SignalR] Lỗi:', e);
+            }
         }
 
         // Vòng lặp Polling kiểm tra donate mới hoặc Test Alert từ streamer

@@ -21,6 +21,11 @@ namespace DonateWeb.Models.Entities
         public string TransactionCode { get; set; } = string.Empty;
 
         /// <summary>
+        /// Mã đơn hàng số nguyên của PayOS (Duy nhất cho mỗi giao dịch)
+        /// </summary>
+        public long? OrderCode { get; set; }
+
+        /// <summary>
         /// Loại giao dịch: "DEPOSIT" (Nạp tiền), "WITHDRAW" (Rút tiền)
         /// </summary>
         [Required]
@@ -52,13 +57,21 @@ namespace DonateWeb.Models.Entities
         public string? PaymentMethodName { get; set; }
 
         /// <summary>
-        /// Trạng thái: 0 = Pending (Chờ duyệt), 1 = Success (Thành công), 2 = Failed/Rejected (Thất bại/Từ chối)
+        /// Trạng thái: 0 = Pending (Chờ duyệt), 1 = Success / Completed (Thành công), 2 = Failed / Cancelled (Thất bại / Hủy)
         /// </summary>
-        public int Status { get; set; } = 1;
+        public const int StatusPending = 0;
+        public const int StatusCompleted = 1;
+        public const int StatusSuccess = 1;
+        public const int StatusCancelled = 2;
+        public const int StatusFailed = 2;
+
+        public int Status { get; set; } = 0;
 
         [MaxLength(500)]
         public string? Note { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public virtual ICollection<WalletTransactionAuditLog> AuditLogs { get; set; } = new List<WalletTransactionAuditLog>();
     }
 }

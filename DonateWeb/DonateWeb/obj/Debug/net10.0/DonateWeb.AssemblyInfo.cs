@@ -11,10 +11,11 @@
 using System;
 using System.Reflection;
 
+[assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute("d6b4c501-8052-4d60-a6b6-615aa0ec2be0")]
 [assembly: System.Reflection.AssemblyCompanyAttribute("DonateWeb")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+cd276054f5afb21aa4a03b0c94e5958d20128a7f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+dc639e99ce9f2219f82d738c0a6275fc233a4a53")]
 [assembly: System.Reflection.AssemblyProductAttribute("DonateWeb")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DonateWeb")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

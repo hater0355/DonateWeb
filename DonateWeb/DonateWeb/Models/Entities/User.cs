@@ -47,6 +47,16 @@ namespace DonateWeb.Models.Entities
         [Column(TypeName = "decimal(18,2)")]
         public decimal WalletBalance { get; set; } = 0;
 
+        /// <summary>
+        /// Alias cho WalletBalance để tương thích theo yêu cầu
+        /// </summary>
+        [NotMapped]
+        public decimal Balance
+        {
+            get => WalletBalance;
+            set => WalletBalance = value;
+        }
+
         public bool IsActive { get; set; } = true;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

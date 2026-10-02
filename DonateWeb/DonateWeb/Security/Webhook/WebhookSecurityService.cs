@@ -116,7 +116,7 @@ namespace DonateWeb.Security.Webhook
         /// </summary>
         public bool ValidateHmacSignature(string rawBody, string? providedSignature)
         {
-            if (string.IsNullOrWhiteSpace(providedSignature))
+            if (string.IsNullOrWhiteSpace(providedSignature) || string.IsNullOrWhiteSpace(_settings.SecretKey))
             {
                 return false;
             }
@@ -140,6 +140,11 @@ namespace DonateWeb.Security.Webhook
         /// </summary>
         public string ComputeHmacSha256(string data)
         {
+            if (string.IsNullOrWhiteSpace(_settings.SecretKey))
+            {
+                throw new InvalidOperationException("Webhook signing key is not configured. Set Security__Webhook__SecretKey using a secret store.");
+            }
+
             var keyBytes = Encoding.UTF8.GetBytes(_settings.SecretKey);
             var dataBytes = Encoding.UTF8.GetBytes(data ?? string.Empty);
 

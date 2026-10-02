@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="DonateWeb/DonateWeb.csproj" />
+  <Project Path="DonateWeb.Tests/DonateWeb.Tests.csproj" />
 </Solution>

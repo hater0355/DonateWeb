@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Hosting;
 using QRCoder;
 using DonateWeb.Data;
 using DonateWeb.Models.Entities;
@@ -20,17 +21,23 @@ namespace DonateWeb.Controllers
         private readonly IAuthService _authService;
         private readonly ILogger<WalletController> _logger;
         private readonly IConfiguration _configuration;
+        private readonly IPayOSService _payOS;
+        private readonly IWebHostEnvironment _environment;
 
         public WalletController(
             AppDbContext context,
             IAuthService authService,
             ILogger<WalletController> logger,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IPayOSService payOS,
+            IWebHostEnvironment environment)
         {
             _context = context;
             _authService = authService;
             _logger = logger;
             _configuration = configuration;
+            _payOS = payOS;
+            _environment = environment;
         }
 
         /// <summary>
@@ -51,6 +58,7 @@ namespace DonateWeb.Controllers
                         BalanceBefore DECIMAL(18,2) NOT NULL DEFAULT 0,
                         BalanceAfter DECIMAL(18,2) NOT NULL DEFAULT 0,
                         PaymentMethodName NVARCHAR(100) NULL,
+                        OrderCode BIGINT NULL,
                         [Status] INT NOT NULL DEFAULT 1,
                         Note NVARCHAR(500) NULL,
                         CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -59,6 +67,18 @@ namespace DonateWeb.Controllers
                     );
                     CREATE UNIQUE NONCLUSTERED INDEX IX_WalletTransactions_TransactionCode ON dbo.WalletTransactions (TransactionCode);
                     CREATE NONCLUSTERED INDEX IX_WalletTransactions_UserId_CreatedAt ON dbo.WalletTransactions (UserId, CreatedAt);
+                END
+
+                IF OBJECT_ID('dbo.WalletTransactions', 'U') IS NOT NULL
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.WalletTransactions') AND name = 'OrderCode')
+                    BEGIN
+                        ALTER TABLE dbo.WalletTransactions ADD OrderCode BIGINT NULL;
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WalletTransactions_OrderCode')
+                    BEGIN
+                        EXEC(N'CREATE UNIQUE NONCLUSTERED INDEX IX_WalletTransactions_OrderCode ON dbo.WalletTransactions (OrderCode) WHERE [OrderCode] IS NOT NULL;');
+                    END
                 END
 
                 IF OBJECT_ID('dbo.WithdrawalRequests', 'U') IS NULL
@@ -190,6 +210,7 @@ namespace DonateWeb.Controllers
             }
 
             var (bankId, accountNo, accountName, bankName) = GetBankConfig();
+            ViewBag.EnablePaymentSimulation = _environment.IsDevelopment();
 
             var model = new DepositViewModel
             {
@@ -214,11 +235,13 @@ namespace DonateWeb.Controllers
 
         /// <summary>
         /// POST: /Wallet/CreateDeposit
-        /// Nhận số tiền nạp, tạo bản ghi WalletTransaction Pending, sinh mã Memo duy nhất và URL VietQR Napas247 động
+        /// Tạo đơn nạp tiền tự động qua PayOS SDK, sinh orderCode timestamp mili-giây,
+        /// lưu WalletTransaction trạng thái Pending, gọi _payOS.createPaymentLink
+        /// và trả về JSON { success = true, orderCode, checkoutUrl, qrCode, ... }
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CreateDeposit(DepositRequestViewModel request)
+        public async Task<IActionResult> CreateDeposit([FromForm] DepositRequestViewModel? request)
         {
             if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
             {
@@ -241,153 +264,246 @@ namespace DonateWeb.Controllers
                 return Json(new { success = false, message = "Chức năng Nạp tiền chỉ dành cho tài khoản Người dùng (Viewer)." });
             }
 
-            // Kiểm tra số tiền hợp lệ
-            if (request == null || request.Amount < 10000)
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { success = false, message = "Số tiền nạp không hợp lệ." });
+            }
+
+            decimal depositAmount = request?.Amount ?? 0;
+
+            // Validate số tiền tối thiểu (10.000 VNĐ)
+            if (depositAmount < 10000)
             {
                 return Json(new { success = false, message = "Số tiền nạp tối thiểu mỗi lần là 10.000 VNĐ." });
             }
 
-            if (request.Amount > 500000000)
+            if (depositAmount > 500000000)
             {
                 return Json(new { success = false, message = "Số tiền nạp tối đa mỗi giao dịch là 500.000.000 VNĐ." });
             }
 
+            if (decimal.Truncate(depositAmount) != depositAmount)
+            {
+                return Json(new { success = false, message = "Số tiền nạp phải là số nguyên VNĐ." });
+            }
+
             try
             {
-                // 1. Tạo TransactionCode duy nhất cho giao dịch
-                var txCode = $"DEP_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N")[..6].ToUpper()}";
+                // Sinh orderCode bằng timestamp mili-giây (yêu cầu của payOS: số nguyên long)
+                long orderCode = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                var txCode = $"DEP_{orderCode}";
 
-                // 2. Tạo bản ghi WalletTransaction với Status = 0 (Pending)
+                // Tạo bản ghi WalletTransaction trạng thái Pending (0) lưu vào DB
                 var walletTx = new WalletTransaction
                 {
                     UserId = user.Id,
+                    OrderCode = orderCode,
                     TransactionCode = txCode,
                     TransactionType = "DEPOSIT",
-                    Amount = request.Amount,
+                    Amount = depositAmount,
                     BalanceBefore = user.WalletBalance,
-                    BalanceAfter = user.WalletBalance, // Chưa cộng số dư khi ở trạng thái Chờ (Pending)
-                    PaymentMethodName = "Chuyển khoản VietQR",
-                    Status = 0, // 0 = Pending (Chờ chuyển khoản)
-                    Note = "Chờ quét mã VietQR",
+                    BalanceAfter = user.WalletBalance,
+                    PaymentMethodName = "PayOS VietQR",
+                    Status = WalletTransaction.StatusPending,
+                    Note = $"NAP {orderCode}",
                     CreatedAt = DateTime.UtcNow
                 };
 
                 _context.WalletTransactions.Add(walletTx);
                 await _context.SaveChangesAsync();
 
-                // 3. Sinh mã nội dung chuyển khoản duy nhất (Memo)
-                // Format chuẩn: "NAP " + TransactionId (ví dụ: "NAP 84920")
-                var memo = $"NAP {walletTx.Id}";
-                walletTx.Note = memo;
-                await _context.SaveChangesAsync();
+                // Cấu hình URL quay lại
+                var baseUrl = $"{Request.Scheme}://{Request.Host}";
+                var cancelUrl = $"{baseUrl}/Wallet/Deposit";
+                var returnUrl = $"{baseUrl}/Wallet/DepositSuccess?orderCode={orderCode}";
 
-                // 4. Lấy thông tin tài khoản thụ hưởng từ appsettings.json
+                var rawDescription = $"NAP {orderCode}";
+                var description = rawDescription.Length > 25 ? rawDescription.Substring(0, 25) : rawDescription;
+
+                var paymentData = new PaymentData
+                {
+                    orderCode = orderCode,
+                    amount = (int)depositAmount,
+                    description = description,
+                    cancelUrl = cancelUrl,
+                    returnUrl = returnUrl,
+                    buyerName = user.FullName ?? user.Username,
+                    buyerEmail = user.Email
+                };
+
+                // Gọi PayOS SDK tạo Payment Link
+                var result = await _payOS.createPaymentLink(paymentData);
+
                 var (bankId, accountNo, accountName, bankName) = GetBankConfig();
+                if (!string.IsNullOrEmpty(result.accountNumber)) accountNo = result.accountNumber;
+                if (!string.IsNullOrEmpty(result.accountName)) accountName = result.accountName;
 
-                // 5. URL encode đúng chuẩn RFC 3986 cho addInfo và accountName
-                var encodedMemo = Uri.EscapeDataString(memo);
-                var encodedAccountName = Uri.EscapeDataString(accountName);
-
-                // Tạo URL chuẩn img.vietqr.io với template compact2 chuyên nghiệp
-                var qrUrl = $"https://img.vietqr.io/image/{bankId}-{accountNo}-compact2.png?amount={(long)walletTx.Amount}&addInfo={encodedMemo}&accountName={encodedAccountName}";
-
-                // 6. Đóng gói dữ liệu trả về cho ViewModel
                 var paymentModel = new DepositPaymentViewModel
                 {
                     TransactionId = walletTx.Id,
+                    OrderCode = orderCode,
                     TransactionCode = walletTx.TransactionCode,
                     Amount = walletTx.Amount,
-                    Memo = memo,
-                    BankId = bankId,
+                    Memo = description,
+                    BankId = !string.IsNullOrEmpty(result.bin) ? result.bin : bankId,
                     BankName = bankName,
                     AccountNo = accountNo,
                     AccountName = accountName,
-                    QrUrl = qrUrl,
+                    QrUrl = !string.IsNullOrEmpty(result.qrCode) ? result.qrCode : $"https://img.vietqr.io/image/{bankId}-{accountNo}-compact2.png?amount={(long)depositAmount}&addInfo={Uri.EscapeDataString(description)}&accountName={Uri.EscapeDataString(accountName)}",
+                    QrCode = result.qrCode,
+                    CheckoutUrl = result.checkoutUrl,
                     CreatedAt = walletTx.CreatedAt,
                     ExpireAt = walletTx.CreatedAt.AddMinutes(10),
-                    ExpireSeconds = 600 // 10 phút đếm ngược
+                    ExpireSeconds = 600
                 };
 
-                // Trả về JSON cho Client xử lý chuyển Bước 2 mượt mà
+                // Trả về kết quả JSON gồm: { success = true, orderCode, checkoutUrl, qrCode, ... }
                 return Json(new
                 {
                     success = true,
+                    orderCode = orderCode,
+                    checkoutUrl = result.checkoutUrl,
+                    qrCode = result.qrCode,
                     data = paymentModel,
-                    message = "Tạo mã QR nạp tiền thành công."
+                    amount = depositAmount,
+                    description = description,
+                    message = "Tạo mã QR nạp tiền qua PayOS thành công."
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Lỗi khi tạo mã QR nạp tiền cho UserId {UserId}", userId);
+                _logger.LogError(ex, "Lỗi khi gọi PayOS createPaymentLink cho UserId {UserId}", userId);
                 return Json(new
                 {
                     success = false,
-                    message = "Đã xảy ra lỗi trong quá trình tạo mã QR nạp tiền. Vui lòng thử lại sau."
+                    message = "Đã xảy ra lỗi trong quá trình tạo đơn thanh toán PayOS. Vui lòng thử lại sau."
                 });
             }
         }
 
         /// <summary>
-        /// GET: /Wallet/CheckDepositStatus?transactionId=...
-        /// Polling AJAX kiểm tra trạng thái giao dịch định kỳ (mỗi 3 giây)
-        /// Trả về JSON { isPaid: true/false }
+        /// GET: /Wallet/CheckStatus?orderCode=...
+        /// Action polling kiểm tra trạng thái đơn hàng PayOS theo orderCode
+        /// Trả về JSON { isPaid = true/false }
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> CheckDepositStatus(int transactionId)
+        public async Task<IActionResult> CheckStatus(long orderCode)
         {
             if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
             {
-                return Unauthorized(new { success = false, isPaid = false, message = "Chưa đăng nhập." });
+                return Unauthorized();
             }
 
-            var transaction = await _context.WalletTransactions
+            var tx = await _context.WalletTransactions
                 .Include(wt => wt.User)
-                .FirstOrDefaultAsync(wt => wt.Id == transactionId && wt.UserId == userId);
+                .AsNoTracking()
+                .FirstOrDefaultAsync(wt => wt.OrderCode == orderCode && wt.UserId == userId);
 
-            if (transaction == null)
+            if (tx == null)
             {
-                return NotFound(new { success = false, isPaid = false, message = "Không tìm thấy giao dịch nạp tiền." });
+                return NotFound(new { success = false, isPaid = false, message = "Không tìm thấy giao dịch với mã này." });
             }
 
-            // Kiểm tra xem đơn đã quá hạn 10 phút chưa
-            var isExpired = false;
-            if (transaction.Status == 0 && DateTime.UtcNow > transaction.CreatedAt.AddMinutes(10))
-            {
-                isExpired = true;
-                transaction.Status = 2; // Failed / Expired
-                if (string.IsNullOrEmpty(transaction.Note) || !transaction.Note.Contains("[Hết hạn]"))
-                {
-                    transaction.Note = (transaction.Note ?? "") + " [Hết hạn thanh toán 10 phút]";
-                }
-                await _context.SaveChangesAsync();
-            }
-
-            var isPaid = transaction.Status == 1;
-
+            var isPaid = tx.Status == WalletTransaction.StatusCompleted;
             return Json(new
             {
                 success = true,
                 isPaid = isPaid,
-                status = transaction.Status,
-                isExpired = isExpired,
-                amount = transaction.Amount,
-                transactionCode = transaction.TransactionCode,
-                newBalance = isPaid ? transaction.User?.WalletBalance : null,
-                message = isPaid
-                    ? "Giao dịch đã được thanh toán thành công!"
-                    : (isExpired ? "Giao dịch đã hết hạn thanh toán (quá 10 phút)." : "Đang chờ thanh toán...")
+                status = tx.Status,
+                orderCode = tx.OrderCode,
+                amount = tx.Amount,
+                newBalance = tx.User?.WalletBalance
             });
         }
 
         /// <summary>
-        /// POST: /Wallet/SimulateSuccess?transactionId=...
+        /// GET: /Wallet/CheckDepositStatus?transactionId=...
+        /// Hỗ trợ cả transactionId và orderCode để tương thích ngược
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> CheckDepositStatus([FromQuery] long? transactionId, [FromQuery] long? orderCode)
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+            {
+                return Unauthorized();
+            }
+
+            var code = orderCode ?? transactionId;
+            if (!code.HasValue)
+            {
+                return BadRequest(new { success = false, isPaid = false, message = "Thiếu orderCode hoặc transactionId." });
+            }
+
+            var tx = await _context.WalletTransactions
+                .Include(wt => wt.User)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(wt => wt.UserId == userId &&
+                    (wt.OrderCode == code.Value || (code.Value <= int.MaxValue && wt.Id == (int)code.Value)));
+
+            if (tx == null)
+            {
+                return NotFound(new { success = false, isPaid = false, message = "Không tìm thấy giao dịch." });
+            }
+
+            var isPaid = tx.Status == WalletTransaction.StatusCompleted;
+            return Json(new
+            {
+                success = true,
+                isPaid = isPaid,
+                status = tx.Status,
+                orderCode = tx.OrderCode,
+                amount = tx.Amount,
+                transactionCode = tx.TransactionCode,
+                newBalance = isPaid ? tx.User?.WalletBalance : null,
+                message = isPaid ? "Giao dịch đã được thanh toán thành công!" : "Đang chờ thanh toán..."
+            });
+        }
+
+        /// <summary>
+        /// GET: /Wallet/DepositSuccess?orderCode=...
+        /// Trang hiển thị thông báo nạp tiền thành công sau khi chuyển hướng từ cổng PayOS
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> DepositSuccess(long? orderCode)
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+            {
+                return RedirectToAction("Login", "Auth");
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null)
+            {
+                return RedirectToAction("Login", "Auth");
+            }
+
+            WalletTransaction? tx = null;
+            if (orderCode.HasValue)
+            {
+                tx = await _context.WalletTransactions
+                    .FirstOrDefaultAsync(wt => wt.OrderCode == orderCode.Value && wt.UserId == userId);
+            }
+
+            ViewBag.OrderCode = orderCode;
+            ViewBag.Transaction = tx;
+            ViewBag.WalletBalance = user.WalletBalance;
+
+            return View(user);
+        }
+
+        /// <summary>
+        /// POST: /Wallet/SimulateSuccess?orderCode=...
         /// Action hỗ trợ TEST / DEMO: Giả lập thanh toán thành công cho đơn đang Pending
-        /// Kích hoạt cộng tiền vào ví và cập nhật Cookie claims để kiểm tra hiệu ứng Polling
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SimulateSuccess(int transactionId)
+        public async Task<IActionResult> SimulateSuccess([FromQuery] long? orderCode, [FromQuery] int? transactionId)
         {
+            if (!_environment.IsDevelopment())
+            {
+                return NotFound();
+            }
+
             if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
             {
                 return Unauthorized(new { success = false, message = "Chưa đăng nhập." });
@@ -395,7 +511,9 @@ namespace DonateWeb.Controllers
 
             var tx = await _context.WalletTransactions
                 .Include(wt => wt.User)
-                .FirstOrDefaultAsync(wt => wt.Id == transactionId && wt.UserId == userId);
+                .FirstOrDefaultAsync(wt => wt.TransactionType == "DEPOSIT" &&
+                    ((orderCode.HasValue && wt.OrderCode == orderCode.Value && wt.UserId == userId)
+                    || (transactionId.HasValue && wt.Id == transactionId.Value && wt.UserId == userId)));
 
             if (tx == null)
             {
@@ -404,12 +522,12 @@ namespace DonateWeb.Controllers
 
             if (tx.Status == 1)
             {
-                return Json(new { success = true, isPaid = true, message = "Giao dịch này đã được thanh toán thành công." });
+                return Json(new { success = true, isPaid = true, message = "Giao dịch này đã được thanh toán thành công từ trước.", newBalance = tx.User?.WalletBalance, amount = tx.Amount, orderCode = tx.OrderCode });
             }
 
-            if (tx.Status == 2)
+            if (tx.Status != WalletTransaction.StatusPending)
             {
-                return BadRequest(new { success = false, message = "Giao dịch đã bị hết hạn hoặc hủy bỏ." });
+                return Conflict(new { success = false, message = "Giao dịch không còn ở trạng thái chờ thanh toán." });
             }
 
             var user = tx.User;
@@ -418,22 +536,20 @@ namespace DonateWeb.Controllers
                 return BadRequest(new { success = false, message = "Không tìm thấy thông tin tài khoản người dùng." });
             }
 
-            // Tiến hành cộng tiền vào ví của người dùng
             tx.BalanceBefore = user.WalletBalance;
             user.WalletBalance += tx.Amount;
             tx.BalanceAfter = user.WalletBalance;
-            tx.Status = 1; // 1 = Thành công
+            tx.Status = 1;
             user.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-
-            // Cập nhật lại Cookie Authentication để Header hiển thị ngay số dư mới
             await RefreshUserClaimsCookieAsync(user);
 
             return Json(new
             {
                 success = true,
                 isPaid = true,
+                orderCode = tx.OrderCode,
                 amount = tx.Amount,
                 newBalance = user.WalletBalance,
                 message = $"Mô phỏng thanh toán thành công! Đã nạp +{tx.Amount:N0} VNĐ vào ví tài khoản."
