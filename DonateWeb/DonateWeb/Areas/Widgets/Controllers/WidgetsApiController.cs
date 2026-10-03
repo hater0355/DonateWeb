@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using DonateWeb.Data;
 using DonateWeb.Models.Enums;
 using DonateWeb.Areas.Widgets.Services;
+using System.Collections.Concurrent;
 
 namespace DonateWeb.Areas.Widgets.Controllers
 {
@@ -14,12 +15,74 @@ namespace DonateWeb.Areas.Widgets.Controllers
         private readonly IWidgetService _widgetService;
         private readonly ILogger<WidgetsApiController> _logger;
         private readonly AppDbContext _context;
+        private readonly IWindowsSpeechService _windowsSpeechService;
+        private static readonly ConcurrentDictionary<string, DateTimeOffset> LastSpeechRequestByToken = new();
 
-        public WidgetsApiController(IWidgetService widgetService, ILogger<WidgetsApiController> logger, AppDbContext context)
+        public WidgetsApiController(
+            IWidgetService widgetService,
+            ILogger<WidgetsApiController> logger,
+            AppDbContext context,
+            IWindowsSpeechService windowsSpeechService)
         {
             _widgetService = widgetService;
             _logger = logger;
             _context = context;
+            _windowsSpeechService = windowsSpeechService;
+        }
+
+        [HttpPost("api/widgets/alertbox/tts/{slug}")]
+        [RequestSizeLimit(4096)]
+        public async Task<IActionResult> SynthesizeAlertSpeech(string slug, [FromBody] AlertSpeechRequest request, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(request.Text) || request.Text.Length > 500 || string.IsNullOrWhiteSpace(request.Token))
+            {
+                return BadRequest();
+            }
+
+            var cleanSlug = slug.Trim().ToLowerInvariant();
+            var config = await _widgetService.GetAlertBoxConfigAsync(cleanSlug, "");
+            if (!FixedTimeEquals(request.Token, config.WidgetToken))
+            {
+                return NotFound();
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            if (LastSpeechRequestByToken.TryGetValue(request.Token, out var lastRequest) && now - lastRequest < TimeSpan.FromMilliseconds(750))
+            {
+                return StatusCode(StatusCodes.Status429TooManyRequests);
+            }
+            LastSpeechRequestByToken[request.Token] = now;
+
+            try
+            {
+                var wave = await _windowsSpeechService.SynthesizeVietnameseAsync(request.Text.Trim(), cancellationToken);
+                Response.Headers.CacheControl = "no-store";
+                return File(wave, "audio/wav");
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Windows Vietnamese TTS is unavailable for widget {StreamerSlug}.", cleanSlug);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+            catch (PlatformNotSupportedException ex)
+            {
+                _logger.LogWarning(ex, "Windows TTS was requested on an unsupported host for widget {StreamerSlug}.", cleanSlug);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        private static bool FixedTimeEquals(string provided, string expected)
+        {
+            var providedBytes = System.Text.Encoding.UTF8.GetBytes(provided);
+            var expectedBytes = System.Text.Encoding.UTF8.GetBytes(expected);
+            return providedBytes.Length == expectedBytes.Length &&
+                   System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes);
+        }
+
+        public sealed class AlertSpeechRequest
+        {
+            public string Token { get; set; } = string.Empty;
+            public string Text { get; set; } = string.Empty;
         }
 
         /// <summary>

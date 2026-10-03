@@ -660,6 +660,7 @@ namespace DonateWeb.Areas.Widgets.Services
             var testAlert = new AlertPollResultDto
             {
                 DonationId = 0, // 0 biểu thị alert thử nghiệm
+                TtsToken = config.WidgetToken,
                 DonorName = "Khán Giả Thử Nghiệm",
                 Amount = 50000,
                 FormattedAmount = "50.000đ",
@@ -679,6 +680,12 @@ namespace DonateWeb.Areas.Widgets.Services
             };
 
             queue.Enqueue(testAlert);
+        }
+
+        public async Task<AlertPollResultDto?> CreateDonationAlertAsync(Donation donation, string streamerSlug)
+        {
+            var config = await GetAlertBoxConfigAsync(streamerSlug, "");
+            return DonationAlertFactory.Create(donation, config, _moderationService);
         }
 
         /// <summary>
@@ -710,41 +717,11 @@ namespace DonateWeb.Areas.Widgets.Services
 
             if (donation != null)
             {
-                // KIỂM DUYỆT BẢO VỆ STREAMER: Lọc sạch từ ngữ tục tĩu, kỳ thị, xúc phạm và link độc hại trước khi đưa lên màn hình OBS
-                var cleanDonorName = _moderationService.SanitizeForStream(donation.DonorName);
-                var cleanMessage = _moderationService.SanitizeForStream(donation.Message);
-
-                var template = string.IsNullOrWhiteSpace(config.MessageTemplate)
-                    ? "{donor} vừa ủng hộ {amount} VNĐ!"
-                    : config.MessageTemplate;
-
-                var text = template
-                    .Replace("{donor}", cleanDonorName)
-                    .Replace("{amount}", donation.Amount.ToString("N0"))
-                    .Replace("{message}", cleanMessage);
-
-                var alert = new AlertPollResultDto
+                var alert = DonationAlertFactory.Create(donation, config, _moderationService);
+                if (alert != null)
                 {
-                    DonationId = donation.Id,
-                    DonorName = cleanDonorName,
-                    Amount = donation.Amount,
-                    FormattedAmount = $"{donation.Amount:N0}đ",
-                    Message = cleanMessage,
-                    DisplayText = text,
-                    MediaType = config.MediaType ?? "image",
-                    ImageUrl = config.ImageUrl,
-                    SoundUrl = config.SoundUrl,
-                    SoundVolume = config.SoundVolume,
-                    DurationSeconds = config.DurationSeconds,
-                    TextColor = config.TextColor,
-                    FontFamily = config.FontFamily,
-                    FontSize = config.FontSize,
-                    AnimationIn = config.AnimationIn,
-                    AnimationOut = config.AnimationOut,
-                    IsTtsEnabled = config.IsTtsEnabled
-                };
-
-                return (true, alert);
+                    return (true, alert);
+                }
             }
 
             return (false, null);

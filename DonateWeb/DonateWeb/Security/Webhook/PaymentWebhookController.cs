@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using DonateWeb.Areas.Widgets.Services;
-using DonateWeb.Areas.Widgets.ViewModels;
 using DonateWeb.Data;
 using DonateWeb.Hubs;
 using DonateWeb.Models.Entities;
@@ -247,35 +246,11 @@ namespace DonateWeb.Security.Webhook
                 if (donation.StreamerProfile != null && !string.IsNullOrWhiteSpace(donation.StreamerProfile.Slug))
                 {
                     var streamerSlug = donation.StreamerProfile.Slug.Trim().ToLowerInvariant();
-                    var alertConfig = await _widgetService.GetAlertBoxConfigAsync(streamerSlug, "");
-                    var template = string.IsNullOrWhiteSpace(alertConfig.MessageTemplate)
-                        ? "{donor} vừa ủng hộ {amount} VNĐ!"
-                        : alertConfig.MessageTemplate;
-                    var displayText = template
-                        .Replace("{donor}", donation.DonorName)
-                        .Replace("{amount}", donation.Amount.ToString("N0"))
-                        .Replace("{message}", donation.Message ?? "");
-                    var alertDto = new AlertPollResultDto
+                    var alertDto = await _widgetService.CreateDonationAlertAsync(donation, streamerSlug);
+                    if (alertDto != null)
                     {
-                        DonationId = donation.Id,
-                        DonorName = donation.DonorName,
-                        Amount = donation.Amount,
-                        FormattedAmount = $"{donation.Amount:N0}đ",
-                        Message = donation.Message ?? "",
-                        DisplayText = displayText,
-                        MediaType = alertConfig.MediaType ?? "image",
-                        ImageUrl = alertConfig.ImageUrl,
-                        SoundUrl = alertConfig.SoundUrl,
-                        SoundVolume = alertConfig.SoundVolume,
-                        DurationSeconds = alertConfig.DurationSeconds,
-                        TextColor = alertConfig.TextColor,
-                        FontFamily = alertConfig.FontFamily,
-                        FontSize = alertConfig.FontSize,
-                        AnimationIn = alertConfig.AnimationIn,
-                        AnimationOut = alertConfig.AnimationOut,
-                        IsTtsEnabled = alertConfig.IsTtsEnabled
-                    };
-                    await _hubContext.Clients.Group("Streamer_" + streamerSlug).SendAsync("ReceiveAlert", alertDto);
+                        await _hubContext.Clients.Group("Streamer_" + streamerSlug).SendAsync("ReceiveAlert", alertDto);
+                    }
                 }
                 await _hubContext.Clients.Group("Tx_" + orderCode).SendAsync("DonationSuccess", new { orderCode, amount = donation.Amount, isPaid = true });
                 return Ok(new { message = "Success" });
@@ -740,45 +715,17 @@ namespace DonateWeb.Security.Webhook
             if (donation.StreamerProfile != null && !string.IsNullOrWhiteSpace(donation.StreamerProfile.Slug))
             {
                 var streamerSlug = donation.StreamerProfile.Slug.Trim().ToLowerInvariant();
-                var alertConfig = await _widgetService.GetAlertBoxConfigAsync(streamerSlug, "");
-
-                var template = string.IsNullOrWhiteSpace(alertConfig.MessageTemplate)
-                    ? "{donor} vừa ủng hộ {amount} VNĐ!"
-                    : alertConfig.MessageTemplate;
-
-                var displayText = template
-                    .Replace("{donor}", donation.DonorName)
-                    .Replace("{amount}", donation.Amount.ToString("N0"))
-                    .Replace("{message}", donation.Message ?? "");
-
-                var alertDto = new AlertPollResultDto
+                var alertDto = await _widgetService.CreateDonationAlertAsync(donation, streamerSlug);
+                if (alertDto != null)
                 {
-                    DonationId = donation.Id,
-                    DonorName = donation.DonorName,
-                    Amount = donation.Amount,
-                    FormattedAmount = $"{donation.Amount:N0}đ",
-                    Message = donation.Message ?? "",
-                    DisplayText = displayText,
-                    MediaType = alertConfig.MediaType ?? "image",
-                    ImageUrl = alertConfig.ImageUrl,
-                    SoundUrl = alertConfig.SoundUrl,
-                    SoundVolume = alertConfig.SoundVolume,
-                    DurationSeconds = alertConfig.DurationSeconds,
-                    TextColor = alertConfig.TextColor,
-                    FontFamily = alertConfig.FontFamily,
-                    FontSize = alertConfig.FontSize,
-                    AnimationIn = alertConfig.AnimationIn,
-                    AnimationOut = alertConfig.AnimationOut,
-                    IsTtsEnabled = alertConfig.IsTtsEnabled
-                };
+                    // Bắn đến toàn bộ Browser Source OBS đang cắm đường dẫn widget của streamer này
+                    await _hubContext.Clients.Group("Streamer_" + streamerSlug)
+                        .SendAsync("ReceiveAlert", alertDto);
 
-                // Bắn đến toàn bộ Browser Source OBS đang cắm đường dẫn widget của streamer này
-                await _hubContext.Clients.Group("Streamer_" + streamerSlug)
-                    .SendAsync("ReceiveAlert", alertDto);
-
-                _logger.LogInformation(
-                    "[SIGNALR OBS ALERT] Đã bắn sự kiện ReceiveAlert lên màn hình OBS cho Streamer {StreamerSlug}",
-                    streamerSlug);
+                    _logger.LogInformation(
+                        "[SIGNALR OBS ALERT] Đã bắn sự kiện ReceiveAlert lên màn hình OBS cho Streamer {StreamerSlug}",
+                        streamerSlug);
+                }
             }
 
             // 5. BẮN SỰ KIỆN SIGNALR REAL-TIME ĐẾN MÀN HÌNH VIETQR CỦA VIEWER ĐANG CHỜ

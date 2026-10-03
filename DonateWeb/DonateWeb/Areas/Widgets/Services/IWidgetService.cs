@@ -1,4 +1,5 @@
 using DonateWeb.Areas.Widgets.ViewModels;
+using DonateWeb.Models.Entities;
 
 namespace DonateWeb.Areas.Widgets.Services
 {
@@ -93,5 +94,10 @@ namespace DonateWeb.Areas.Widgets.Services
         /// Polling kiểm tra thông báo donate mới hoặc thông báo test cho OBS Alert Box
         /// </summary>
         Task<(bool hasAlert, AlertPollResultDto? alert)> PollAlertAsync(string streamerSlug, int lastDonationId);
+
+        /// <summary>
+        /// Tạo payload OBS thống nhất cho một khoản donate đã xác nhận; null nếu dưới ngưỡng alert.
+        /// </summary>
+        Task<AlertPollResultDto?> CreateDonationAlertAsync(Donation donation, string streamerSlug);
     }
 }

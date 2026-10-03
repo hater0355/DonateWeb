@@ -1,26 +1,28 @@
 @model DonateWeb.Models.Entities.User
 @{
-    ViewData["Title"] = "Nạp tiền thành công";
     var tx = ViewBag.Transaction as DonateWeb.Models.Entities.WalletTransaction;
     var orderCode = ViewBag.OrderCode;
     var balance = ViewBag.WalletBalance ?? Model?.WalletBalance ?? 0;
+    var isPaid = tx?.Status == DonateWeb.Models.Entities.WalletTransaction.StatusCompleted;
+    var hasTransaction = tx != null;
+    ViewData["Title"] = isPaid ? "Nạp tiền thành công" : "Đang xác nhận nạp tiền";
 }
 
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-12 col-md-8 col-lg-6">
             <div class="card card-custom bg-white border-0 shadow-lg p-4 p-md-5 text-center rounded-4">
-                <!-- Icon thành công -->
                 <div class="mb-4">
-                    <div class="mx-auto rounded-circle bg-success-subtle text-success d-flex align-items-center justify-content-center shadow-sm" style="width: 90px; height: 90px; font-size: 3rem;">
-                        <i class="fa-solid fa-circle-check"></i>
+                    <div id="depositStatusIcon" class="mx-auto rounded-circle @(isPaid ? "bg-success-subtle text-success" : "bg-warning-subtle text-warning") d-flex align-items-center justify-content-center shadow-sm" style="width: 90px; height: 90px; font-size: 3rem;">
+                        <i class="fa-solid @(isPaid ? "fa-circle-check" : "fa-clock")"></i>
                     </div>
                 </div>
 
-                <h3 class="fw-bold text-dark-green mb-2">NẠP TIỀN THÀNH CÔNG!</h3>
-                <p class="text-muted mb-4">Giao dịch nạp tiền qua cổng thanh toán PayOS đã được xử lý hoàn tất và ghi nhận vào tài khoản của bạn.</p>
+                <h3 id="depositStatusTitle" class="fw-bold text-dark-green mb-2">@(isPaid ? "NẠP TIỀN THÀNH CÔNG!" : hasTransaction ? "ĐANG CHỜ XÁC NHẬN" : "KHÔNG TÌM THẤY GIAO DỊCH")</h3>
+                <p id="depositStatusMessage" class="text-muted mb-4">
+                    @(isPaid ? "PayOS đã xác nhận thanh toán và số tiền đã được ghi nhận vào ví của bạn." : hasTransaction ? "PayOS đã chuyển bạn quay lại. Chúng tôi đang chờ xác nhận thanh toán từ hệ thống; số dư chỉ thay đổi sau khi xác minh hoàn tất." : "Không tìm thấy giao dịch nạp tiền thuộc tài khoản của bạn.")
+                </p>
 
-                <!-- Thẻ thông tin chi tiết -->
                 <div class="bg-light rounded-3 p-3 p-md-4 text-start mb-4 border">
                     @if (orderCode != null)
                     {
@@ -29,7 +31,6 @@
                             <strong class="font-monospace text-dark-green">#@orderCode</strong>
                         </div>
                     }
-
                     @if (tx != null)
                     {
                         <div class="d-flex justify-content-between py-2 border-bottom">
@@ -37,30 +38,62 @@
                             <strong class="font-monospace text-dark">@tx.TransactionCode</strong>
                         </div>
                         <div class="d-flex justify-content-between py-2 border-bottom">
-                            <span class="text-muted small">Số tiền đã nạp:</span>
+                            <span class="text-muted small">Số tiền nạp:</span>
                             <strong class="text-success fs-5">+@tx.Amount.ToString("N0") VNĐ</strong>
                         </div>
                     }
-
                     <div class="d-flex justify-content-between py-2">
                         <span class="text-muted small">Số dư ví hiện tại:</span>
-                        <strong class="text-dark-green fs-5">@string.Format("{0:N0}", balance) VNĐ</strong>
+                        <strong id="depositBalance" class="text-dark-green fs-5">@string.Format("{0:N0}", balance) VNĐ</strong>
                     </div>
                 </div>
 
-                <!-- Các nút điều hướng -->
+                @if (hasTransaction && !isPaid)
+                {
+                    <p id="depositPollingStatus" class="small text-muted" role="status">Đang tự động kiểm tra trạng thái giao dịch...</p>
+                }
+
                 <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
-                    <a href="/Wallet/Deposit" class="btn btn-dark-green rounded-pill px-4 py-2 fw-semibold">
-                        <i class="fa-solid fa-plus me-1"></i> Nạp thêm tiền
-                    </a>
-                    <a href="/Streamer/Donate" class="btn btn-outline-success rounded-pill px-4 py-2 fw-semibold">
-                        <i class="fa-solid fa-heart me-1"></i> Ủng hộ Streamer
-                    </a>
-                    <a href="/" class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-semibold">
-                        <i class="fa-solid fa-home me-1"></i> Về trang chủ
-                    </a>
+                    <a href="/Wallet/Deposit" class="btn btn-dark-green rounded-pill px-4 py-2 fw-semibold"><i class="fa-solid fa-plus me-1"></i> Nạp thêm tiền</a>
+                    <a href="/Streamer/Donate" class="btn btn-outline-success rounded-pill px-4 py-2 fw-semibold"><i class="fa-solid fa-heart me-1"></i> Ủng hộ Streamer</a>
+                    <a href="/" class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-semibold"><i class="fa-solid fa-home me-1"></i> Về trang chủ</a>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+@if (hasTransaction && !isPaid)
+{
+    <script>
+        (() => {
+            const orderCode = @tx!.OrderCode;
+            const statusText = document.getElementById('depositPollingStatus');
+            let checking = false;
+            const checkStatus = async () => {
+                if (checking) return;
+                checking = true;
+                try {
+                    const response = await fetch(`/Wallet/CheckStatus?orderCode=${encodeURIComponent(orderCode)}`, {
+                        credentials: 'same-origin',
+                        cache: 'no-store'
+                    });
+                    if (!response.ok) {
+                        if (statusText) statusText.textContent = 'Chưa nhận được xác nhận từ máy chủ. Hệ thống sẽ tiếp tục kiểm tra.';
+                        return;
+                    }
+                    const result = await response.json();
+                    if (result.isPaid) {
+                        window.location.reload();
+                    }
+                } catch {
+                    if (statusText) statusText.textContent = 'Mất kết nối tạm thời. Hệ thống sẽ tiếp tục kiểm tra.';
+                } finally {
+                    checking = false;
+                }
+            };
+            checkStatus();
+            window.setInterval(checkStatus, 2500);
+        })();
+    </script>
+}

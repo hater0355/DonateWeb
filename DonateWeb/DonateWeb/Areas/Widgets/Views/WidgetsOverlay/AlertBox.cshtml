@@ -27,6 +27,7 @@
 
 <!-- Audio Player ẩn dùng để phát âm thanh hiệu ứng -->
 <audio id="alertAudioPlayer" preload="auto"></audio>
+<audio id="alertSpeechPlayer" preload="none"></audio>
 
 @section Scripts {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
@@ -47,11 +48,29 @@
         const alertMessageWrapper = document.getElementById('alertMessageWrapper');
         const alertMessageText = document.getElementById('alertMessageText');
         const audioPlayer = document.getElementById('alertAudioPlayer');
+        const speechPlayer = document.getElementById('alertSpeechPlayer');
 
         // Hàng đợi các Alert đang chờ phát lần lượt
         let alertQueue = [];
         let isPlayingAlert = false;
         let lastDonationId = 0;
+        const seenDonationIds = new Set();
+        const seenDonationOrder = [];
+
+        function enqueueAlert(alertData) {
+            if (!alertData) return;
+            const donationId = Number(alertData.donationId || 0);
+            if (donationId > 0) {
+                if (seenDonationIds.has(donationId)) return;
+                seenDonationIds.add(donationId);
+                seenDonationOrder.push(donationId);
+                if (seenDonationOrder.length > 500) {
+                    seenDonationIds.delete(seenDonationOrder.shift());
+                }
+            }
+            alertQueue.push(alertData);
+            processQueue();
+        }
 
         // Khởi động lấy id ban đầu
         async function initAlertState() {
@@ -86,18 +105,21 @@
                 // Lắng nghe sự kiện ReceiveAlert từ PaymentWebhookController khi Webhook PayOS kích hoạt
                 hubConn.on('ReceiveAlert', function (alertData) {
                     console.log('[OBS SignalR Real-time] Nhận Alert mới từ PayOS Webhook:', alertData);
-                    if (alertData) {
-                        if (alertData.donationId > 0) {
-                            lastDonationId = Math.max(lastDonationId, alertData.donationId);
-                        }
-                        alertQueue.push(alertData);
-                        processQueue();
-                    }
+                    enqueueAlert(alertData);
+                });
+
+                const joinStreamerGroup = function () {
+                    hubConn.invoke('JoinStreamerGroup', streamerSlug);
+                };
+
+                hubConn.onreconnected(function () {
+                    console.log('[OBS SignalR] Đã kết nối lại, đăng ký nhóm streamer.');
+                    joinStreamerGroup().catch(err => console.warn('[OBS SignalR] Không thể tham gia lại nhóm streamer:', err));
                 });
 
                 hubConn.start().then(function () {
                     console.log('[OBS SignalR] Kết nối PaymentHub thành công cho Streamer:', streamerSlug);
-                    hubConn.invoke('JoinStreamerGroup', streamerSlug);
+                    return joinStreamerGroup();
                 }).catch(function (err) {
                     console.warn('[OBS SignalR] Không thể kết nối Hub, tiếp tục với Polling 2.5s:', err);
                 });
@@ -122,8 +144,7 @@
                         }
 
                         // Đưa thông báo vào hàng đợi phát
-                        alertQueue.push(result.data);
-                        processQueue();
+                        enqueueAlert(result.data);
                     }
                 }
             } catch (err) {
@@ -188,15 +209,56 @@
                 audioPlayer.play().catch(e => console.log("Không thể tự động phát âm thanh:", e));
             }
 
-            // 3. Đọc lời nhắn Text-to-Speech nếu được bật
-            if (alertData.isTtsEnabled && 'speechSynthesis' in window) {
-                setTimeout(() => {
-                    const textToRead = alertData.donorName + ' nói: ' + (alertData.message || 'Cảm ơn streamer!');
-                    const utterance = new SpeechSynthesisUtterance(textToRead);
-                    utterance.lang = 'vi-VN';
-                    utterance.rate = 1.0;
-                    window.speechSynthesis.speak(utterance);
-                }, 1000);
+            let visualFinished = false;
+            let speechFinished = !alertData.isTtsEnabled;
+            let finishStarted = false;
+            const finishAlertIfReady = () => {
+                if (!visualFinished || !speechFinished || finishStarted) return;
+                finishStarted = true;
+                if (isVideo) alertVideo.pause();
+                isPlayingAlert = false;
+                processQueue();
+            };
+
+            // Generate speech on the Windows host so OBS does not depend on browser voices.
+            if (alertData.isTtsEnabled) {
+                const safeName = String(alertData.donorName || 'Người ủng hộ').slice(0, 100);
+                const safeAmount = Number(alertData.amount || 0).toLocaleString('vi-VN') + ' đồng';
+                const safeMessage = String(alertData.message || '').trim().slice(0, 240);
+                const textToRead = `${safeName} vừa ủng hộ ${safeAmount}.${safeMessage ? ' Lời nhắn: ' + safeMessage : ''}`;
+                const finishSpeech = () => {
+                    speechPlayer.onended = null;
+                    speechPlayer.onerror = null;
+                    if (speechPlayer.dataset.objectUrl) {
+                        URL.revokeObjectURL(speechPlayer.dataset.objectUrl);
+                        delete speechPlayer.dataset.objectUrl;
+                    }
+                    speechFinished = true;
+                    finishAlertIfReady();
+                };
+
+                fetch('/api/widgets/alertbox/tts/' + encodeURIComponent(streamerSlug), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: alertData.ttsToken, text: textToRead })
+                })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Windows TTS request failed (' + response.status + ')');
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        const objectUrl = URL.createObjectURL(blob);
+                        speechPlayer.dataset.objectUrl = objectUrl;
+                        speechPlayer.src = objectUrl;
+                        speechPlayer.volume = Math.max(0, Math.min(1, volume / 100));
+                        speechPlayer.onended = finishSpeech;
+                        speechPlayer.onerror = finishSpeech;
+                        return speechPlayer.play();
+                    })
+                    .catch(error => {
+                        console.warn('[OBS TTS] Không thể tạo hoặc phát giọng Windows:', error);
+                        finishSpeech();
+                    });
             }
 
             // 4. Kích hoạt hiệu ứng xuất hiện (Animation In)
@@ -209,13 +271,8 @@
 
                 setTimeout(() => {
                     alertContainer.style.display = 'none';
-                    if (isVideo) {
-                        alertVideo.pause();
-                    }
-                    isPlayingAlert = false;
-
-                    // Tiếp tục phát thông báo kế tiếp trong hàng đợi nếu có
-                    processQueue();
+                    visualFinished = true;
+                    finishAlertIfReady();
                 }, 1000);
             }, durationSec * 1000);
         }

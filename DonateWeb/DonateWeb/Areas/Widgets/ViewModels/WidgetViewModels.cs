@@ -247,6 +247,8 @@ namespace DonateWeb.Areas.Widgets.ViewModels
     {
         public int DonationId { get; set; }
 
+        public string TtsToken { get; set; } = string.Empty;
+
         public string DonorName { get; set; } = string.Empty;
 
         public decimal Amount { get; set; }

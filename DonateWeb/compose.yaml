@@ -1,0 +1,15 @@
+services:
+  web:
+    build:
+      context: ./DonateWeb
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__DefaultConnection: "Server=host.docker.internal,1433;Database=DonateWebDB;User Id=${DB_USER:?Set DB_USER in .env};Password=${DB_PASSWORD:?Set DB_PASSWORD in .env};Encrypt=True;TrustServerCertificate=True;MultipleActiveResultSets=true"
+      PayOS__ClientId: ${PAYOS_CLIENT_ID:?Set PAYOS_CLIENT_ID in .env}
+      PayOS__ApiKey: ${PAYOS_API_KEY:?Set PAYOS_API_KEY in .env}
+      PayOS__ChecksumKey: ${PAYOS_CHECKSUM_KEY:?Set PAYOS_CHECKSUM_KEY in .env}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

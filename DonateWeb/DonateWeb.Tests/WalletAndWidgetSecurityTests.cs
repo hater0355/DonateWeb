@@ -215,7 +215,11 @@ public class WalletAndWidgetSecurityTests
         await database.Context.SaveChangesAsync();
 
         var widgetService = new Mock<IWidgetService>();
-        var controller = new WidgetsApiController(widgetService.Object, NullLogger<WidgetsApiController>.Instance, database.Context)
+        var controller = new WidgetsApiController(
+            widgetService.Object,
+            NullLogger<WidgetsApiController>.Instance,
+            database.Context,
+            Mock.Of<IWindowsSpeechService>())
         {
             ControllerContext = new ControllerContext
             {
