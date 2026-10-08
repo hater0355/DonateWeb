@@ -1,7 +1,12 @@
 @model DonateWeb.ViewModels.Streamer.StreamerDonateViewModel
+@using Microsoft.EntityFrameworkCore
+@inject DonateWeb.Data.AppDbContext DbContext
 @{
-    var isStreamerAccount = User.IsInRole(DonateWeb.Models.Enums.UserRoles.Streamer) || (ViewBag.IsOwnerStreamer == true);
-    ViewData["Title"] = isStreamerAccount ? $"Trang cá nhân - {Model.DisplayName}" : $"Donate cho {Model.DisplayName} (ID: {Model.Slug})";
+    // Chỉ hiển thị form chỉnh sửa nếu người dùng đang đăng nhập là CHỦ SỞ HỮU của chính kênh streamer này.
+    // Nếu là streamer khác, viewer hoặc khách vãng lai, chỉ xem và gửi donate như viewer bình thường.
+    var isOwnerStreamer = (ViewBag.IsOwnerStreamer == true);
+    var isStreamerAccount = isOwnerStreamer;
+    ViewData["Title"] = isOwnerStreamer ? $"Trang cá nhân - {Model.DisplayName}" : $"Donate cho {Model.DisplayName} (ID: {Model.Slug})";
 }
 
 @if (isStreamerAccount)
@@ -52,6 +57,43 @@
         backdrop-filter: blur(8px);
         box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }
+    .status-feed-card {
+        border-color: rgba(45, 106, 79, 0.15) !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .status-feed-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(0,0,0,0.08) !important;
+    }
+    .like-btn {
+        background: transparent;
+        border: none;
+        outline: none;
+        padding: 5px 12px;
+        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .like-btn:hover {
+        background-color: rgba(220, 53, 69, 0.08);
+    }
+    .like-btn.liked {
+        color: #e63946;
+        font-weight: 700;
+    }
+    .like-btn:not(.liked) {
+        color: #6c757d;
+    }
+    .like-btn i {
+        font-size: 1.15rem;
+        transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .like-btn:active i {
+        transform: scale(1.35);
+    }
     .quick-amount-btn {
         border: 1px solid var(--border-color);
         background-color: rgba(255,255,255,0.8);
@@ -90,15 +132,30 @@
     .ql-editor { min-height: 180px; font-size: 0.95rem; color: var(--dark-green, #1a3a28); line-height: 1.65; }
     .ql-toolbar.ql-snow { border-radius: 10px 10px 0 0; border-color: var(--border-color, #dee2e6); background-color: #f8faf9; }
     .ql-container.ql-snow { border-radius: 0 0 10px 10px; border-color: var(--border-color, #dee2e6); background: #fff; }
+    .heart-beat-anim {
+        animation: heartBeat 0.45s ease-in-out;
+    }
+    @@keyframes heartBeat {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.35); }
+        100% { transform: scale(1); }
+    }
+    .follow-btn-interactive {
+        transition: all 0.25s ease;
+    }
+    .follow-btn-interactive:hover {
+        transform: translateY(-2px);
+    }
 </style>
 
 <div class="pb-5">
 
     <!-- 1. Streamer Cover Banner & Header Info -->
-    <div class="streamer-cover mb-4" style="background-image: url('@(string.IsNullOrEmpty(Model.BannerUrl) ? "/images/default-banner.jpg" : Model.BannerUrl)');">
+    <div class="streamer-cover mb-4" id="streamerCoverHeader" style="background-image: url('@(string.IsNullOrEmpty(Model.BannerUrl) ? "/images/default-banner.jpg" : Model.BannerUrl)');">
         <div class="streamer-cover-overlay"></div>
         <div class="streamer-header-info">
-            <img src="@(string.IsNullOrEmpty(Model.AvatarUrl) ? "/images/default-avatar.png" : Model.AvatarUrl)" 
+            <img id="streamerAvatarHeader"
+                 src="@(string.IsNullOrEmpty(Model.AvatarUrl) ? "/images/default-avatar.png" : Model.AvatarUrl)" 
                  alt="@Model.DisplayName" 
                  class="streamer-profile-avatar" />
             
@@ -117,27 +174,58 @@
                 </div>
                 <div class="text-white-50 small d-flex align-items-center gap-3">
                     <span><i class="fa-solid fa-link me-1"></i> domain.com/@Model.Slug</span>
-                    <span><i class="fa-solid fa-users me-1"></i> @Model.FollowerCount.ToString("N0") người theo dõi</span>
+                    <span><i class="fa-solid fa-users me-1"></i> <span id="headerFollowerCount">@Model.FollowerCount.ToString("N0")</span> người theo dõi</span>
                 </div>
             </div>
 
-            <!-- Social Links -->
-            <div class="d-none d-md-flex align-items-center gap-2">
+            <!-- Follow Button / Shop / Cart Action & Social Links -->
+            <div class="d-flex align-items-center gap-2">
+                @if (isOwnerStreamer)
+                {
+                    <span class="badge bg-white text-dark-green rounded-pill px-3 py-2 fw-bold shadow-sm d-flex align-items-center gap-1" title="Kênh của bạn">
+                        <i class="fa-solid fa-user-check text-success"></i> Kênh của bạn
+                    </span>
+                }
+                else
+                {
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <button type="button" 
+                                id="btnFollowStreamer"
+                                class="btn @(Model.IsFollowedByCurrentUser ? "btn-danger text-white" : "btn-outline-light") rounded-pill px-3 py-2 fw-bold d-flex align-items-center gap-2 shadow-sm follow-btn-interactive"
+                                onclick="toggleFollowStreamer(@Model.StreamerProfileId)"
+                                title="@(Model.IsFollowedByCurrentUser ? "Nhấn để hủy theo dõi" : "Nhấn để theo dõi và thêm vào mục Streamer Yêu Thích")">
+                            <i id="followHeartIcon" class="fa-@(Model.IsFollowedByCurrentUser ? "solid" : "regular") fa-heart @(Model.IsFollowedByCurrentUser ? "text-white" : "text-danger")"></i>
+                            <span id="followBtnText">@(Model.IsFollowedByCurrentUser ? "Đang theo dõi" : "Theo dõi")</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <a href="/Auth/Login?returnUrl=/@Model.Slug" 
+                           class="btn btn-outline-light rounded-pill px-3 py-2 fw-bold d-flex align-items-center gap-2 shadow-sm"
+                           title="Đăng nhập để theo dõi @Model.DisplayName">
+                            <i class="fa-regular fa-heart text-danger"></i>
+                            <span>Theo dõi</span>
+                        </a>
+                    }
+                }
+
+
                 @if (!string.IsNullOrEmpty(Model.YoutubeUrl))
                 {
-                    <a href="@Model.YoutubeUrl" target="_blank" class="btn btn-sm btn-light rounded-circle text-danger" title="YouTube"><i class="fa-brands fa-youtube"></i></a>
+                    <a href="@Model.YoutubeUrl" target="_blank" class="btn btn-sm btn-light rounded-circle text-danger d-none d-md-inline-flex" title="YouTube"><i class="fa-brands fa-youtube"></i></a>
                 }
                 @if (!string.IsNullOrEmpty(Model.TwitchUrl))
                 {
-                    <a href="@Model.TwitchUrl" target="_blank" class="btn btn-sm btn-light rounded-circle" style="color:#9146FF;" title="Twitch"><i class="fa-brands fa-twitch"></i></a>
+                    <a href="@Model.TwitchUrl" target="_blank" class="btn btn-sm btn-light rounded-circle d-none d-md-inline-flex" style="color:#9146FF;" title="Twitch"><i class="fa-brands fa-twitch"></i></a>
                 }
                 @if (!string.IsNullOrEmpty(Model.DiscordUrl))
                 {
-                    <a href="@Model.DiscordUrl" target="_blank" class="btn btn-sm btn-light rounded-circle" style="color:#5865F2;" title="Discord"><i class="fa-brands fa-discord"></i></a>
+                    <a href="@Model.DiscordUrl" target="_blank" class="btn btn-sm btn-light rounded-circle d-none d-md-inline-flex" style="color:#5865F2;" title="Discord"><i class="fa-brands fa-discord"></i></a>
                 }
                 @if (!string.IsNullOrEmpty(Model.FacebookUrl))
                 {
-                    <a href="@Model.FacebookUrl" target="_blank" class="btn btn-sm btn-light rounded-circle" style="color:#1877F2;" title="Facebook"><i class="fa-brands fa-facebook"></i></a>
+                    <a href="@Model.FacebookUrl" target="_blank" class="btn btn-sm btn-light rounded-circle d-none d-md-inline-flex" style="color:#1877F2;" title="Facebook"><i class="fa-brands fa-facebook"></i></a>
                 }
             </div>
         </div>
@@ -160,7 +248,7 @@
     }
 
     <!-- 2. Streamer Greeting Message (Lời chào) -->
-    <div class="greeting-bubble mb-4">
+    <div class="greeting-bubble mb-3">
         <div class="d-flex align-items-start gap-3">
             <i class="fa-solid fa-quote-left text-success fs-3 mt-1 opacity-50"></i>
             <div>
@@ -168,6 +256,38 @@
                 <div class="fst-italic text-dark-green">
                     "@(string.IsNullOrWhiteSpace(Model.GreetingMessage) ? "Cảm ơn bạn đã luôn đồng hành và ủng hộ mình nhé!" : Model.GreetingMessage)"
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2a. Streamer Merch & Shop Spotlight Banner -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden" style="background: linear-gradient(135deg, #1b4533 0%, #29503e 100%); color: white;">
+        <div class="card-body p-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle p-3 bg-white text-dark-green d-flex align-items-center justify-content-center shadow-sm" style="width: 52px; height: 52px;">
+                    <i class="fa-solid fa-store fs-4 text-success"></i>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-warning text-dark fw-bold px-2 py-1 small">GIAN HÀNG CHÍNH THỨC</span>
+                        <span class="small text-white-50">Độc quyền từ @Model.DisplayName</span>
+                    </div>
+                    <h5 class="fw-bold mb-1 text-white">Mua sắm vật phẩm &amp; phụ kiện từ Idol</h5>
+                    <p class="mb-0 text-white-50 small">
+                        Áo thun, pad chuột, bình giữ nhiệt, móc khóa... Mua hàng và thanh toán bằng số dư Ví hoặc quét mã VietQR!
+                    </p>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="/Shop/StreamerShop?slug=@Model.Slug" class="btn btn-warning rounded-pill px-4 py-2 fw-bold text-dark shadow-sm">
+                    <i class="fa-solid fa-cart-shopping me-1"></i> Vào Giỏ Hàng Mua Ngay
+                </a>
+                @if (isOwnerStreamer)
+                {
+                    <a href="/Shop/MyProducts" class="btn btn-outline-light rounded-pill px-3 py-2 fw-semibold small">
+                        <i class="fa-solid fa-boxes-stacked me-1"></i> Quản lý Shop
+                    </a>
+                }
             </div>
         </div>
     </div>
@@ -275,11 +395,15 @@
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label small fw-semibold text-dark-green">Ảnh đại diện (Tải lên từ máy tính)</label>
-                                <input type="file" name="avatarFile" accept="image/*" class="form-control form-control-custom" />
+                                <input type="file" name="avatarFile" accept="image/*" class="form-control form-control-custom"
+                                       onchange="if(this.files && this.files[0]) { var el = document.getElementById('streamerAvatarHeader'); if(el) el.src = window.URL.createObjectURL(this.files[0]); }" />
+                                <input type="hidden" name="avatarUrl" value="@Model.AvatarUrl" />
                             </div>
                             <div class="col-12 col-md-6">
-                                <label class="form-label small fw-semibold text-dark-green">Ảnh bìa (Banner URL)</label>
-                                <input type="text" name="bannerUrl" value="@Model.BannerUrl" class="form-control form-control-custom" placeholder="URL ảnh bìa" />
+                                <label class="form-label small fw-semibold text-dark-green">Ảnh bìa (Tải lên từ máy tính)</label>
+                                <input type="file" name="bannerFile" accept="image/*" class="form-control form-control-custom"
+                                       onchange="if(this.files && this.files[0]) { var el = document.getElementById('streamerCoverHeader'); if(el) el.style.backgroundImage = 'url(' + window.URL.createObjectURL(this.files[0]) + ')'; }" />
+                                <input type="hidden" name="bannerUrl" value="@Model.BannerUrl" />
                             </div>
                             <div class="col-12">
                                 <label class="form-label small fw-semibold text-dark-green">Lời chào ngắn trên trang cá nhân</label>
@@ -542,55 +666,168 @@
         </div>
     </div>
 
-    <!-- 4. Danh sách Streamer đề xuất khác -->
-    <div class="mt-5 pt-4 border-top">
-        <h6 class="fw-bold text-dark-green mb-3 text-uppercase">
-            <i class="fa-solid fa-compass text-success me-2"></i> Khám phá các Streamer khác
-        </h6>
-        <div class="row g-3">
-            <div class="col-6 col-md-3">
-                <a href="/tenstreamer" class="text-decoration-none">
-                    <div class="p-3 bg-white rounded-3 border shadow-sm d-flex align-items-center gap-3 transition">
-                        <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=HoangNam" class="rounded-circle border" width="45" height="45" />
-                        <div>
-                            <div class="fw-bold text-dark-green small">Hoàng Nam Gaming</div>
-                            <div class="text-muted small" style="font-size: 0.72rem;">@@tenstreamer</div>
+    <!-- ========================================================================= -->
+    <!-- BẢNG TIN / STATUS CỦA STREAMER -->
+    <!-- ========================================================================= -->
+    @{
+        var streamerStatuses = ViewBag.StreamerStatuses as List<DonateWeb.Models.Entities.StreamerStatus> ?? new List<DonateWeb.Models.Entities.StreamerStatus>();
+        var likedIds = ViewBag.LikedStatusIds as HashSet<string> ?? new HashSet<string>();
+    }
+
+    <div class="card card-custom p-4 bg-white border-0 shadow-sm mb-4" id="streamerStatusSection">
+        <div class="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom flex-wrap gap-2">
+            <div>
+                <h5 class="fw-bold text-dark-green mb-1">
+                    <i class="fa-solid fa-newspaper text-success me-2"></i> BẢNG TIN &amp; STATUS CỦA @Model.DisplayName
+                </h5>
+                <small class="text-muted">Cập nhật tin tức, hình ảnh và hoạt động mới nhất từ streamer</small>
+            </div>
+            @if (isOwnerStreamer)
+            {
+                <button type="button" class="btn btn-success rounded-pill px-3 py-2 fw-semibold btn-sm shadow-sm" onclick="toggleStatusComposeBox()">
+                    <i class="fa-solid fa-pen-to-square me-1"></i> Đăng Status Mới
+                </button>
+            }
+        </div>
+
+        @if (isOwnerStreamer)
+        {
+            <!-- Khung Đăng Status của Streamer Chủ Kênh -->
+            <div id="statusComposeBox" class="p-3 mb-4 rounded-4 bg-light border border-success border-opacity-25 shadow-sm">
+                <form asp-controller="Streamer" asp-action="CreateStatus" method="post" enctype="multipart/form-data" id="createStatusForm">
+                    <input type="hidden" name="streamerProfileId" value="@Model.StreamerProfileId" />
+                    <input type="hidden" name="returnUrl" value="@Context.Request.Path" />
+
+                    <div class="d-flex gap-3 align-items-start mb-3">
+                        <img src="@Model.AvatarUrl" alt="@Model.DisplayName" class="rounded-circle border" style="width: 44px; height: 44px; object-fit: cover;" onerror="this.src='/images/default-avatar.png'" />
+                        <div class="flex-grow-1">
+                            <textarea name="content" 
+                                      id="statusContentInput" 
+                                      class="form-control border-0 bg-white rounded-3 shadow-none p-3" 
+                                      rows="3" 
+                                      placeholder="@Model.DisplayName ơi, bạn muốn chia sẻ điều gì hôm nay với người xem?..." 
+                                      style="resize: none; font-size: 0.95rem;"></textarea>
                         </div>
                     </div>
-                </a>
-            </div>
-            <div class="col-6 col-md-3">
-                <a href="/domixi" class="text-decoration-none">
-                    <div class="p-3 bg-white rounded-3 border shadow-sm d-flex align-items-center gap-3 transition">
-                        <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=DoMixi" class="rounded-circle border" width="45" height="45" />
+
+                    <!-- Khung preview ảnh nếu streamer chọn tệp -->
+                    <div id="statusImagePreviewContainer" class="mb-3 d-none position-relative d-inline-block">
+                        <img id="statusSelectedImagePreview" src="" alt="Xem trước ảnh" class="rounded-3 shadow-sm border" style="max-height: 220px; max-width: 100%; object-fit: cover;" />
+                        <button type="button" class="btn btn-danger btn-sm rounded-circle position-absolute top-0 end-0 m-2 shadow" onclick="clearSelectedStatusImage()" title="Xóa ảnh này">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-between pt-2 border-top flex-wrap gap-2">
                         <div>
-                            <div class="fw-bold text-dark-green small">Độ Phùng (Mixi)</div>
-                            <div class="text-muted small" style="font-size: 0.72rem;">@@domixi</div>
+                            <label for="statusImageUploadInput" class="btn btn-outline-success btn-sm rounded-pill px-3 fw-semibold cursor-pointer mb-0">
+                                <i class="fa-solid fa-image text-success me-1"></i> Thêm ảnh
+                            </label>
+                            <input type="file" id="statusImageUploadInput" name="imageFile" accept="image/jpeg,image/png,image/gif,image/webp" class="d-none" onchange="handleStatusImageSelect(this)" />
+                            <small class="text-muted ms-2 d-none d-sm-inline" style="font-size: 0.78rem;">(Hỗ trợ JPEG, PNG, GIF, WebP tối đa 8MB)</small>
+                        </div>
+                        <button type="submit" class="btn btn-success rounded-pill px-4 py-2 fw-bold shadow-sm" id="btnSubmitStatus">
+                            <i class="fa-solid fa-paper-plane me-1"></i> Đăng bài
+                        </button>
+                    </div>
+                </form>
+            </div>
+        }
+
+        <!-- Danh sách Status đã đăng -->
+        <div class="row g-4" id="statusListContainer">
+            @if (streamerStatuses.Any())
+            {
+                foreach (var status in streamerStatuses)
+                {
+                    var isLiked = likedIds.Contains(status.Id.ToString());
+                    <div class="col-12 col-md-6" id="status-card-@status.Id">
+                        <div class="card h-100 rounded-4 border p-3 shadow-sm position-relative bg-white status-feed-card">
+                            <!-- Header bài đăng -->
+                            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                                <div class="d-flex align-items-center gap-2">
+                                    <img src="@Model.AvatarUrl" alt="@Model.DisplayName" class="rounded-circle border" style="width: 42px; height: 42px; object-fit: cover;" onerror="this.src='/images/default-avatar.png'" />
+                                    <div>
+                                        <div class="fw-bold text-dark-green d-flex align-items-center gap-1" style="font-size: 0.9rem;">
+                                            @Model.DisplayName
+                                            @if (Model.IsVerified)
+                                            {
+                                                <i class="fa-solid fa-circle-check text-info" style="font-size: 0.75rem;" title="Đã xác minh"></i>
+                                            }
+                                        </div>
+                                        <small class="text-muted" style="font-size: 0.75rem;">
+                                            <i class="fa-regular fa-clock me-1"></i>@status.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                                        </small>
+                                    </div>
+                                </div>
+
+                                @if (isOwnerStreamer)
+                                {
+                                    <!-- Nút xóa bài viết cho chủ kênh -->
+                                    <button type="button" 
+                                            class="btn btn-outline-danger btn-sm rounded-pill px-2 py-1" 
+                                            onclick="confirmDeleteStatus(@status.Id)" 
+                                            title="Xóa bài viết này">
+                                        <i class="fa-solid fa-trash-can me-1"></i> Xóa bài
+                                    </button>
+                                }
+                            </div>
+
+                            <!-- Caption -->
+                            <div class="status-caption mb-3 text-dark" style="font-size: 0.92rem; line-height: 1.5; white-space: pre-line;">
+                                @status.Content
+                            </div>
+
+                            <!-- Ảnh đính kèm (nếu có) -->
+                            @if (!string.IsNullOrEmpty(status.ImageUrl))
+                            {
+                                <div class="status-media mb-3 rounded-3 overflow-hidden text-center bg-light" onclick="previewStatusMedia('@status.ImageUrl', '@Model.DisplayName')" style="cursor: pointer;" title="Bấm để xem ảnh lớn">
+                                    <img src="@status.ImageUrl" alt="Ảnh status @Model.DisplayName" class="img-fluid rounded-3" style="max-height: 320px; width: 100%; object-fit: cover; transition: transform 0.25s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'" />
+                                </div>
+                            }
+
+                            <!-- Footer: Thả tim -->
+                            <div class="mt-auto pt-2 border-top d-flex align-items-center justify-content-between">
+                                <button type="button" 
+                                        class="like-btn @(isLiked ? "liked" : "")" 
+                                        data-status-id="@status.Id" 
+                                        onclick="toggleStreamerStatusLike(this, @status.Id)" 
+                                        title="Thả tim bài viết">
+                                    <i class="@(isLiked ? "fa-solid fa-heart text-danger" : "fa-regular fa-heart")"></i>
+                                    <span class="like-count fw-bold" style="font-size: 0.88rem;">@status.LikeCount.ToString("N0")</span>
+                                </button>
+
+                                <span class="badge bg-light text-muted border small">
+                                    <i class="fa-regular fa-heart text-danger me-1"></i> Lượt tim
+                                </span>
+                            </div>
                         </div>
                     </div>
-                </a>
-            </div>
-            <div class="col-6 col-md-3">
-                <a href="/pewpew" class="text-decoration-none">
-                    <div class="p-3 bg-white rounded-3 border shadow-sm d-flex align-items-center gap-3 transition">
-                        <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=PewPew" class="rounded-circle border" width="45" height="45" />
-                        <div>
-                            <div class="fw-bold text-dark-green small">PewPew Channel</div>
-                            <div class="text-muted small" style="font-size: 0.72rem;">@@pewpew</div>
-                        </div>
+                }
+            }
+            else
+            {
+                <div class="col-12 py-5 text-center text-muted">
+                    <div class="p-3 bg-light d-inline-block rounded-circle mb-3">
+                        <i class="fa-regular fa-newspaper display-5 text-success opacity-75"></i>
                     </div>
-                </a>
-            </div>
-            <div class="col-6 col-md-3">
-                <a href="/streamer/register" class="text-decoration-none">
-                    <div class="p-3 bg-light-green rounded-3 border border-success shadow-sm d-flex align-items-center justify-content-center text-center gap-2 h-100">
-                        <i class="fa-solid fa-plus-circle text-success fs-5"></i>
-                        <span class="fw-bold text-dark-green small">Tạo kênh Streamer</span>
-                    </div>
-                </a>
-            </div>
+                    <h6 class="fw-bold text-dark">Chưa có status nào được đăng tải</h6>
+                    <p class="small text-muted mb-3">
+                        @(isOwnerStreamer 
+                            ? "Hãy là người đầu tiên đăng status để chia sẻ thông báo và hình ảnh tới người xem nhé!" 
+                            : $"{Model.DisplayName} chưa đăng bài viết nào gần đây.")
+                    </p>
+                    @if (isOwnerStreamer)
+                    {
+                        <button type="button" class="btn btn-outline-success btn-sm rounded-pill px-3" onclick="toggleStatusComposeBox()">
+                            <i class="fa-solid fa-plus me-1"></i> Đăng bài viết đầu tiên
+                        </button>
+                    }
+                </div>
+            }
         </div>
     </div>
+
 
     <!-- ========================================================================= -->
     <!-- MODAL THANH TOÁN VIETQR REAL-TIME (TỰ ĐỘNG NHẬN DIỆN QUA PAYOS & SIGNALR) -->
@@ -721,6 +958,21 @@
         </div>
     </div>
 
+</div>
+
+<!-- Modal xem ảnh lớn bài viết Status của Streamer -->
+<div class="modal fade" id="statusMediaLightboxModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-body p-0 text-center position-relative">
+                <button type="button" class="btn btn-dark btn-sm rounded-circle position-absolute top-0 end-0 m-3 shadow" data-bs-dismiss="modal" style="width: 36px; height: 36px; z-index: 10;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <img id="statusLightboxImg" src="" alt="Ảnh bài viết" class="img-fluid rounded-3 shadow-lg" style="max-height: 85vh; object-fit: contain; background: #000;" />
+                <div id="statusLightboxCaption" class="mt-2 text-white bg-dark bg-opacity-75 p-2 rounded small d-inline-block"></div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
@@ -1200,6 +1452,221 @@
         setTimeout(() => {
             btnElement.innerHTML = orig;
         }, 2000);
+    }
+
+    // Toggle Follow Streamer (Theo dõi / Bỏ theo dõi Streamer)
+    function toggleFollowStreamer(streamerProfileId) {
+        var btn = document.getElementById('btnFollowStreamer');
+        var btnText = document.getElementById('followBtnText');
+        var heartIcon = document.getElementById('followHeartIcon');
+        var countDisplay = document.getElementById('headerFollowerCount');
+        if (!btn) return;
+
+        btn.disabled = true;
+        fetch('/Streamer/ToggleFollow', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ streamerProfileId: streamerProfileId })
+        })
+        .then(function(res) {
+            if (!res.ok) throw new Error('Network error');
+            return res.json();
+        })
+        .then(function(data) {
+            btn.disabled = false;
+            if (data.success) {
+                if (data.isFollowing) {
+                    btn.className = 'btn btn-danger text-white rounded-pill px-3 py-2 fw-bold d-flex align-items-center gap-2 shadow-sm follow-btn-interactive';
+                    btn.title = 'Nhấn để hủy theo dõi';
+                    if (heartIcon) {
+                        heartIcon.className = 'fa-solid fa-heart text-white heart-beat-anim';
+                    }
+                    if (btnText) btnText.textContent = 'Đang theo dõi';
+                } else {
+                    btn.className = 'btn btn-outline-light rounded-pill px-3 py-2 fw-bold d-flex align-items-center gap-2 shadow-sm follow-btn-interactive';
+                    btn.title = 'Nhấn để theo dõi và thêm vào mục Streamer Yêu Thích';
+                    if (heartIcon) {
+                        heartIcon.className = 'fa-regular fa-heart text-danger';
+                    }
+                    if (btnText) btnText.textContent = 'Theo dõi';
+                }
+                if (countDisplay && data.followerCount !== undefined) {
+                    countDisplay.textContent = Number(data.followerCount).toLocaleString('vi-VN');
+                }
+            } else {
+                alert(data.message || 'Không thể thực hiện thao tác.');
+            }
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            console.error(err);
+            alert('Có lỗi kết nối, vui lòng thử lại sau.');
+        });
+    }
+
+    // =========================================================================
+    // XỬ LÝ STATUS CỦA STREAMER (ĐĂNG BÀI, XÓA BÀI, THẢ TIM, XEM ẢNH)
+    // =========================================================================
+    function toggleStatusComposeBox() {
+        var box = document.getElementById('statusComposeBox');
+        if (!box) return;
+        if (box.classList.contains('d-none')) {
+            box.classList.remove('d-none');
+            var input = document.getElementById('statusContentInput');
+            if (input) input.focus();
+        } else {
+            box.classList.add('d-none');
+        }
+    }
+
+    function handleStatusImageSelect(input) {
+        if (!input || !input.files || !input.files[0]) return;
+        var file = input.files[0];
+        if (file.size > 8 * 1024 * 1024) {
+            alert('Ảnh tải lên không được vượt quá 8MB.');
+            input.value = '';
+            return;
+        }
+
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var container = document.getElementById('statusImagePreviewContainer');
+            var previewImg = document.getElementById('statusSelectedImagePreview');
+            if (previewImg && container) {
+                previewImg.src = e.target.result;
+                container.classList.remove('d-none');
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function clearSelectedStatusImage() {
+        var input = document.getElementById('statusImageUploadInput');
+        var container = document.getElementById('statusImagePreviewContainer');
+        var previewImg = document.getElementById('statusSelectedImagePreview');
+        if (input) input.value = '';
+        if (previewImg) previewImg.src = '';
+        if (container) container.classList.add('d-none');
+    }
+
+    function confirmDeleteStatus(statusId) {
+        if (!statusId) return;
+        if (!confirm('Bạn có chắc chắn muốn xóa bài viết status này không?')) return;
+
+        var formData = new FormData();
+        formData.append('statusId', statusId);
+
+        fetch('/Streamer/DeleteStatus', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.success) {
+                var card = document.getElementById('status-card-' + statusId);
+                if (card) {
+                    card.style.transition = 'all 0.3s ease';
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.9)';
+                    setTimeout(function() {
+                        card.remove();
+                        var container = document.getElementById('statusListContainer');
+                        if (container && container.querySelectorAll('.status-feed-card').length === 0) {
+                            container.innerHTML = `
+                                <div class="col-12 py-5 text-center text-muted">
+                                    <div class="p-3 bg-light d-inline-block rounded-circle mb-3">
+                                        <i class="fa-regular fa-newspaper display-5 text-success opacity-75"></i>
+                                    </div>
+                                    <h6 class="fw-bold text-dark">Chưa có status nào được đăng tải</h6>
+                                    <p class="small text-muted mb-3">Hãy đăng status mới để chia sẻ thông báo và hình ảnh tới người xem nhé!</p>
+                                </div>
+                            `;
+                        }
+                    }, 300);
+                }
+            } else {
+                alert(data.message || 'Không thể xóa status. Vui lòng thử lại.');
+            }
+        })
+        .catch(err => {
+            console.error('Lỗi khi xóa status:', err);
+            alert('Có lỗi xảy ra khi xóa status.');
+        });
+    }
+
+    function toggleStreamerStatusLike(btn, statusId) {
+        if (!statusId) return;
+        
+        var icon = btn.querySelector('i');
+        var countSpan = btn.querySelector('.like-count');
+        
+        var isCurrentlyLiked = btn.classList.contains('liked');
+        var currentCount = parseInt((countSpan.textContent || '0').replace(/,/g, '')) || 0;
+        
+        if (isCurrentlyLiked) {
+            btn.classList.remove('liked');
+            icon.className = 'fa-regular fa-heart';
+            countSpan.textContent = Math.max(0, currentCount - 1).toLocaleString('vi-VN');
+        } else {
+            btn.classList.add('liked');
+            icon.className = 'fa-solid fa-heart text-danger';
+            countSpan.textContent = (currentCount + 1).toLocaleString('vi-VN');
+        }
+
+        var formData = new FormData();
+        formData.append('statusId', statusId);
+
+        fetch('/Streamer/ToggleLikeStatus', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.success) {
+                if (data.isLiked) {
+                    btn.classList.add('liked');
+                    icon.className = 'fa-solid fa-heart text-danger';
+                } else {
+                    btn.classList.remove('liked');
+                    icon.className = 'fa-regular fa-heart';
+                }
+                countSpan.textContent = data.likeCount.toLocaleString('vi-VN');
+            } else {
+                if (isCurrentlyLiked) {
+                    btn.classList.add('liked');
+                    icon.className = 'fa-solid fa-heart text-danger';
+                    countSpan.textContent = currentCount.toLocaleString('vi-VN');
+                } else {
+                    btn.classList.remove('liked');
+                    icon.className = 'fa-regular fa-heart';
+                    countSpan.textContent = currentCount.toLocaleString('vi-VN');
+                }
+            }
+        })
+        .catch(err => {
+            console.error('Lỗi khi thả tim:', err);
+        });
+    }
+
+    function previewStatusMedia(url, streamerName) {
+        if (!url) return;
+        var modalEl = document.getElementById('statusMediaLightboxModal');
+        var img = document.getElementById('statusLightboxImg');
+        var cap = document.getElementById('statusLightboxCaption');
+        if (img) img.src = url;
+        if (cap) cap.textContent = 'Ảnh đăng bởi ' + (streamerName || 'Streamer');
+        if (window.bootstrap && bootstrap.Modal) {
+            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        }
     }
 </script>
 

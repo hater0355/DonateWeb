@@ -93,5 +93,70 @@ namespace DonateWeb.Areas.Admin.Services
             string actionType,
             string note,
             string adminUsername);
+
+
+        // -------------------------------------------------------------
+        // 4. NGHIỆP VỤ QUẢN LÝ & PHÊ DUYỆT SẢN PHẨM GIAN HÀNG STREAMER
+        // -------------------------------------------------------------
+
+        /// <summary>
+        /// Lấy danh sách sản phẩm do streamer đăng bán, hỗ trợ tìm kiếm và lọc theo trạng thái duyệt
+        /// </summary>
+        Task<AdminProductListViewModel> GetProductsAsync(
+            string? searchTerm,
+            string statusFilter,
+            int? streamerId,
+            int page = 1,
+            int pageSize = 15);
+
+        /// <summary>
+        /// Phê duyệt sản phẩm của Streamer cho phép bày bán trên sàn
+        /// </summary>
+        Task<(bool Success, string Message)> ApproveProductAsync(int productId, string adminUsername);
+
+        /// <summary>
+        /// Từ chối sản phẩm của Streamer kèm lý do
+        /// </summary>
+        Task<(bool Success, string Message)> RejectProductAsync(int productId, string reason, string adminUsername);
+
+        /// <summary>
+        /// Xóa vĩnh viễn sản phẩm vi phạm
+        /// </summary>
+        Task<(bool Success, string Message)> DeleteProductAsync(int productId, string adminUsername);
+
+        /// <summary>
+        /// Bật / Tắt trạng thái kích hoạt của sản phẩm
+        /// </summary>
+        Task<(bool Success, string Message)> ToggleProductActiveAsync(int productId, string adminUsername);
+
+
+        // -------------------------------------------------------------
+        // 5. NGHIỆP VỤ ĐĂNG & QUẢN LÝ BẢN TIN BREAKING NEWS
+        // -------------------------------------------------------------
+
+        /// <summary>
+        /// Lấy dữ liệu quản lý Breaking News (tin hiện tại và lịch sử)
+        /// </summary>
+        Task<BreakingNewsManageViewModel> GetBreakingNewsManageAsync();
+
+        /// <summary>
+        /// Đăng mới hoặc cập nhật Breaking News
+        /// </summary>
+        Task<(bool Success, string Message)> SaveBreakingNewsAsync(BreakingNewsInputModel model, string adminUsername);
+
+        /// <summary>
+        /// Bật / Tắt trạng thái hiển thị của một bản tin
+        /// </summary>
+        Task<(bool Success, string Message)> ToggleBreakingNewsAsync(int id, string adminUsername);
+
+        /// <summary>
+        /// Xóa bản tin khỏi hệ thống
+        /// </summary>
+        Task<(bool Success, string Message)> DeleteBreakingNewsAsync(int id, string adminUsername);
+
+        /// <summary>
+        /// Để trống Breaking News (tắt toàn bộ các bản tin đang phát)
+        /// </summary>
+        Task<(bool Success, string Message)> ClearActiveBreakingNewsAsync(string adminUsername);
     }
 }

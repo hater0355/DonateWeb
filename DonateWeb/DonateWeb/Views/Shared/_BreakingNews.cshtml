@@ -1,8 +1,43 @@
+@inject DonateWeb.Data.AppDbContext DbContext
 <!-- FILE: Views/Shared/_BreakingNews.cshtml -->
-<div class="breaking-news-banner mb-4 d-flex align-items-center justify-content-between p-3 rounded-3" id="breakingNewsBanner">
-    <a href="/Streamer/Donate" class="text-decoration-none d-flex align-items-center gap-3 flex-grow-1 overflow-hidden">
-        <span class="badge badge-breaking fs-6 px-3 py-2 rounded-2 flex-shrink-0">Breaking News</span>
-        <span class="text-white fw-medium text-truncate">Hệ thống Donate chính thức khởi động! Khám phá và ủng hộ các streamer yêu thích ngay...</span>
-    </a>
-    <button type="button" class="btn-close btn-close-white ms-2" aria-label="Close" onclick="closeBreakingNews()"></button>
-</div>
+@{
+    // Truy vấn bản tin Breaking News đang được kích hoạt gần nhất
+    var activeNews = DbContext.BreakingNews
+        .Where(b => b.IsActive && !string.IsNullOrWhiteSpace(b.Content))
+        .OrderByDescending(b => b.UpdatedAt ?? b.CreatedAt)
+        .FirstOrDefault();
+}
+
+@if (activeNews != null && !string.IsNullOrWhiteSpace(activeNews.Content))
+{
+    <div class="breaking-news-banner mb-4 d-flex align-items-center p-2 px-3 rounded-3 shadow-sm position-relative overflow-hidden" id="breakingNewsBanner">
+        <!-- Huy hiệu Breaking News cố định bên trái -->
+        <div class="badge badge-breaking px-3 py-2 rounded-2 flex-shrink-0 d-flex align-items-center gap-2 me-3 z-2">
+            <span class="breaking-pulse-dot"></span>
+            <span class="fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.8rem;">Breaking News</span>
+        </div>
+
+        <!-- Khung chữ chạy ngang (Marquee Container) -->
+        <div class="breaking-marquee-container flex-grow-1 overflow-hidden position-relative">
+            @if (!string.IsNullOrWhiteSpace(activeNews.LinkUrl))
+            {
+                <a href="@activeNews.LinkUrl" class="breaking-marquee-track text-decoration-none" title="Nhấn để xem chi tiết: @activeNews.Content">
+                    <span class="breaking-marquee-text fw-medium">
+                        @activeNews.Content
+                    </span>
+                </a>
+            }
+            else
+            {
+                <div class="breaking-marquee-track">
+                    <span class="breaking-marquee-text fw-medium">
+                        @activeNews.Content
+                    </span>
+                </div>
+            }
+        </div>
+
+        <!-- Nút đóng thanh thông báo -->
+        <button type="button" class="btn-close btn-close-white ms-3 flex-shrink-0 z-2" aria-label="Close" onclick="closeBreakingNews()" title="Đóng thông báo"></button>
+    </div>
+}

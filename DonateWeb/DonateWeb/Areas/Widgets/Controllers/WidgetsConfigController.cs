@@ -6,8 +6,6 @@ using DonateWeb.Data;
 using DonateWeb.Models.Enums;
 using DonateWeb.Areas.Widgets.Services;
 using DonateWeb.Areas.Widgets.ViewModels;
-using DonateWeb.Hubs;
-using Microsoft.AspNetCore.SignalR;
 
 namespace DonateWeb.Areas.Widgets.Controllers
 {
@@ -20,14 +18,12 @@ namespace DonateWeb.Areas.Widgets.Controllers
         private readonly IWidgetService _widgetService;
         private readonly ILogger<WidgetsConfigController> _logger;
         private readonly AppDbContext _context;
-        private readonly IHubContext<PaymentHub> _hubContext;
 
-        public WidgetsConfigController(IWidgetService widgetService, ILogger<WidgetsConfigController> logger, AppDbContext context, IHubContext<PaymentHub> hubContext)
+        public WidgetsConfigController(IWidgetService widgetService, ILogger<WidgetsConfigController> logger, AppDbContext context)
         {
             _widgetService = widgetService;
             _logger = logger;
             _context = context;
-            _hubContext = hubContext;
         }
 
         private async Task<string?> GetOwnedStreamerSlugAsync(string? requestedSlug = null)
@@ -54,10 +50,7 @@ namespace DonateWeb.Areas.Widgets.Controllers
 
         private string GetBaseUrl()
         {
-            var scheme = HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().IsProduction()
-                ? "https"
-                : Request.Scheme;
-            return $"{scheme}://{Request.Host}";
+            return $"{Request.Scheme}://{Request.Host}";
         }
 
         // ====================================================================
@@ -71,11 +64,6 @@ namespace DonateWeb.Areas.Widgets.Controllers
             var targetSlug = await GetOwnedStreamerSlugAsync(slug);
             if (targetSlug == null) return Forbid();
             var model = await _widgetService.GetAlertBoxConfigAsync(targetSlug, GetBaseUrl());
-            if (!await _context.AlertBoxConfigs.AnyAsync(config => config.StreamerProfileId == model.StreamerProfileId))
-            {
-                await _widgetService.SaveAlertBoxConfigAsync(model);
-                model = await _widgetService.GetAlertBoxConfigAsync(targetSlug, GetBaseUrl());
-            }
 
             if (TempData["SuccessMessage"] != null)
             {
@@ -124,16 +112,6 @@ namespace DonateWeb.Areas.Widgets.Controllers
             var slug = await GetOwnedStreamerSlugAsync();
             if (slug == null) return Forbid();
             await _widgetService.TriggerTestAlertAsync(slug);
-            var config = await _widgetService.GetAlertBoxConfigAsync(slug, GetBaseUrl());
-            if (config.IsTtsEnabled)
-            {
-                await _hubContext.Clients.Group("Tts_" + slug).SendAsync("ReceiveTtsTest", new DonateWeb.Areas.Widgets.ViewModels.TtsDonationAlertDto
-                {
-                    DonorName = "Khán giả thử nghiệm",
-                    Amount = 50000,
-                    Message = "Đây là lời nhắn thử nghiệm giọng đọc."
-                });
-            }
             return Json(new { success = true, message = "Đã phát thông báo thử nghiệm lên OBS thành công!" });
         }
 

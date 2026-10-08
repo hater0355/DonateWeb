@@ -66,6 +66,7 @@ namespace DonateWeb.Areas.Admin.Services
             var suspendedStreamersCount = await _context.StreamerProfiles.CountAsync(s => !s.IsActive);
             var activeStreamersCount = await _context.StreamerProfiles.CountAsync(s => s.IsActive && s.ApprovalStatus == StreamerApprovalStatus.Approved);
             var pendingStreamersCount = await _context.StreamerProfiles.CountAsync(s => s.ApprovalStatus == StreamerApprovalStatus.Pending);
+            var pendingProductsCount = await _context.ShopProducts.CountAsync(p => p.ApprovalStatus == ProductApprovalStatus.Pending);
 
             // 1.3. Chuẩn bị dữ liệu vẽ biểu đồ dòng tiền 7 ngày gần nhất (Chart.js)
             var chartLabels = new List<string>();
@@ -154,6 +155,7 @@ namespace DonateWeb.Areas.Admin.Services
                 SuspendedStreamersCount = suspendedStreamersCount,
                 ActiveStreamersCount = activeStreamersCount,
                 PendingStreamersCount = pendingStreamersCount,
+                PendingProductsCount = pendingProductsCount,
                 ChartLabels = chartLabels,
                 ChartInflowData = chartInflow,
                 ChartOutflowData = chartOutflow,
@@ -770,6 +772,372 @@ namespace DonateWeb.Areas.Admin.Services
                 adminUsername, txCode, actionType, oldStatus, newStatus);
 
             return (true, $"Xử lý giao dịch '{txCode}' thành công. Đã cập nhật trạng thái và ghi nhật ký kiểm tra.");
+        }
+
+
+        // ====================================================================
+        // 4. QUẢN LÝ & PHÊ DUYỆT SẢN PHẨM SHOP STREAMER
+        // ====================================================================
+
+        public async Task<AdminProductListViewModel> GetProductsAsync(
+            string? searchTerm,
+            string statusFilter,
+            int? streamerId,
+            int page = 1,
+            int pageSize = 15)
+        {
+            var query = _context.ShopProducts
+                .Include(p => p.StreamerProfile)
+                    .ThenInclude(sp => sp.User)
+                .AsNoTracking();
+
+            // Thống kê số lượng tổng thể
+            var totalCount = await _context.ShopProducts.CountAsync();
+            var pendingCount = await _context.ShopProducts.CountAsync(p => p.ApprovalStatus == ProductApprovalStatus.Pending);
+            var approvedCount = await _context.ShopProducts.CountAsync(p => p.ApprovalStatus == ProductApprovalStatus.Approved);
+            var rejectedCount = await _context.ShopProducts.CountAsync(p => p.ApprovalStatus == ProductApprovalStatus.Rejected);
+
+            // Lọc từ khóa
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.Trim().ToLower();
+                query = query.Where(p =>
+                    p.Name.ToLower().Contains(term) ||
+                    (p.Description != null && p.Description.ToLower().Contains(term)) ||
+                    p.StreamerProfile.DisplayName.ToLower().Contains(term) ||
+                    p.StreamerProfile.Slug.ToLower().Contains(term));
+            }
+
+            // Lọc trạng thái duyệt
+            var sFilter = string.IsNullOrWhiteSpace(statusFilter) ? "all" : statusFilter.Trim().ToLower();
+            query = sFilter switch
+            {
+                "pending" => query.Where(p => p.ApprovalStatus == ProductApprovalStatus.Pending),
+                "approved" => query.Where(p => p.ApprovalStatus == ProductApprovalStatus.Approved),
+                "rejected" => query.Where(p => p.ApprovalStatus == ProductApprovalStatus.Rejected),
+                _ => query
+            };
+
+            // Lọc theo streamer
+            if (streamerId.HasValue && streamerId.Value > 0)
+            {
+                query = query.Where(p => p.StreamerProfileId == streamerId.Value);
+            }
+
+            var filteredTotal = await query.CountAsync();
+            var totalPages = (int)Math.Ceiling(filteredTotal / (double)pageSize);
+            if (totalPages < 1) totalPages = 1;
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+
+            var items = await query
+                .OrderByDescending(p => p.ApprovalStatus == ProductApprovalStatus.Pending)
+                .ThenByDescending(p => p.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(p => new AdminProductItemViewModel
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Description = p.Description,
+                    Price = p.Price,
+                    ImageUrl = p.ImageUrl,
+                    StockQuantity = p.StockQuantity,
+                    IsActive = p.IsActive,
+                    ApprovalStatus = p.ApprovalStatus,
+                    RejectionReason = p.RejectionReason,
+                    ApprovedAt = p.ApprovedAt,
+                    ApprovedBy = p.ApprovedBy,
+                    CreatedAt = p.CreatedAt,
+                    StreamerProfileId = p.StreamerProfileId,
+                    StreamerDisplayName = p.StreamerProfile.DisplayName,
+                    StreamerSlug = !string.IsNullOrWhiteSpace(p.StreamerProfile.User != null ? p.StreamerProfile.User.AccountId : null) ? p.StreamerProfile.User!.AccountId! : p.StreamerProfile.Slug,
+                    StreamerAvatarUrl = p.StreamerProfile.AvatarUrl,
+                    StreamerOwnerUsername = p.StreamerProfile.User != null ? p.StreamerProfile.User.Username : ""
+                })
+                .ToListAsync();
+
+            var streamers = await _context.StreamerProfiles
+                .Where(s => s.ShopProducts.Any())
+                .Select(s => new AdminProductStreamerOption
+                {
+                    Id = s.Id,
+                    DisplayName = s.DisplayName
+                })
+                .ToListAsync();
+
+            return new AdminProductListViewModel
+            {
+                Products = items,
+                SearchTerm = searchTerm?.Trim(),
+                StatusFilter = sFilter,
+                StreamerIdFilter = streamerId,
+                Streamers = streamers,
+                TotalCount = totalCount,
+                PendingCount = pendingCount,
+                ApprovedCount = approvedCount,
+                RejectedCount = rejectedCount,
+                CurrentPage = page,
+                TotalPages = totalPages,
+                PageSize = pageSize
+            };
+        }
+
+        public async Task<(bool Success, string Message)> ApproveProductAsync(int productId, string adminUsername)
+        {
+            var product = await _context.ShopProducts
+                .Include(p => p.StreamerProfile)
+                .FirstOrDefaultAsync(p => p.Id == productId);
+
+            if (product == null)
+            {
+                return (false, "Không tìm thấy thông tin sản phẩm cần duyệt.");
+            }
+
+            product.ApprovalStatus = ProductApprovalStatus.Approved;
+            product.ApprovedAt = DateTime.UtcNow;
+            product.ApprovedBy = adminUsername;
+            product.RejectionReason = null;
+            product.IsActive = true;
+            product.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Admin {Admin} đã phê duyệt sản phẩm '{Name}' (ID: {Id}) của streamer {Streamer}",
+                adminUsername, product.Name, product.Id, product.StreamerProfile.DisplayName);
+
+            return (true, $"Đã phê duyệt sản phẩm \"{product.Name}\" của kênh {product.StreamerProfile.DisplayName} thành công! Sản phẩm hiện đã có thể bày bán trên gian hàng.");
+        }
+
+        public async Task<(bool Success, string Message)> RejectProductAsync(int productId, string reason, string adminUsername)
+        {
+            var product = await _context.ShopProducts
+                .Include(p => p.StreamerProfile)
+                .FirstOrDefaultAsync(p => p.Id == productId);
+
+            if (product == null)
+            {
+                return (false, "Không tìm thấy thông tin sản phẩm.");
+            }
+
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                reason = "Sản phẩm vi phạm tiêu chuẩn cộng đồng hoặc thông tin/hình ảnh chưa phù hợp.";
+            }
+
+            product.ApprovalStatus = ProductApprovalStatus.Rejected;
+            product.RejectionReason = reason.Trim();
+            product.ApprovedAt = DateTime.UtcNow;
+            product.ApprovedBy = adminUsername;
+            product.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogWarning("Admin {Admin} đã từ chối duyệt sản phẩm '{Name}' (ID: {Id}). Lý do: {Reason}",
+                adminUsername, product.Name, product.Id, reason);
+
+            return (true, $"Đã từ chối duyệt sản phẩm \"{product.Name}\". Phản hồi và lý do đã được lưu để streamer kiểm tra.");
+        }
+
+        public async Task<(bool Success, string Message)> DeleteProductAsync(int productId, string adminUsername)
+        {
+            var product = await _context.ShopProducts
+                .Include(p => p.StreamerProfile)
+                .FirstOrDefaultAsync(p => p.Id == productId);
+
+            if (product == null)
+            {
+                return (false, "Không tìm thấy sản phẩm cần xóa.");
+            }
+
+            var prodName = product.Name;
+            _context.ShopProducts.Remove(product);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Admin {Admin} đã xóa sản phẩm '{Name}' (ID: {Id}) khỏi hệ thống", adminUsername, prodName, productId);
+
+            return (true, $"Đã xóa sản phẩm \"{prodName}\" thành công.");
+        }
+
+        public async Task<(bool Success, string Message)> ToggleProductActiveAsync(int productId, string adminUsername)
+        {
+            var product = await _context.ShopProducts.FirstOrDefaultAsync(p => p.Id == productId);
+            if (product == null)
+            {
+                return (false, "Không tìm thấy sản phẩm.");
+            }
+
+            product.IsActive = !product.IsActive;
+            product.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            var statusDesc = product.IsActive ? "mở bán trở lại" : "tạm ngưng bán";
+            return (true, $"Đã {statusDesc} sản phẩm \"{product.Name}\".");
+        }
+
+
+        // ====================================================================
+        // 5. ĐĂNG & QUẢN LÝ BẢN TIN BREAKING NEWS
+        // ====================================================================
+
+        public async Task<BreakingNewsManageViewModel> GetBreakingNewsManageAsync()
+        {
+            var activeNews = await _context.BreakingNews
+                .Where(b => b.IsActive)
+                .OrderByDescending(b => b.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            var history = await _context.BreakingNews
+                .OrderByDescending(b => b.CreatedAt)
+                .Take(25)
+                .ToListAsync();
+
+            var input = activeNews != null
+                ? new BreakingNewsInputModel
+                {
+                    Id = activeNews.Id,
+                    Content = activeNews.Content,
+                    LinkUrl = activeNews.LinkUrl,
+                    IsActive = activeNews.IsActive
+                }
+                : new BreakingNewsInputModel { IsActive = true };
+
+            return new BreakingNewsManageViewModel
+            {
+                Input = input,
+                CurrentActiveNews = activeNews,
+                History = history
+            };
+        }
+
+        public async Task<(bool Success, string Message)> SaveBreakingNewsAsync(BreakingNewsInputModel model, string adminUsername)
+        {
+            if (string.IsNullOrWhiteSpace(model.Content))
+            {
+                return (false, "Nội dung Breaking News không được để trống.");
+            }
+
+            // Nếu kích hoạt bản tin này, tắt các bản tin khác để chỉ có 1 bản tin chạy ngang duy nhất
+            if (model.IsActive)
+            {
+                var currentActives = await _context.BreakingNews.Where(b => b.IsActive).ToListAsync();
+                foreach (var b in currentActives)
+                {
+                    if (!model.Id.HasValue || b.Id != model.Id.Value)
+                    {
+                        b.IsActive = false;
+                        b.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
+            }
+
+            if (model.Id.HasValue && model.Id.Value > 0)
+            {
+                var existing = await _context.BreakingNews.FindAsync(model.Id.Value);
+                if (existing == null)
+                {
+                    return (false, "Không tìm thấy bản tin cần cập nhật.");
+                }
+
+                existing.Content = model.Content.Trim();
+                existing.LinkUrl = string.IsNullOrWhiteSpace(model.LinkUrl) ? null : model.LinkUrl.Trim();
+                existing.IsActive = model.IsActive;
+                existing.CreatedBy = adminUsername;
+                existing.UpdatedAt = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Admin {Admin} đã cập nhật Breaking News (ID: {Id})", adminUsername, existing.Id);
+
+                return (true, model.IsActive 
+                    ? "Cập nhật Breaking News thành công! Dòng chữ đang chạy ngang trên trang web." 
+                    : "Đã cập nhật bản tin ở trạng thái tạm ẩn.");
+            }
+            else
+            {
+                var news = new BreakingNews
+                {
+                    Content = model.Content.Trim(),
+                    LinkUrl = string.IsNullOrWhiteSpace(model.LinkUrl) ? null : model.LinkUrl.Trim(),
+                    IsActive = model.IsActive,
+                    CreatedBy = adminUsername,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.BreakingNews.Add(news);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Admin {Admin} đã đăng Breaking News mới (ID: {Id})", adminUsername, news.Id);
+
+                return (true, model.IsActive 
+                    ? "Đăng Breaking News thành công! Dòng chữ đang chạy ngang trên trang web." 
+                    : "Đã lưu bản tin ở trạng thái tạm ẩn (Chưa phát sóng).");
+            }
+        }
+
+        public async Task<(bool Success, string Message)> ToggleBreakingNewsAsync(int id, string adminUsername)
+        {
+            var item = await _context.BreakingNews.FindAsync(id);
+            if (item == null)
+            {
+                return (false, "Không tìm thấy bản tin.");
+            }
+
+            if (!item.IsActive)
+            {
+                // Khi bật bản tin này, tắt các bản tin khác
+                var otherActives = await _context.BreakingNews.Where(b => b.IsActive && b.Id != id).ToListAsync();
+                foreach (var b in otherActives)
+                {
+                    b.IsActive = false;
+                    b.UpdatedAt = DateTime.UtcNow;
+                }
+                item.IsActive = true;
+            }
+            else
+            {
+                item.IsActive = false;
+            }
+
+            item.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return (true, item.IsActive 
+                ? "Đã kích hoạt bản tin! Dòng chữ đang chạy ngang trên hệ thống." 
+                : "Đã tắt bản tin. Thanh Breaking News hiện đang để trống.");
+        }
+
+        public async Task<(bool Success, string Message)> DeleteBreakingNewsAsync(int id, string adminUsername)
+        {
+            var item = await _context.BreakingNews.FindAsync(id);
+            if (item == null)
+            {
+                return (false, "Không tìm thấy bản tin cần xóa.");
+            }
+
+            _context.BreakingNews.Remove(item);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Admin {Admin} đã xóa Breaking News (ID: {Id})", adminUsername, id);
+            return (true, "Đã xóa bản tin thành công khỏi hệ thống.");
+        }
+
+        public async Task<(bool Success, string Message)> ClearActiveBreakingNewsAsync(string adminUsername)
+        {
+            var activeList = await _context.BreakingNews.Where(b => b.IsActive).ToListAsync();
+            if (!activeList.Any())
+            {
+                return (true, "Thanh Breaking News hiện tại vốn dĩ đang để trống.");
+            }
+
+            foreach (var b in activeList)
+            {
+                b.IsActive = false;
+                b.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Admin {Admin} đã gỡ toàn bộ Breaking News về trạng thái để trống", adminUsername);
+
+            return (true, "Đã gỡ bỏ toàn bộ tin tức đang phát. Thanh Breaking News trên website hiện đang để trống.");
         }
     }
 }

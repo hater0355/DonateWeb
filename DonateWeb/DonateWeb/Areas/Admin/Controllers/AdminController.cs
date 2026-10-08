@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using DonateWeb.Areas.Admin.Services;
+using DonateWeb.Areas.Admin.ViewModels;
 using DonateWeb.Models.Enums;
 
 namespace DonateWeb.Areas.Admin.Controllers
@@ -266,6 +267,224 @@ namespace DonateWeb.Areas.Admin.Controllers
             }
 
             return RedirectToAction(nameof(TransactionDetail), new { id });
+        }
+
+
+        // ====================================================================
+        // 4. CHỨC NĂNG: QUẢN LÝ VÀ PHÊ DUYỆT SẢN PHẨM SHOP STREAMER
+        // ====================================================================
+
+        /// <summary>
+        /// Trang danh sách sản phẩm do streamer đăng bán: Kiểm duyệt nội dung, giá, ảnh trước khi hiển thị công khai.
+        /// URL: /Admin/Products
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> Products(
+            string? search,
+            string statusFilter = "all",
+            int? streamerId = null,
+            int page = 1)
+        {
+            var productsData = await _adminService.GetProductsAsync(search, statusFilter, streamerId, page, pageSize: 15);
+            return View(productsData);
+        }
+
+        /// <summary>
+        /// Phê duyệt sản phẩm của Streamer
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApproveProduct(int id)
+        {
+            var adminUser = User.Identity?.Name ?? "Admin";
+            var (success, message) = await _adminService.ApproveProductAsync(id, adminUser);
+
+            if (success)
+            {
+                TempData["SuccessMessage"] = message;
+            }
+            else
+            {
+                TempData["ErrorMessage"] = message;
+            }
+
+            return RedirectToAction(nameof(Products));
+        }
+
+        /// <summary>
+        /// Từ chối sản phẩm của Streamer kèm lý do
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RejectProduct(int id, string? reason)
+        {
+            var adminUser = User.Identity?.Name ?? "Admin";
+            var (success, message) = await _adminService.RejectProductAsync(id, reason ?? "", adminUser);
+
+            if (success)
+            {
+                TempData["SuccessMessage"] = message;
+            }
+            else
+            {
+                TempData["ErrorMessage"] = message;
+            }
+
+            return RedirectToAction(nameof(Products));
+        }
+
+        /// <summary>
+        /// Xóa sản phẩm vi phạm
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteProduct(int id)
+        {
+            var adminUser = User.Identity?.Name ?? "Admin";
+            var (success, message) = await _adminService.DeleteProductAsync(id, adminUser);
+
+            if (success)
+            {
+                TempData["SuccessMessage"] = message;
+            }
+            else
+            {
+                TempData["ErrorMessage"] = message;
+            }
+
+            return RedirectToAction(nameof(Products));
+        }
+
+        /// <summary>
+        /// Bật/tắt trạng thái mở bán sản phẩm
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleProductActive(int id)
+        {
+            var adminUser = User.Identity?.Name ?? "Admin";
+            var (success, message) = await _adminService.ToggleProductActiveAsync(id, adminUser);
+
+            if (success)
+            {
+                TempData["SuccessMessage"] = message;
+            }
+            else
+            {
+                TempData["ErrorMessage"] = message;
+            }
+
+            return RedirectToAction(nameof(Products));
+        }
+
+
+        // ====================================================================
+        // 5. CHỨC NĂNG: ĐĂNG & QUẢN LÝ BẢN TIN BREAKING NEWS
+        // ====================================================================
+
+        /// <summary>
+        /// Trang đăng và quản lý Breaking News (tin tức chạy chữ ngang trên toàn hệ thống).
+        /// URL: /Admin/BreakingNews
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> BreakingNews()
+        {
+            var model = await _adminService.GetBreakingNewsManageAsync();
+            return View(model);
+        }
+
+        /// <summary>
+        /// Lưu hoặc đăng mới Breaking News
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveBreakingNews(BreakingNewsInputModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                TempData["ErrorMessage"] = "Dữ liệu bản tin chưa hợp lệ. Vui lòng kiểm tra lại.";
+                return RedirectToAction(nameof(BreakingNews));
+            }
+
+            var adminUser = User.Identity?.Name ?? "Admin";
+            var (success, message) = await _adminService.SaveBreakingNewsAsync(model, adminUser);
+
+            if (success)
+            {
+                TempData["SuccessMessage"] = message;
+            }
+            else
+            {
+                TempData["ErrorMessage"] = message;
+            }
+
+            return RedirectToAction(nameof(BreakingNews));
+        }
+
+        /// <summary>
+        /// Bật/Tắt hiển thị một bản tin
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleBreakingNews(int id)
+        {
+            var adminUser = User.Identity?.Name ?? "Admin";
+            var (success, message) = await _adminService.ToggleBreakingNewsAsync(id, adminUser);
+
+            if (success)
+            {
+                TempData["SuccessMessage"] = message;
+            }
+            else
+            {
+                TempData["ErrorMessage"] = message;
+            }
+
+            return RedirectToAction(nameof(BreakingNews));
+        }
+
+        /// <summary>
+        /// Xóa bản tin
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteBreakingNews(int id)
+        {
+            var adminUser = User.Identity?.Name ?? "Admin";
+            var (success, message) = await _adminService.DeleteBreakingNewsAsync(id, adminUser);
+
+            if (success)
+            {
+                TempData["SuccessMessage"] = message;
+            }
+            else
+            {
+                TempData["ErrorMessage"] = message;
+            }
+
+            return RedirectToAction(nameof(BreakingNews));
+        }
+
+        /// <summary>
+        /// Gỡ bỏ toàn bộ tin tức (đưa thanh Breaking News về trạng thái để trống)
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ClearActiveBreakingNews()
+        {
+            var adminUser = User.Identity?.Name ?? "Admin";
+            var (success, message) = await _adminService.ClearActiveBreakingNewsAsync(adminUser);
+
+            if (success)
+            {
+                TempData["SuccessMessage"] = message;
+            }
+            else
+            {
+                TempData["ErrorMessage"] = message;
+            }
+
+            return RedirectToAction(nameof(BreakingNews));
         }
     }
 }

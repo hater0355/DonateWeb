@@ -1,0 +1,711 @@
+﻿@model DonateWeb.ViewModels.Shop.StreamerShopViewModel
+@{
+    ViewData["Title"] = $"Gian hàng & Giỏ hàng của {Model.StreamerName}";
+}
+
+<style>
+    .streamer-shop-hero {
+        background: linear-gradient(135deg, rgba(31, 69, 47, 0.95) 0%, rgba(41, 80, 62, 0.9) 100%), url('@Model.StreamerBanner');
+        background-size: cover;
+        background-position: center;
+        border-radius: 20px;
+        color: white;
+        padding: 28px 32px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(27, 69, 51, 0.18);
+    }
+    .streamer-shop-avatar {
+        width: 84px;
+        height: 84px;
+        border-radius: 50%;
+        border: 4px solid #ffffff;
+        object-fit: cover;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .product-shop-card {
+        border-radius: 16px;
+        border: 1px solid rgba(163, 199, 181, 0.4);
+        background: #ffffff;
+        transition: all 0.25s ease;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    }
+    .product-shop-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 22px rgba(31, 69, 47, 0.12);
+        border-color: #29503e;
+    }
+    .product-shop-thumb {
+        width: 100%;
+        padding-top: 75%;
+        position: relative;
+        background: #f1f5f3;
+        overflow: hidden;
+    }
+    .product-shop-thumb img {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.3s ease;
+    }
+    .product-shop-card:hover .product-shop-thumb img {
+        transform: scale(1.05);
+    }
+    .sticky-cart-sidebar {
+        position: sticky;
+        top: 85px;
+    }
+    .payment-option-label {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background: #ffffff;
+    }
+    .payment-option-label:hover {
+        border-color: #29503e;
+        background: #f4fcf6;
+    }
+    .payment-radio:checked + .payment-option-label {
+        border-color: #1b4533;
+        background: #e6f0e9;
+        font-weight: 600;
+        box-shadow: 0 0 0 1px #1b4533;
+    }
+    .qty-btn {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        font-size: 0.85rem;
+    }
+    .cart-item-row {
+        padding: 10px 0;
+        border-bottom: 1px dashed #e2e8f0;
+    }
+    .cart-item-row:last-child {
+        border-bottom: none;
+    }
+</style>
+
+<div class="container-fluid px-0 pb-5">
+    @Html.AntiForgeryToken()
+
+    <!-- Streamer Shop Hero Header -->
+    <div class="streamer-shop-hero mb-4">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <img src="@Model.StreamerAvatar" alt="@Model.StreamerName" class="streamer-shop-avatar" onerror="this.src='/images/default-avatar.png';" />
+                <div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                        <span class="badge bg-warning text-dark fw-bold px-2 py-1 small">
+                            <i class="fa-solid fa-store me-1"></i> GIAN HÀNG ĐỘC LẬP
+                        </span>
+                        @if (Model.IsOwner)
+                        {
+                            <span class="badge bg-light text-dark fw-bold px-2 py-1 small">
+                                <i class="fa-solid fa-crown text-warning me-1"></i> Gian hàng của bạn
+                            </span>
+                        }
+                    </div>
+                    <h2 class="fw-bold mb-1 display-6">Shop của @Model.StreamerName</h2>
+                    <p class="mb-0 text-white-50 small">
+                        Tất cả sản phẩm tại đây đều do Streamer <strong>@Model.StreamerName</strong> trực tiếp cung cấp và phát hành độc quyền.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex align-items-center gap-2">
+                <a href="/@(Model.StreamerSlug)" class="btn btn-outline-light rounded-pill px-3 py-2 fw-semibold" title="Trở về trang cá nhân của Streamer">
+                    <i class="fa-solid fa-user me-1"></i> Trang cá nhân
+                </a>
+                <a href="/Shop" class="btn btn-light rounded-pill px-3 py-2 fw-semibold text-dark-green" title="Xem sàn sản phẩm chung">
+                    <i class="fa-solid fa-layer-group me-1"></i> Sàn chung
+                </a>
+                @if (Model.IsOwner)
+                {
+                    <a href="/Shop/MyProducts" class="btn btn-warning rounded-pill px-3 py-2 fw-bold text-dark shadow-sm">
+                        <i class="fa-solid fa-plus-circle me-1"></i> Quản lý sản phẩm
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content: Products List (Left) + Independent Cart & Checkout (Right) -->
+    <div class="row g-4">
+        <!-- CỘT TRÁI: DANH SÁCH SẢN PHẨM CỦA STREAMER NÀY -->
+        <div class="col-lg-7 col-xl-8">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="fw-bold text-dark-green mb-0 d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-boxes-stacked text-success"></i>
+                    Sản phẩm của @Model.StreamerName
+                    <span class="badge bg-light-green text-dark-green rounded-pill font-monospace">@Model.Products.Count sản phẩm</span>
+                </h5>
+                <span class="small text-muted">Chọn sản phẩm để thêm vào giỏ bên phải</span>
+            </div>
+
+            @if (!Model.Products.Any())
+            {
+                <div class="card border-0 shadow-sm rounded-4 p-5 text-center bg-white">
+                    <div class="py-4">
+                        <i class="fa-solid fa-store-slash fa-3x text-muted mb-3 opacity-50"></i>
+                        <h5 class="fw-bold text-dark">Streamer chưa đăng sản phẩm nào</h5>
+                        <p class="text-muted small mb-3">Gian hàng của streamer này hiện đang cập nhật sản phẩm mới. Vui lòng quay lại sau!</p>
+                        @if (Model.IsOwner)
+                        {
+                            <a href="/Shop/MyProducts" class="btn btn-dark-green rounded-pill px-4 fw-semibold">
+                                <i class="fa-solid fa-plus me-1"></i> Thêm sản phẩm đầu tiên của bạn
+                            </a>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-3 g-3">
+                    @foreach (var prod in Model.Products)
+                    {
+                        <div class="col">
+                            <div class="product-shop-card">
+                                <div class="product-shop-thumb">
+                                    <img src="@(string.IsNullOrWhiteSpace(prod.ImageUrl) ? "/images/default-banner.jpg" : prod.ImageUrl)"
+                                         alt="@prod.Name"
+                                         loading="lazy"
+                                         onerror="this.src='/images/default-banner.jpg';" />
+                                </div>
+                                <div class="p-3 d-flex flex-column flex-grow-1">
+                                    <div class="d-flex align-items-center justify-content-between mb-1">
+                                        <span class="badge bg-light-green text-dark-green small font-monospace">Kho: @prod.StockQuantity</span>
+                                        <span class="small text-muted" style="font-size: 0.75rem;">Mã SP: #@prod.Id</span>
+                                    </div>
+                                    <h6 class="fw-bold text-dark mb-1 text-truncate-2" style="min-height: 40px; line-height: 1.35;" title="@prod.Name">
+                                        @prod.Name
+                                    </h6>
+                                    <p class="text-muted small mb-3 text-truncate-2" style="font-size: 0.8rem; min-height: 36px; line-height: 1.35;">
+                                        @(string.IsNullOrWhiteSpace(prod.Description) ? "Sản phẩm chính thức do Idol phát hành." : prod.Description)
+                                    </p>
+                                    <div class="mt-auto pt-2 border-top d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <div class="small text-muted" style="font-size: 0.72rem;">GIÁ</div>
+                                            <div class="fw-bold text-dark-green fs-5">@prod.Price.ToString("N0") <span style="font-size: 0.85rem;">đ</span></div>
+                                        </div>
+                                        <button type="button" 
+                                                class="btn btn-dark-green rounded-pill px-3 py-1 fw-semibold small shadow-sm btn-add-to-cart"
+                                                onclick="addToCart(@prod.Id, '@Html.Raw(prod.Name.Replace("'", "\\'"))', @prod.Price, '@(string.IsNullOrWhiteSpace(prod.ImageUrl) ? "/images/default-banner.jpg" : prod.ImageUrl)', @prod.StockQuantity)">
+                                            <i class="fa-solid fa-cart-plus me-1"></i> Thêm vào giỏ
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- CỘT PHẢI: GIỎ HÀNG RIÊNG BIỆT & FORM THANH TOÁN (WALLET / VIETQR) -->
+        <div class="col-lg-5 col-xl-4">
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white sticky-cart-sidebar">
+                <div class="d-flex align-items-center justify-content-between pb-3 border-bottom mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-cart-shopping text-success fs-5"></i>
+                        <h5 class="fw-bold text-dark mb-0">Giỏ hàng của bạn</h5>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger border-0 small" onclick="clearCart()" title="Xóa toàn bộ giỏ hàng này">
+                        <i class="fa-regular fa-trash-can me-1"></i> Làm trống
+                    </button>
+                </div>
+
+                <div class="small text-muted mb-3 d-flex align-items-center gap-1">
+                    <i class="fa-solid fa-shield-halved text-success"></i>
+                    <span>Giỏ hàng độc lập tại Shop: <strong class="text-dark">@Model.StreamerName</strong></span>
+                </div>
+
+                <!-- Danh sách sản phẩm trong giỏ -->
+                <div id="cartItemsContainer" style="max-height: 240px; overflow-y: auto;" class="pe-1 mb-3">
+                    <!-- Sẽ render động qua Javascript -->
+                    <div class="text-center py-4 text-muted" id="emptyCartNotice">
+                        <i class="fa-solid fa-basket-shopping fa-2x mb-2 opacity-50"></i>
+                        <div class="small">Giỏ hàng đang trống</div>
+                        <div class="small text-muted-50">Hãy chọn sản phẩm bên trái để bắt đầu mua</div>
+                    </div>
+                </div>
+
+                <!-- Tổng tiền đơn hàng -->
+                <div class="p-3 rounded-3 bg-light mb-3">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="text-muted small">Tạm tính:</span>
+                        <span class="fw-semibold text-dark font-monospace" id="subtotalDisplay">0 đ</span>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="text-muted small">Phí vận chuyển:</span>
+                        <span class="fw-semibold text-success small">Miễn phí (Toàn quốc)</span>
+                    </div>
+                    <hr class="my-2 border-secondary opacity-25">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span class="fw-bold text-dark">Tổng thanh toán:</span>
+                        <span class="fw-bold text-dark-green fs-5 font-monospace" id="totalDisplay">0 đ</span>
+                    </div>
+                </div>
+
+                <!-- FORM ĐIỀN THÔNG TIN ĐẶT HÀNG -->
+                <div class="mb-3">
+                    <h6 class="fw-bold text-dark mb-2 small text-uppercase">
+                        <i class="fa-solid fa-location-dot text-danger me-1"></i> Thông tin giao hàng
+                    </h6>
+                    <div class="mb-2">
+                        <input type="text" id="buyerName" class="form-control form-control-sm rounded-3" 
+                               placeholder="Họ và tên người nhận *" value="@Model.ViewerName" required />
+                    </div>
+                    <div class="mb-2">
+                        <input type="tel" id="buyerPhone" class="form-control form-control-sm rounded-3" 
+                               placeholder="Số điện thoại liên hệ *" value="@Model.ViewerPhone" required />
+                    </div>
+                    <div class="mb-2">
+                        <input type="text" id="buyerAddress" class="form-control form-control-sm rounded-3" 
+                               placeholder="Địa chỉ nhận hàng (Số nhà, đường, phường, quận...) *" required />
+                    </div>
+                    <div class="mb-2">
+                        <input type="text" id="orderNote" class="form-control form-control-sm rounded-3" 
+                               placeholder="Ghi chú thêm (Size áo, lời nhắn...)" />
+                    </div>
+                </div>
+
+                <!-- CHỌN PHƯƠNG THỨC THANH TOÁN (VÍ HOẶC QR) -->
+                <div class="mb-3">
+                    <h6 class="fw-bold text-dark mb-2 small text-uppercase">
+                        <i class="fa-solid fa-credit-card text-primary me-1"></i> Phương thức thanh toán
+                    </h6>
+
+                    <!-- 1. Thanh toán bằng ví số dư -->
+                    <div class="mb-2">
+                        <input type="radio" name="paymentMethod" value="Wallet" id="payWallet" class="d-none payment-radio" checked />
+                        <label for="payWallet" class="payment-option-label">
+                            <div class="rounded-circle p-2 bg-success text-white d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                <i class="fa-solid fa-wallet fa-sm"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <span class="text-dark small fw-bold">Ví số dư tài khoản</span>
+                                    <span class="badge bg-light-green text-dark-green small">Khuyên dùng</span>
+                                </div>
+                                <div class="small text-muted" style="font-size: 0.75rem;">
+                                    Số dư hiện tại: <strong class="text-success font-monospace" id="viewerBalanceText">@Model.ViewerWalletBalance.ToString("N0") VNĐ</strong>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- 2. Thanh toán quét mã QR VietQR -->
+                    <div>
+                        <input type="radio" name="paymentMethod" value="VietQR" id="payVietQR" class="d-none payment-radio" />
+                        <label for="payVietQR" class="payment-option-label">
+                            <div class="rounded-circle p-2 bg-primary text-white d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                <i class="fa-solid fa-qrcode fa-sm"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <span class="text-dark small fw-bold">Quét mã VietQR Napas247</span>
+                                    <span class="badge bg-primary text-white small">Tức thì</span>
+                                </div>
+                                <div class="small text-muted" style="font-size: 0.75rem;">
+                                    Tự động tạo mã QR chính xác số tiền & nội dung đơn
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Cảnh báo nếu số dư ví không đủ -->
+                @if (Model.IsViewerAuthenticated)
+                {
+                    <div id="insufficientBalanceAlert" class="alert alert-warning py-2 px-3 small rounded-3 d-none mb-3">
+                        <i class="fa-solid fa-circle-exclamation me-1"></i>
+                        Số dư ví của bạn không đủ. Hãy <a href="/Wallet/Deposit" target="_blank" class="fw-bold text-dark text-decoration-underline">Nạp thêm ví</a> hoặc chọn phương thức <strong>Quét mã VietQR</strong>.
+                    </div>
+                }
+                else
+                {
+                    <div id="unauthenticatedWalletAlert" class="alert alert-info py-2 px-3 small rounded-3 mb-3">
+                        <i class="fa-solid fa-info-circle me-1"></i>
+                        Thanh toán bằng ví yêu cầu <a href="/Auth/Login" class="fw-bold text-dark text-decoration-underline">Đăng nhập</a>. Hoặc bạn có thể chọn ngay <strong>Quét mã VietQR</strong> không cần đăng nhập!
+                    </div>
+                }
+
+                <!-- Nút Submit Đặt Hàng -->
+                <button type="button" 
+                        id="btnSubmitCheckout" 
+                        class="btn btn-dark-green w-100 py-3 fw-bold rounded-3 shadow-sm d-flex align-items-center justify-content-center gap-2"
+                        onclick="processCheckout()">
+                    <i class="fa-solid fa-bag-shopping"></i>
+                    <span id="btnCheckoutText">Tiến hành đặt hàng (0 đ)</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL HIỂN THỊ MÃ VIETQR KHI CHỌN PHƯƠNG THỨC QR -->
+<div class="modal fade" id="vietQrModal" tabindex="-1" aria-labelledby="vietQrModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow-lg overflow-hidden">
+            <div class="modal-header bg-dark-green text-white py-3 border-0">
+                <h5 class="modal-title fw-bold fs-6 d-flex align-items-center gap-2" id="vietQrModalLabel">
+                    <i class="fa-solid fa-qrcode text-warning"></i>
+                    Quét Mã VietQR Để Hoàn Tất Đơn Hàng
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <div class="badge bg-light-green text-dark-green px-3 py-1 rounded-pill mb-2 font-monospace fs-6" id="qrModalOrderCode">
+                    ĐƠN HÀNG #ORD...
+                </div>
+                <p class="text-muted small mb-3">
+                    Mở ứng dụng Ngân hàng (MB, Vietcombank, Techcombank, TPBank...) hoặc ví điện tử bất kỳ và quét mã QR dưới đây:
+                </p>
+
+                <!-- Khung chứa ảnh QR -->
+                <div class="p-3 bg-light rounded-4 d-inline-block border shadow-sm mb-3">
+                    <img id="qrImageElement" src="" alt="Mã VietQR" class="img-fluid rounded-3" style="max-width: 250px; height: auto;" />
+                </div>
+
+                <!-- Bảng chi tiết chuyển khoản -->
+                <div class="bg-light p-3 rounded-3 text-start small mb-3 border">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Ngân hàng thụ hưởng:</span>
+                        <strong class="text-dark" id="qrBankName">MB Bank</strong>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-muted">Số tài khoản:</span>
+                        <div class="d-flex align-items-center gap-1">
+                            <strong class="text-dark font-monospace" id="qrBankAccountNo">0354031024</strong>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-success text-decoration-none" onclick="copyToClipboard('qrBankAccountNo')" title="Sao chép số tài khoản">
+                                <i class="fa-regular fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Chủ tài khoản:</span>
+                        <strong class="text-dark text-uppercase" id="qrBankAccountName">@Model.StreamerName</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Số tiền thanh toán:</span>
+                        <strong class="text-danger fw-bold fs-6 font-monospace" id="qrAmountDisplay">0 VNĐ</strong>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted">Nội dung chuyển khoản:</span>
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="badge bg-warning text-dark font-monospace px-2 py-1" id="qrContentDisplay">SHOP ...</span>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-success text-decoration-none" onclick="copyToClipboard('qrContentDisplay')" title="Sao chép nội dung chuyển khoản">
+                                <i class="fa-regular fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <a id="btnViewDetailOrder" href="#" class="btn btn-dark-green w-100 py-2 rounded-3 fw-bold">
+                        <i class="fa-solid fa-circle-check me-1"></i> Tôi đã quét mã chuyển tiền
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const streamerId = @Model.StreamerId;
+    const cartStorageKey = `onlyfan_cart_streamer_${streamerId}`;
+    const userWalletBalance = @Model.ViewerWalletBalance;
+    const isAuthenticated = @(Model.IsViewerAuthenticated ? "true" : "false");
+
+    let cart = [];
+
+    // Tải giỏ hàng từ localStorage cho riêng Streamer này
+    function loadCart() {
+        try {
+            const raw = localStorage.getItem(cartStorageKey);
+            if (raw) {
+                cart = JSON.parse(raw);
+            } else {
+                cart = [];
+            }
+        } catch (e) {
+            cart = [];
+        }
+        renderCart();
+    }
+
+    // Lưu giỏ hàng vào localStorage của riêng Streamer này
+    function saveCart() {
+        localStorage.setItem(cartStorageKey, JSON.stringify(cart));
+        renderCart();
+    }
+
+    // Thêm sản phẩm vào giỏ
+    function addToCart(id, name, price, imageUrl, maxStock) {
+        const existing = cart.find(i => i.id === id);
+        if (existing) {
+            if (existing.quantity < maxStock) {
+                existing.quantity += 1;
+            } else {
+                alert(`Số lượng trong giỏ đã đạt mức tối đa tồn kho (${maxStock} sản phẩm).`);
+                return;
+            }
+        } else {
+            cart.push({
+                id: id,
+                name: name,
+                price: price,
+                imageUrl: imageUrl,
+                quantity: 1,
+                maxStock: maxStock
+            });
+        }
+        saveCart();
+    }
+
+    // Thay đổi số lượng sản phẩm (+1 / -1)
+    function changeQuantity(id, delta) {
+        const item = cart.find(i => i.id === id);
+        if (!item) return;
+
+        item.quantity += delta;
+        if (item.quantity <= 0) {
+            cart = cart.filter(i => i.id !== id);
+        } else if (item.quantity > item.maxStock) {
+            item.quantity = item.maxStock;
+            alert(`Sản phẩm này chỉ còn tối đa ${item.maxStock} chiếc.`);
+        }
+        saveCart();
+    }
+
+    // Xóa sản phẩm khỏi giỏ
+    function removeFromCart(id) {
+        cart = cart.filter(i => i.id !== id);
+        saveCart();
+    }
+
+    // Xóa sạch giỏ hàng của Streamer này
+    function clearCart() {
+        if (cart.length === 0) return;
+        if (confirm("Bạn có chắc chắn muốn làm trống giỏ hàng này?")) {
+            cart = [];
+            saveCart();
+        }
+    }
+
+    // Render giao diện giỏ hàng
+    function renderCart() {
+        const container = document.getElementById("cartItemsContainer");
+        const emptyNotice = document.getElementById("emptyCartNotice");
+        const subtotalEl = document.getElementById("subtotalDisplay");
+        const totalEl = document.getElementById("totalDisplay");
+        const btnCheckoutText = document.getElementById("btnCheckoutText");
+        const insufficientAlert = document.getElementById("insufficientBalanceAlert");
+
+        if (!cart || cart.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-4 text-muted">
+                    <i class="fa-solid fa-basket-shopping fa-2x mb-2 opacity-50"></i>
+                    <div class="small">Giỏ hàng đang trống</div>
+                    <div class="small text-muted-50">Hãy chọn sản phẩm bên trái để bắt đầu mua</div>
+                </div>
+            `;
+            subtotalEl.innerText = "0 đ";
+            totalEl.innerText = "0 đ";
+            btnCheckoutText.innerText = "Tiến hành đặt hàng (0 đ)";
+            if (insufficientAlert) insufficientAlert.classList.add("d-none");
+            return;
+        }
+
+        let total = 0;
+        let html = "";
+
+        cart.forEach(item => {
+            const itemTotal = item.price * item.quantity;
+            total += itemTotal;
+
+            html += `
+                <div class="cart-item-row d-flex align-items-center gap-2">
+                    <img src="${item.imageUrl}" alt="${item.name}" class="rounded-2 border" style="width: 44px; height: 44px; object-fit: cover;" onerror="this.src='/images/default-banner.jpg';" />
+                    <div class="flex-grow-1" style="min-width: 0;">
+                        <div class="fw-semibold text-dark text-truncate small" title="${item.name}">${item.name}</div>
+                        <div class="small text-success fw-bold font-monospace">${item.price.toLocaleString("vi-VN")} đ</div>
+                    </div>
+                    <div class="d-flex align-items-center gap-1">
+                        <button type="button" class="btn btn-sm btn-outline-secondary qty-btn" onclick="changeQuantity(${item.id}, -1)">-</button>
+                        <span class="small font-monospace px-1 fw-bold">${item.quantity}</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary qty-btn" onclick="changeQuantity(${item.id}, 1)">+</button>
+                        <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-1" onclick="removeFromCart(${item.id})" title="Xóa">
+                            <i class="fa-regular fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+        const formattedTotal = total.toLocaleString("vi-VN") + " đ";
+        subtotalEl.innerText = formattedTotal;
+        totalEl.innerText = formattedTotal;
+        btnCheckoutText.innerText = `Tiến hành đặt hàng (${formattedTotal})`;
+
+        // Kiểm tra số dư ví
+        const isWalletSelected = document.getElementById("payWallet") && document.getElementById("payWallet").checked;
+        if (insufficientAlert) {
+            if (isWalletSelected && isAuthenticated && userWalletBalance < total) {
+                insufficientAlert.classList.remove("d-none");
+            } else {
+                insufficientAlert.classList.add("d-none");
+            }
+        }
+    }
+
+    // Lắng nghe thay đổi radio thanh toán
+    document.querySelectorAll('input[name="paymentMethod"]').forEach(el => {
+        el.addEventListener("change", function() {
+            renderCart();
+        });
+    });
+
+    // Xử lý gửi đơn hàng qua API
+    async function processCheckout() {
+        if (!cart || cart.length === 0) {
+            alert("Giỏ hàng của bạn đang trống! Vui lòng chọn sản phẩm trước khi thanh toán.");
+            return;
+        }
+
+        const buyerName = document.getElementById("buyerName").value.trim();
+        const buyerPhone = document.getElementById("buyerPhone").value.trim();
+        const buyerAddress = document.getElementById("buyerAddress").value.trim();
+        const orderNote = document.getElementById("orderNote").value.trim();
+        const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || "Wallet";
+
+        if (!buyerName) {
+            alert("Vui lòng nhập Họ và tên người nhận hàng.");
+            document.getElementById("buyerName").focus();
+            return;
+        }
+
+        if (!buyerPhone) {
+            alert("Vui lòng nhập Số điện thoại liên hệ.");
+            document.getElementById("buyerPhone").focus();
+            return;
+        }
+
+        if (!buyerAddress) {
+            alert("Vui lòng nhập Địa chỉ nhận hàng.");
+            document.getElementById("buyerAddress").focus();
+            return;
+        }
+
+        let total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+        if (paymentMethod === "Wallet") {
+            if (!isAuthenticated) {
+                alert("Vui lòng Đăng nhập tài khoản để thanh toán bằng số dư Ví, hoặc chọn phương thức 'Quét mã VietQR'.");
+                window.location.href = "/Auth/Login?returnUrl=" + encodeURIComponent(window.location.pathname + window.location.search);
+                return;
+            }
+            if (userWalletBalance < total) {
+                alert(`Số dư ví của bạn (${userWalletBalance.toLocaleString('vi-VN')} VNĐ) không đủ để thanh toán đơn hàng ${total.toLocaleString('vi-VN')} VNĐ. Vui lòng nạp thêm tiền hoặc chọn thanh toán quét mã QR!`);
+                return;
+            }
+        }
+
+        const btn = document.getElementById("btnSubmitCheckout");
+        const originalBtnContent = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-2"></i> Đang xử lý đặt hàng...`;
+
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || "";
+
+        const payload = {
+            streamerProfileId: streamerId,
+            items: cart.map(i => ({ productId: i.id, quantity: i.quantity })),
+            buyerName: buyerName,
+            buyerPhone: buyerPhone,
+            buyerAddress: buyerAddress,
+            note: orderNote,
+            paymentMethod: paymentMethod
+        };
+
+        try {
+            const resp = await fetch("/Shop/Checkout", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "RequestVerificationToken": token
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const res = await resp.json();
+
+            if (!res.success) {
+                alert(res.message || "Đã xảy ra lỗi khi tạo đơn hàng. Vui lòng thử lại!");
+                btn.disabled = false;
+                btn.innerHTML = originalBtnContent;
+                return;
+            }
+
+            // Xóa sạch giỏ hàng sau khi đặt thành công
+            cart = [];
+            localStorage.removeItem(cartStorageKey);
+            renderCart();
+
+            if (res.isPaid) {
+                // Đã thanh toán thành công bằng Ví
+                alert(res.message || "Thanh toán bằng số dư ví thành công!");
+                window.location.href = `/Shop/Detail?orderCode=${encodeURIComponent(res.orderCode)}`;
+            } else {
+                // Phương thức VietQR -> Hiển thị Popup QR
+                document.getElementById("qrModalOrderCode").innerText = `ĐƠN HÀNG #${res.orderCode}`;
+                document.getElementById("qrImageElement").src = res.qrBase64;
+                document.getElementById("qrBankName").innerText = res.bankName;
+                document.getElementById("qrBankAccountNo").innerText = res.bankAccountNumber;
+                document.getElementById("qrBankAccountName").innerText = res.bankAccountName;
+                document.getElementById("qrAmountDisplay").innerText = res.formattedAmount;
+                document.getElementById("qrContentDisplay").innerText = res.transferContent;
+                document.getElementById("btnViewDetailOrder").href = `/Shop/Detail?orderCode=${encodeURIComponent(res.orderCode)}`;
+
+                const qrModal = new bootstrap.Modal(document.getElementById("vietQrModal"));
+                qrModal.show();
+                btn.disabled = false;
+                btn.innerHTML = originalBtnContent;
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Lỗi kết nối máy chủ khi thanh toán. Vui lòng thử lại!");
+            btn.disabled = false;
+            btn.innerHTML = originalBtnContent;
+        }
+    }
+
+    function copyToClipboard(elementId) {
+        const text = document.getElementById(elementId).innerText.trim();
+        navigator.clipboard.writeText(text).then(() => {
+            alert(`Đã sao chép: ${text}`);
+        });
+    }
+
+    // Khởi tạo giỏ hàng khi tải xong DOM
+    document.addEventListener("DOMContentLoaded", loadCart);
+</script>

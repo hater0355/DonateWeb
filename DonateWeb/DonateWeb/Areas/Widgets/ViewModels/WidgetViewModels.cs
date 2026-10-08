@@ -247,6 +247,8 @@ namespace DonateWeb.Areas.Widgets.ViewModels
     {
         public int DonationId { get; set; }
 
+        public string TtsToken { get; set; } = string.Empty;
+
         public string DonorName { get; set; } = string.Empty;
 
         public decimal Amount { get; set; }
@@ -287,14 +289,5 @@ namespace DonateWeb.Areas.Widgets.ViewModels
         public string AnimationOut { get; set; } = "fadeOutUp";
 
         public bool IsTtsEnabled { get; set; } = false;
-    }
-
-    public sealed class TtsDonationAlertDto
-    {
-        public Guid EventId { get; set; } = Guid.NewGuid();
-        public int DonationId { get; set; }
-        public string DonorName { get; set; } = string.Empty;
-        public decimal Amount { get; set; }
-        public string Message { get; set; } = string.Empty;
     }
 }

@@ -25,6 +25,20 @@ namespace DonateWeb.Data
         public DbSet<AlertBoxConfig> AlertBoxConfigs => Set<AlertBoxConfig>();
         public DbSet<StreamerGoal> StreamerGoals => Set<StreamerGoal>();
 
+        // Phân hệ Gian hàng & Giỏ hàng Streamer
+        public DbSet<ShopProduct> ShopProducts => Set<ShopProduct>();
+        public DbSet<ShopOrder> ShopOrders => Set<ShopOrder>();
+        public DbSet<ShopOrderItem> ShopOrderItems => Set<ShopOrderItem>();
+
+        // Bản tin Breaking News
+        public DbSet<BreakingNews> BreakingNews => Set<BreakingNews>();
+
+        // Danh sách theo dõi Streamer (Streamer yêu thích)
+        public DbSet<StreamerFollow> StreamerFollows => Set<StreamerFollow>();
+
+        // Bài viết Status của Streamer
+        public DbSet<StreamerStatus> StreamerStatuses => Set<StreamerStatus>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -171,6 +185,75 @@ namespace DonateWeb.Data
                       .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasIndex(sg => new { sg.StreamerProfileId, sg.IsActive });
+            });
+
+            // ShopProduct
+            modelBuilder.Entity<ShopProduct>(entity =>
+            {
+                entity.HasOne(p => p.StreamerProfile)
+                      .WithMany(s => s.ShopProducts)
+                      .HasForeignKey(p => p.StreamerProfileId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ShopOrder
+            modelBuilder.Entity<ShopOrder>(entity =>
+            {
+                entity.HasOne(o => o.StreamerProfile)
+                      .WithMany(s => s.ShopOrders)
+                      .HasForeignKey(o => o.StreamerProfileId)
+                      .OnDelete(DeleteBehavior.NoAction);
+
+                entity.HasOne(o => o.BuyerUser)
+                      .WithMany()
+                      .HasForeignKey(o => o.BuyerUserId)
+                      .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(o => o.OrderCode).IsUnique();
+            });
+
+            // ShopOrderItem
+            modelBuilder.Entity<ShopOrderItem>(entity =>
+            {
+                entity.HasOne(i => i.ShopOrder)
+                      .WithMany(o => o.Items)
+                      .HasForeignKey(i => i.ShopOrderId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(i => i.ShopProduct)
+                      .WithMany(p => p.OrderItems)
+                      .HasForeignKey(i => i.ShopProductId)
+                      .OnDelete(DeleteBehavior.NoAction);
+            });
+
+            // StreamerFollow (Mối quan hệ theo dõi Streamer - Streamer yêu thích)
+            modelBuilder.Entity<StreamerFollow>(entity =>
+            {
+                entity.HasKey(sf => sf.Id);
+                entity.HasIndex(sf => new { sf.UserId, sf.StreamerProfileId }).IsUnique();
+
+                entity.HasOne(sf => sf.User)
+                      .WithMany(u => u.FollowedStreamers)
+                      .HasForeignKey(sf => sf.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(sf => sf.StreamerProfile)
+                      .WithMany(sp => sp.Followers)
+                      .HasForeignKey(sf => sf.StreamerProfileId)
+                      .OnDelete(DeleteBehavior.NoAction);
+            });
+
+            // StreamerStatus (Bài viết Status của Streamer)
+            modelBuilder.Entity<StreamerStatus>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+                entity.Property(s => s.Content).IsRequired().HasMaxLength(4000);
+                entity.Property(s => s.ImageUrl).HasMaxLength(500);
+
+                entity.HasOne(s => s.StreamerProfile)
+                      .WithMany(sp => sp.Statuses)
+                      .HasForeignKey(s => s.StreamerProfileId)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
         }
     }

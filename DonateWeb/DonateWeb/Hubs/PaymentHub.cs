@@ -1,6 +1,4 @@
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
-using DonateWeb.Data;
 
 namespace DonateWeb.Hubs
 {
@@ -14,12 +12,10 @@ namespace DonateWeb.Hubs
     public class PaymentHub : Hub
     {
         private readonly ILogger<PaymentHub> _logger;
-        private readonly AppDbContext _context;
 
-        public PaymentHub(ILogger<PaymentHub> logger, AppDbContext context)
+        public PaymentHub(ILogger<PaymentHub> logger)
         {
             _logger = logger;
-            _context = context;
         }
 
         /// <summary>
@@ -60,34 +56,6 @@ namespace DonateWeb.Hubs
                 await Groups.AddToGroupAsync(Context.ConnectionId, "Streamer_" + cleanSlug);
                 _logger.LogInformation("[SignalR OBS] Connection {ConnectionId} đã kết nối vào nhóm Streamer_{CleanSlug}", Context.ConnectionId, cleanSlug);
             }
-        }
-
-        public async Task JoinTtsGroup(string streamerSlug, string widgetToken)
-        {
-            var cleanSlug = (streamerSlug ?? string.Empty).Trim().ToLowerInvariant();
-            if (cleanSlug.Length is 0 or > 100 || string.IsNullOrWhiteSpace(widgetToken))
-                throw new HubException("Thông tin kết nối trợ lý không hợp lệ.");
-
-            var storedToken = await (
-                from config in _context.AlertBoxConfigs
-                join profile in _context.StreamerProfiles on config.StreamerProfileId equals profile.Id
-                where profile.Slug.ToLower() == cleanSlug
-                select config.WidgetToken)
-                .FirstOrDefaultAsync(Context.ConnectionAborted);
-
-            if (!FixedTimeEquals(widgetToken, storedToken))
-                throw new HubException("Widget Token không hợp lệ.");
-
-            await Groups.AddToGroupAsync(Context.ConnectionId, "Tts_" + cleanSlug, Context.ConnectionAborted);
-        }
-
-        private static bool FixedTimeEquals(string provided, string? expected)
-        {
-            if (string.IsNullOrEmpty(expected)) return false;
-            var providedBytes = System.Text.Encoding.UTF8.GetBytes(provided);
-            var expectedBytes = System.Text.Encoding.UTF8.GetBytes(expected);
-            return providedBytes.Length == expectedBytes.Length &&
-                   System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes);
         }
 
         /// <summary>

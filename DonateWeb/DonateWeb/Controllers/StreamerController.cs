@@ -59,6 +59,22 @@ namespace DonateWeb.Controllers
             return path;
         }
 
+        /// <summary>
+        /// Lưu file ảnh bìa được tải lên từ máy tính vào thư mục vật lý wwwroot/images/banners
+        /// và trả về đường dẫn lưu vào Database (/images/banners/ten-file)
+        /// </summary>
+        private async Task<string?> SaveBannerFileAsync(IFormFile? bannerFile, int userId)
+        {
+            var (path, error) = await BannerUploadService.SaveAsync(bannerFile, _webHostEnvironment.WebRootPath, userId, HttpContext.RequestAborted);
+            if (error != null)
+            {
+                ModelState.AddModelError(nameof(bannerFile), error);
+                return null;
+            }
+
+            return path;
+        }
+
         private async Task RefreshUserCookieClaimsAsync(int userId)
         {
             var updatedUser = await _authService.GetUserByIdAsync(userId);
@@ -185,10 +201,12 @@ namespace DonateWeb.Controllers
 
             // Kiểm tra nếu người đang xem là chủ sở hữu kênh Streamer này (hoặc tài khoản Streamer đang xem trang của mình)
             bool isOwnerStreamer = false;
+            bool isFollowing = false;
             decimal currentWalletBalance = 0; // [MỚI THÊM] Lấy số dư tài khoản hiện tại của Viewer
             if (User.Identity?.IsAuthenticated == true && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var currentUid))
             {
                 isOwnerStreamer = (streamer.UserId == currentUid);
+                isFollowing = await _streamerService.IsFollowingAsync(currentUid, streamer.Id);
                 var currentUser = await _authService.GetUserByIdAsync(currentUid);
                 if (currentUser != null)
                 {
@@ -196,6 +214,7 @@ namespace DonateWeb.Controllers
                 }
             }
             ViewBag.IsOwnerStreamer = isOwnerStreamer;
+            ViewBag.IsFollowing = isFollowing;
 
             var defaultDonorName = User.Identity?.IsAuthenticated == true ? (User.FindFirst("FullName")?.Value ?? User.Identity.Name ?? "") : "";
             var defaultAmount = streamer.MinDonateAmount > 0 ? streamer.MinDonateAmount : 20000;
@@ -225,6 +244,8 @@ namespace DonateWeb.Controllers
                 IsVerified = streamer.IsVerified,
                 IsActive = streamer.IsActive,
                 LockReason = streamer.LockReason,
+                IsFollowedByCurrentUser = isFollowing,
+                IsCurrentUserOwner = isOwnerStreamer,
                 BankName = streamer.BankName,
                 BankAccountNumber = streamer.BankAccountNumber,
                 BankAccountName = streamer.BankAccountName,
@@ -254,6 +275,29 @@ namespace DonateWeb.Controllers
                 model.ErrorMessage = "Kênh này chưa được Quản trị viên phê duyệt.";
             }
 
+            // Lấy danh sách các streamer khác đã có trong database
+            var otherStreamers = await _context.StreamerProfiles
+                .AsNoTracking()
+                .Include(sp => sp.User)
+                .Where(sp => sp.IsActive && sp.Id != streamer.Id)
+                .OrderByDescending(sp => sp.TotalReceived)
+                .ThenByDescending(sp => sp.FollowerCount)
+                .Take(8)
+                .ToListAsync();
+            ViewBag.OtherStreamers = otherStreamers;
+
+            // Lấy danh sách Status đã đăng của streamer này
+            var streamerStatuses = await _context.StreamerStatuses
+                .AsNoTracking()
+                .Where(s => s.StreamerProfileId == streamer.Id)
+                .OrderByDescending(s => s.CreatedAt)
+                .ToListAsync();
+            ViewBag.StreamerStatuses = streamerStatuses;
+
+            var likedCookie = Request.Cookies["LikedStatuses"] ?? "";
+            var likedIds = likedCookie.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet();
+            ViewBag.LikedStatusIds = likedIds;
+
             return View(model);
         }
 
@@ -263,7 +307,7 @@ namespace DonateWeb.Controllers
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UpdateBio(string slug, string displayName, string? greetingMessage, string? bio, IFormFile? avatarFile, string? bannerUrl)
+        public async Task<IActionResult> UpdateBio(string slug, string displayName, string? greetingMessage, string? bio, IFormFile? avatarFile, IFormFile? bannerFile, string? bannerUrl)
         {
             if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
             {
@@ -276,13 +320,27 @@ namespace DonateWeb.Controllers
                 return RedirectToAction("Register", "Streamer");
             }
 
+            // Kiểm tra bảo mật: Streamer chỉ có thể sửa trang của chính mình, chặn sửa trang của streamer khác
+            var targetStreamer = await _streamerService.GetBySlugAsync(slug);
+            if (targetStreamer != null && targetStreamer.UserId != userId)
+            {
+                TempData["ErrorMessage"] = "Bạn không có quyền chỉnh sửa thông tin của streamer khác.";
+                return Redirect("/" + (targetStreamer.User?.AccountId ?? targetStreamer.Slug));
+            }
+
             // Lưu file ảnh đại diện vào wwwroot/images/avatars nếu người dùng có chọn file mới
             var uploadedAvatarPath = await SaveAvatarFileAsync(avatarFile, userId);
+            // Lưu file ảnh bìa vào wwwroot/images/banners nếu người dùng có chọn file mới
+            var uploadedBannerPath = await SaveBannerFileAsync(bannerFile, userId);
             if (!ModelState.IsValid)
             {
                 TempData["ErrorMessage"] = ModelState.Values.SelectMany(value => value.Errors).First().ErrorMessage;
                 return Redirect("/" + streamer.Slug);
             }
+
+            var finalBannerUrl = !string.IsNullOrWhiteSpace(uploadedBannerPath)
+                ? uploadedBannerPath
+                : (!string.IsNullOrWhiteSpace(bannerUrl) ? bannerUrl.Trim() : streamer.BannerUrl);
 
             var configModel = new StreamerProfileConfigViewModel
             {
@@ -292,7 +350,7 @@ namespace DonateWeb.Controllers
                 GreetingMessage = string.IsNullOrWhiteSpace(greetingMessage) ? streamer.GreetingMessage : greetingMessage.Trim(),
                 Bio = bio,
                 AvatarUrl = !string.IsNullOrWhiteSpace(uploadedAvatarPath) ? uploadedAvatarPath : streamer.AvatarUrl,
-                BannerUrl = string.IsNullOrWhiteSpace(bannerUrl) ? streamer.BannerUrl : bannerUrl.Trim(),
+                BannerUrl = finalBannerUrl,
                 MinDonateAmount = streamer.MinDonateAmount,
                 BankName = streamer.BankName,
                 BankAccountNumber = streamer.BankAccountNumber,
@@ -345,6 +403,9 @@ namespace DonateWeb.Controllers
                     currentWalletBalance = currentUser.WalletBalance;
                 }
             }
+
+            // Kiểm tra quyền sở hữu kênh khi post donate
+            ViewBag.IsOwnerStreamer = currentUserId.HasValue && (streamer.UserId == currentUserId.Value);
 
             // Gán lại thông tin streamer hiển thị
             model.StreamerProfileId = streamer.Id;
@@ -575,7 +636,8 @@ namespace DonateWeb.Controllers
         }
 
         /// <summary>
-        /// Bảng điều khiển tổng quan dành cho Streamer (cho phép cả Viewer và Admin xem khám phá)
+        /// Trang Streamer Yêu Thích (Icon trái tim): hiển thị danh sách các Streamer mà người dùng đã nhấn Theo dõi.
+        /// URL: /Streamer/Overview hoặc /Streamer/Favorites
         /// </summary>
         [Authorize]
         [HttpGet]
@@ -587,10 +649,205 @@ namespace DonateWeb.Controllers
             }
 
             var streamer = await _streamerService.GetByUserIdAsync(userId);
-            var featuredStreamers = await _streamerService.GetFeaturedStreamersAsync(8);
+            var followedStreamers = await _streamerService.GetFollowedStreamersAsync(userId);
             ViewBag.Streamer = streamer;
-            ViewBag.FeaturedStreamers = featuredStreamers;
+            ViewBag.FollowedStreamers = followedStreamers;
             return View();
+        }
+
+        [Authorize]
+        [HttpGet("/Streamer/Favorites")]
+        public Task<IActionResult> Favorites() => Overview();
+
+        /// <summary>
+        /// API / Action bật/tắt theo dõi (Follow / Unfollow) streamer
+        /// Hỗ trợ cả AJAX JSON POST và standard Form POST
+        /// </summary>
+        [Authorize]
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> ToggleFollow([FromBody] FollowRequestModel? jsonModel, [FromForm] int? streamerProfileId, [FromForm] string? returnUrl)
+        {
+            var targetId = jsonModel?.StreamerProfileId ?? streamerProfileId ?? 0;
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+            {
+                if (Request.Headers["Accept"].ToString().Contains("application/json") || jsonModel != null)
+                {
+                    return Json(new { success = false, message = "Vui lòng đăng nhập để theo dõi Streamer." });
+                }
+                return RedirectToAction("Login", "Auth");
+            }
+
+            var (isFollowing, followerCount, message) = await _streamerService.ToggleFollowAsync(userId, targetId);
+
+            if (Request.Headers["Accept"].ToString().Contains("application/json") || jsonModel != null)
+            {
+                return Json(new
+                {
+                    success = true,
+                    isFollowing,
+                    followerCount,
+                    message
+                });
+            }
+
+            TempData["SuccessMessage"] = message;
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                return LocalRedirect(returnUrl);
+            }
+            return RedirectToAction(nameof(Overview));
+        }
+
+        /// <summary>
+        /// Đăng Status mới cho Streamer (chỉ chủ kênh mới có quyền đăng)
+        /// </summary>
+        [Authorize]
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> CreateStatus([FromForm] int streamerProfileId, [FromForm] string? content, [FromForm] IFormFile? imageFile, [FromForm] string? returnUrl)
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var currentUid))
+            {
+                return RedirectToAction("Login", "Auth");
+            }
+
+            var streamer = await _context.StreamerProfiles.FirstOrDefaultAsync(s => s.Id == streamerProfileId);
+            if (streamer == null || streamer.UserId != currentUid)
+            {
+                TempData["ErrorMessage"] = "Bạn không có quyền đăng status trên kênh này.";
+                return Redirect(returnUrl ?? "/");
+            }
+
+            if (string.IsNullOrWhiteSpace(content) && (imageFile == null || imageFile.Length == 0))
+            {
+                TempData["ErrorMessage"] = "Vui lòng nhập nội dung caption hoặc chọn ảnh để đăng status.";
+                return Redirect(returnUrl ?? $"/streamer/{streamer.Slug}");
+            }
+
+            string? uploadedImagePath = null;
+            if (imageFile != null && imageFile.Length > 0)
+            {
+                var (path, error) = await StatusUploadService.SaveAsync(imageFile, _webHostEnvironment.WebRootPath, streamer.Id, HttpContext.RequestAborted);
+                if (!string.IsNullOrEmpty(error))
+                {
+                    TempData["ErrorMessage"] = error;
+                    return Redirect(returnUrl ?? $"/streamer/{streamer.Slug}");
+                }
+                uploadedImagePath = path;
+            }
+
+            var status = new StreamerStatus
+            {
+                StreamerProfileId = streamer.Id,
+                Content = (content ?? "").Trim(),
+                ImageUrl = uploadedImagePath,
+                LikeCount = 0,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.StreamerStatuses.Add(status);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = "Đã đăng status thành công!";
+            return Redirect(returnUrl ?? $"/streamer/{streamer.Slug}");
+        }
+
+        /// <summary>
+        /// Xóa Status (chỉ chủ kênh sở hữu status mới được xóa)
+        /// </summary>
+        [Authorize]
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> DeleteStatus([FromForm] int statusId, [FromForm] string? returnUrl)
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var currentUid))
+            {
+                return Json(new { success = false, message = "Vui lòng đăng nhập." });
+            }
+
+            var status = await _context.StreamerStatuses
+                .Include(s => s.StreamerProfile)
+                .FirstOrDefaultAsync(s => s.Id == statusId);
+
+            if (status == null)
+            {
+                return Json(new { success = false, message = "Không tìm thấy status." });
+            }
+
+            if (status.StreamerProfile.UserId != currentUid)
+            {
+                return Json(new { success = false, message = "Bạn không có quyền xóa bài viết này." });
+            }
+
+            if (!string.IsNullOrEmpty(status.ImageUrl))
+            {
+                try
+                {
+                    var fullPath = Path.Combine(_webHostEnvironment.WebRootPath, status.ImageUrl.TrimStart('/'));
+                    if (System.IO.File.Exists(fullPath))
+                    {
+                        System.IO.File.Delete(fullPath);
+                    }
+                }
+                catch { }
+            }
+
+            var slug = status.StreamerProfile.Slug;
+            _context.StreamerStatuses.Remove(status);
+            await _context.SaveChangesAsync();
+
+            if (Request.Headers["Accept"].ToString().Contains("application/json") || Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = true, message = "Đã xóa status thành công." });
+            }
+
+            TempData["SuccessMessage"] = "Đã xóa status thành công!";
+            return Redirect(returnUrl ?? $"/streamer/{slug}");
+        }
+
+        /// <summary>
+        /// Bật/tắt thả tim Status (hỗ trợ cả Viewer, Streamer, Khách vãng lai)
+        /// </summary>
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> ToggleLikeStatus([FromForm] int statusId)
+        {
+            var status = await _context.StreamerStatuses.FirstOrDefaultAsync(s => s.Id == statusId);
+            if (status == null)
+            {
+                return Json(new { success = false, message = "Không tìm thấy status." });
+            }
+
+            var likedCookie = Request.Cookies["LikedStatuses"] ?? "";
+            var likedIds = likedCookie.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet();
+            bool isLiked;
+
+            if (likedIds.Contains(statusId.ToString()))
+            {
+                likedIds.Remove(statusId.ToString());
+                status.LikeCount = Math.Max(0, status.LikeCount - 1);
+                isLiked = false;
+            }
+            else
+            {
+                likedIds.Add(statusId.ToString());
+                status.LikeCount += 1;
+                isLiked = true;
+            }
+
+            await _context.SaveChangesAsync();
+
+            var cookieOptions = new CookieOptions
+            {
+                Expires = DateTimeOffset.UtcNow.AddDays(365),
+                HttpOnly = false,
+                SameSite = SameSiteMode.Lax,
+                IsEssential = true
+            };
+            Response.Cookies.Append("LikedStatuses", string.Join(",", likedIds), cookieOptions);
+
+            return Json(new { success = true, isLiked, likeCount = status.LikeCount });
         }
 
         /// <summary>
@@ -700,7 +957,7 @@ namespace DonateWeb.Controllers
         [Authorize]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Config(StreamerProfileConfigViewModel model, IFormFile? avatarFile)
+        public async Task<IActionResult> Config(StreamerProfileConfigViewModel model, IFormFile? avatarFile, IFormFile? bannerFile)
         {
             if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
             {
@@ -717,20 +974,30 @@ namespace DonateWeb.Controllers
             if (!ModelState.IsValid)
             {
                 model.AvatarUrl = streamer.AvatarUrl;
+                model.BannerUrl = streamer.BannerUrl;
                 return View(model);
             }
 
             var fileToSave = avatarFile ?? model.AvatarFile;
             var uploadedAvatarPath = await SaveAvatarFileAsync(fileToSave, userId);
+
+            var bannerToSave = bannerFile ?? model.BannerFile;
+            var uploadedBannerPath = await SaveBannerFileAsync(bannerToSave, userId);
+
             if (!ModelState.IsValid)
             {
                 model.AvatarUrl = streamer.AvatarUrl;
+                model.BannerUrl = streamer.BannerUrl;
                 return View(model);
             }
 
             model.AvatarUrl = !string.IsNullOrWhiteSpace(uploadedAvatarPath)
                 ? uploadedAvatarPath
                 : streamer.AvatarUrl;
+
+            model.BannerUrl = !string.IsNullOrWhiteSpace(uploadedBannerPath)
+                ? uploadedBannerPath
+                : (!string.IsNullOrWhiteSpace(model.BannerUrl) ? model.BannerUrl.Trim() : streamer.BannerUrl);
 
             var (success, error) = await _streamerService.UpdateProfileConfigAsync(userId, model);
             if (!success)
@@ -867,5 +1134,10 @@ namespace DonateWeb.Controllers
             TempData["SuccessMessage"] = message;
             return RedirectToAction("Index", "Profile");
         }
+    }
+
+    public class FollowRequestModel
+    {
+        public int StreamerProfileId { get; set; }
     }
 }

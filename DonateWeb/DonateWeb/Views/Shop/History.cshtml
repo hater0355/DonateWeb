@@ -1,0 +1,206 @@
+﻿@{
+    ViewData["Title"] = "Lịch sử đơn hàng Shop";
+    var purchases = ViewBag.Purchases as List<DonateWeb.Models.Entities.ShopOrder> ?? new();
+    var streamerOrders = ViewBag.StreamerOrders as List<DonateWeb.Models.Entities.ShopOrder> ?? new();
+    var isStreamer = (ViewBag.IsStreamer == true);
+}
+
+<div class="container-fluid px-0 pb-5">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+        <div>
+            <h3 class="fw-bold text-dark-green mb-1">
+                <i class="fa-solid fa-clock-rotate-left text-success me-2"></i>Lịch Sử Đơn Hàng Shop
+            </h3>
+            <p class="text-muted small mb-0">Theo dõi toàn bộ các đơn hàng bạn đã mua hoặc các đơn hàng khách đặt tại gian hàng của bạn.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/Shop" class="btn btn-dark-green rounded-pill px-4 fw-semibold">
+                <i class="fa-solid fa-store me-1"></i> Đến Sàn Sản Phẩm
+            </a>
+        </div>
+    </div>
+
+    <!-- Tabs chuyển đổi nếu là Streamer -->
+    <ul class="nav nav-pills mb-4 gap-2" id="orderHistoryTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active rounded-pill px-4 fw-semibold border" id="purchases-tab" data-bs-toggle="pill" data-bs-target="#purchases" type="button" role="tab" aria-controls="purchases" aria-selected="true">
+                <i class="fa-solid fa-bag-shopping me-1"></i> Đơn mua của tôi (@purchases.Count)
+            </button>
+        </li>
+        @if (isStreamer)
+        {
+            <li class="nav-item" role="presentation">
+                <button class="nav-link rounded-pill px-4 fw-semibold border" id="streamer-tab" data-bs-toggle="pill" data-bs-target="#streamer" type="button" role="tab" aria-controls="streamer" aria-selected="false">
+                    <i class="fa-solid fa-boxes-stacked me-1"></i> Đơn bán của gian hàng (@streamerOrders.Count)
+                </button>
+            </li>
+        }
+    </ul>
+
+    <div class="tab-content" id="orderHistoryTabContent">
+        <!-- TAB 1: ĐƠN MUA CỦA TÔI -->
+        <div class="tab-pane fade show active" id="purchases" role="tabpanel" aria-labelledby="purchases-tab">
+            <div class="card border-0 shadow-sm rounded-4 bg-white overflow-hidden">
+                @if (!purchases.Any())
+                {
+                    <div class="text-center py-5">
+                        <i class="fa-solid fa-cart-arrow-down fa-3x text-muted mb-3 opacity-50"></i>
+                        <h5 class="fw-bold text-dark">Bạn chưa có đơn mua nào</h5>
+                        <p class="text-muted small mb-3">Hãy ghé qua gian hàng của các Streamer bạn yêu thích để mua sắm phụ kiện độc quyền nhé!</p>
+                        <a href="/Shop" class="btn btn-dark-green rounded-pill px-4 fw-semibold">Khám phá sản phẩm ngay</a>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light">
+                                <tr class="text-muted small text-uppercase">
+                                    <th class="ps-4 py-3">Mã đơn</th>
+                                    <th class="py-3">Gian hàng Streamer</th>
+                                    <th class="py-3">Mặt hàng</th>
+                                    <th class="py-3">Tổng tiền</th>
+                                    <th class="py-3">Phương thức</th>
+                                    <th class="py-3">Trạng thái</th>
+                                    <th class="py-3">Thời gian</th>
+                                    <th class="pe-4 py-3 text-end">Chi tiết</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var order in purchases)
+                                {
+                                    <tr>
+                                        <td class="ps-4 font-monospace fw-bold text-dark">
+                                            #@order.OrderCode
+                                        </td>
+                                        <td>
+                                            <span class="fw-semibold text-dark-green">@order.StreamerProfile.DisplayName</span>
+                                        </td>
+                                        <td>
+                                            <div class="small text-truncate" style="max-width: 250px;">
+                                                @string.Join(", ", order.Items.Select(i => $"{i.ProductName} (x{i.Quantity})"))
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="fw-bold text-dark-green font-monospace">@order.TotalAmount.ToString("N0") đ</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border">
+                                                @(order.PaymentMethod == "Wallet" ? "Ví số dư" : "VietQR")
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @if (order.PaymentStatus == "Paid")
+                                            {
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 rounded-pill small">
+                                                    Đã thanh toán
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1 rounded-pill small">
+                                                    Chờ thanh toán
+                                                </span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <span class="small text-muted">@order.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                                        </td>
+                                        <td class="pe-4 text-end">
+                                            <a href="/Shop/Detail?orderCode=@order.OrderCode" class="btn btn-sm btn-outline-dark rounded-pill px-3">
+                                                Xem đơn
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- TAB 2: ĐƠN BÁN CỦA STREAMER -->
+        @if (isStreamer)
+        {
+            <div class="tab-pane fade" id="streamer" role="tabpanel" aria-labelledby="streamer-tab">
+                <div class="card border-0 shadow-sm rounded-4 bg-white overflow-hidden">
+                    @if (!streamerOrders.Any())
+                    {
+                        <div class="text-center py-5">
+                            <i class="fa-solid fa-inbox fa-3x text-muted mb-3 opacity-50"></i>
+                            <h5 class="fw-bold text-dark">Chưa có đơn hàng nào tại gian hàng của bạn</h5>
+                            <p class="text-muted small mb-0">Các đơn đặt hàng từ fan và viewer sẽ xuất hiện tại đây khi họ mua sắm.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="bg-light">
+                                    <tr class="text-muted small text-uppercase">
+                                        <th class="ps-4 py-3">Mã đơn</th>
+                                        <th class="py-3">Người nhận</th>
+                                        <th class="py-3">Số điện thoại & Địa chỉ</th>
+                                        <th class="py-3">Mặt hàng đặt</th>
+                                        <th class="py-3">Tổng thu</th>
+                                        <th class="py-3">Trạng thái</th>
+                                        <th class="py-3">Thời gian</th>
+                                        <th class="pe-4 py-3 text-end">Chi tiết</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var order in streamerOrders)
+                                    {
+                                        <tr>
+                                            <td class="ps-4 font-monospace fw-bold text-dark">
+                                                #@order.OrderCode
+                                            </td>
+                                            <td>
+                                                <div class="fw-bold text-dark">@order.BuyerName</div>
+                                            </td>
+                                            <td>
+                                                <div class="small">@order.BuyerPhone</div>
+                                                <div class="small text-muted text-truncate" style="max-width: 200px;">@order.BuyerAddress</div>
+                                            </td>
+                                            <td>
+                                                <div class="small text-truncate" style="max-width: 250px;">
+                                                    @string.Join(", ", order.Items.Select(i => $"{i.ProductName} (x{i.Quantity})"))
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="fw-bold text-success font-monospace">@order.TotalAmount.ToString("N0") đ</span>
+                                            </td>
+                                            <td>
+                                                @if (order.PaymentStatus == "Paid")
+                                                {
+                                                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 rounded-pill small">
+                                                        Đã thanh toán
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1 rounded-pill small">
+                                                        Chờ thanh toán
+                                                    </span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <span class="small text-muted">@order.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                                            </td>
+                                            <td class="pe-4 text-end">
+                                                <a href="/Shop/Detail?orderCode=@order.OrderCode" class="btn btn-sm btn-outline-dark rounded-pill px-3">
+                                                    Xem đơn
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>

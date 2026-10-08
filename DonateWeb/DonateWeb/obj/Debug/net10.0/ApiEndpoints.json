@@ -164,6 +164,27 @@
   },
   {
     "ContainingType": "DonateWeb.Areas.Widgets.Controllers.WidgetsApiController",
+    "Method": "SynthesizeAlertSpeech",
+    "RelativePath": "api/widgets/alertbox/tts/{slug}",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "slug",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "request",
+        "Type": "DonateWeb.Areas.Widgets.Controllers.WidgetsApiController\u002BAlertSpeechRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "DonateWeb.Areas.Widgets.Controllers.WidgetsApiController",
     "Method": "GetActiveGoal",
     "RelativePath": "api/widgets/goal/{slug}",
     "HttpMethod": "GET",

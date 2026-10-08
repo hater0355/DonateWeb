@@ -1,0 +1,379 @@
+@model DonateWeb.Areas.Admin.ViewModels.BreakingNewsManageViewModel
+@{
+    ViewData["Title"] = "Quản lý & Đăng Breaking News";
+}
+
+<!-- FILE: Areas/Admin/Views/Admin/BreakingNews.cshtml -->
+<!-- CHỨC NĂNG: ĐĂNG VÀ QUẢN LÝ DÒNG TIN CHẠY NGANG (BREAKING NEWS) -->
+
+<style>
+    .breaking-preview-box {
+        background: linear-gradient(135deg, #1b4533 0%, #204e38 100%);
+        border-radius: 12px;
+        padding: 12px 18px;
+        color: white;
+        box-shadow: 0 4px 12px rgba(27, 69, 51, 0.15);
+        overflow: hidden;
+    }
+    .preview-marquee-wrapper {
+        white-space: nowrap;
+        overflow: hidden;
+        position: relative;
+    }
+    .preview-marquee-content {
+        display: inline-block;
+        padding-left: 100%;
+        animation: previewMarquee 18s linear infinite;
+    }
+    .preview-marquee-content:hover {
+        animation-play-state: paused;
+    }
+    @@keyframes previewMarquee {
+        0% { transform: translate3d(0, 0, 0); }
+        100% { transform: translate3d(-100%, 0, 0); }
+    }
+    .pulse-dot-red {
+        width: 10px;
+        height: 10px;
+        background-color: #ef4444;
+        border-radius: 50%;
+        display: inline-block;
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+        animation: pulseRed 1.5s infinite;
+    }
+    @@keyframes pulseRed {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+        70% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+        <h4 class="fw-bold mb-1 text-dark">
+            <i class="fa-solid fa-bullhorn text-danger me-2"></i>Quản Lý & Đăng Breaking News
+        </h4>
+        <p class="text-muted small mb-0">
+            Tin tức đăng tại đây sẽ tự động hiển thị dòng chữ chạy ngang liên tục trên đầu trang web người dùng
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        @if (Model.CurrentActiveNews != null)
+        {
+            <form asp-area="Admin" asp-controller="Admin" asp-action="ClearActiveBreakingNews" method="post" class="d-inline" onsubmit="return confirm('Bạn có chắc muốn gỡ tin này và để trống thanh Breaking News?');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill px-3 shadow-xs">
+                    <i class="fa-solid fa-power-off me-1"></i> Gỡ tin (Để trống Breaking News)
+                </button>
+            </form>
+        }
+        <a href="/" target="_blank" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+            <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Xem Website
+        </a>
+    </div>
+</div>
+
+<!-- Alert thông báo -->
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success border-0 shadow-sm rounded-4 d-flex align-items-center gap-2 p-3 mb-4">
+        <i class="fa-solid fa-circle-check fs-5 text-success"></i>
+        <div class="fw-semibold">@TempData["SuccessMessage"]</div>
+    </div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger border-0 shadow-sm rounded-4 d-flex align-items-center gap-2 p-3 mb-4">
+        <i class="fa-solid fa-triangle-exclamation fs-5 text-danger"></i>
+        <div class="fw-semibold">@TempData["ErrorMessage"]</div>
+    </div>
+}
+
+<!-- KHỐI 1: TRẠNG THÁI HIỆN TẠI & XEM TRƯỚC (LIVE PREVIEW) -->
+<div class="card border-0 shadow-sm rounded-4 mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4 pb-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+            <i class="fa-solid fa-tv text-primary"></i>
+            Trạng Thái Hiển Thị Hiện Tại Trên Website
+        </h5>
+        @if (Model.CurrentActiveNews != null)
+        {
+            <span class="badge bg-success-subtle text-success border border-success px-3 py-2 rounded-pill fs-7 fw-bold d-flex align-items-center gap-2">
+                <span class="pulse-dot-red"></span> ĐANG PHÁT SÓNG TRÊN WEBSITE
+            </span>
+        }
+        else
+        {
+            <span class="badge bg-secondary-subtle text-muted border px-3 py-2 rounded-pill fs-7 fw-semibold">
+                <i class="fa-solid fa-circle-pause me-1"></i> ĐANG ĐỂ TRỐNG (KHÔNG CÓ TIN PHÁT)
+            </span>
+        }
+    </div>
+    <div class="card-body px-4 pb-4">
+        @if (Model.CurrentActiveNews != null)
+        {
+            <div class="breaking-preview-box mb-3 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2 bg-dark px-3 py-1.5 rounded-2 text-white fw-bold me-3 flex-shrink-0" style="font-size: 0.8rem; letter-spacing: 0.05em;">
+                    <span class="pulse-dot-red"></span>
+                    <span>BREAKING NEWS</span>
+                </div>
+                <div class="preview-marquee-wrapper flex-grow-1">
+                    <div class="preview-marquee-content text-white fw-semibold" style="font-size: 0.95rem;">
+                        @Model.CurrentActiveNews.Content
+                        @if (!string.IsNullOrWhiteSpace(Model.CurrentActiveNews.LinkUrl))
+                        {
+                            <span class="badge bg-warning text-dark ms-2" style="font-size: 0.72rem;">(Có gắn Link)</span>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 text-muted small">
+                <div>
+                    <i class="fa-solid fa-clock me-1 text-primary"></i> Đăng lúc: <strong>@Model.CurrentActiveNews.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</strong> 
+                    bởi <strong>@(Model.CurrentActiveNews.CreatedBy ?? "Admin")</strong>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(Model.CurrentActiveNews.LinkUrl))
+                {
+                    <div>
+                        <i class="fa-solid fa-link me-1 text-info"></i> Liên kết đích: 
+                        <a href="@Model.CurrentActiveNews.LinkUrl" target="_blank" class="fw-semibold text-decoration-none text-primary font-monospace">@Model.CurrentActiveNews.LinkUrl</a>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="p-4 rounded-3 text-center bg-light border border-dashed">
+                <i class="fa-regular fa-comment-slash fa-2x text-muted mb-2 opacity-50"></i>
+                <div class="fw-semibold text-dark mb-1">Thanh Breaking News hiện đang để trống</div>
+                <div class="text-muted small">
+                    Người xem trên trang web sẽ không thấy thanh thông báo xuất hiện. Sử dụng biểu mẫu bên dưới để tạo và phát tin mới!
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- KHỐI 2: FORM ĐĂNG / CẬP NHẬT BREAKING NEWS -->
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4 pb-2">
+                <h5 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square text-success"></i>
+                    Biểu Mẫu Soạn & Đăng Breaking News
+                </h5>
+                <p class="text-muted small mb-0">Nhập nội dung thông điệp bạn muốn truyền tải tới tất cả người xem</p>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <form asp-area="Admin" asp-controller="Admin" asp-action="SaveBreakingNews" method="post" id="breakingNewsForm">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Id" id="inputNewsId" value="@(Model.Input?.Id)" />
+
+                    <!-- Nội dung bản tin -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark small">
+                            Nội dung tin tức chạy ngang <span class="text-danger">*</span>
+                        </label>
+                        <textarea name="Content" id="inputNewsContent" class="form-control rounded-3" rows="4" 
+                                  placeholder="Ví dụ: 🔥 CHÀO MỪNG SỰ KIỆN: Khám phá các phòng stream nổi bật và ủng hộ Idol của bạn ngay hôm nay! Nạp ví hoàn tiền 5% duy nhất hôm nay..." 
+                                  required maxlength="1000">@(Model.Input?.Content)</textarea>
+                        <div class="form-text small d-flex justify-content-between">
+                            <span>Chữ sẽ tự động chạy ngang từ phải sang trái trên trang người dùng.</span>
+                            <span id="contentCharCounter" class="text-muted font-monospace">0/1000</span>
+                        </div>
+                    </div>
+
+                    <!-- Đường dẫn liên kết -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark small">
+                            Đường dẫn liên kết khi người dùng nhấn vào (URL) <span class="text-muted fw-normal">(Tùy chọn)</span>
+                        </label>
+                        <input type="text" name="LinkUrl" id="inputNewsLink" class="form-control rounded-3" 
+                               placeholder="Ví dụ: /Streamer/Donate hoặc /Shop hoặc https://..." 
+                               value="@(Model.Input?.LinkUrl)" maxlength="500" />
+                        
+                        <!-- Gợi ý liên kết nhanh -->
+                        <div class="d-flex align-items-center gap-1 mt-2 flex-wrap">
+                            <span class="small text-muted me-1">Gợi ý nhanh:</span>
+                            <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill py-0.5 px-2" style="font-size: 0.75rem;" onclick="setQuickLink('/Streamer/Donate')">
+                                /Streamer/Donate
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill py-0.5 px-2" style="font-size: 0.75rem;" onclick="setQuickLink('/Shop')">
+                                /Shop (Sàn Sản phẩm)
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill py-0.5 px-2" style="font-size: 0.75rem;" onclick="setQuickLink('/Streamer/Register')">
+                                /Streamer/Register
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-danger rounded-pill py-0.5 px-2" style="font-size: 0.75rem;" onclick="setQuickLink('')">
+                                Xóa Link
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Checkbox Kích hoạt -->
+                    <div class="mb-4 form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="inputNewsActive" name="IsActive" value="true" @(Model.Input?.IsActive == true ? "checked" : "") />
+                        <label class="form-check-label fw-semibold text-dark small" for="inputNewsActive">
+                            Kích hoạt phát sóng ngay (Hiển thị chạy chữ ngang ngay sau khi lưu)
+                        </label>
+                        <input type="hidden" name="IsActive" value="false" />
+                    </div>
+
+                    <!-- Nút bấm submit -->
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="submit" class="btn btn-success rounded-pill px-4 py-2 fw-bold flex-grow-1 shadow-sm">
+                            <i class="fa-solid fa-paper-plane me-1"></i> Đăng Breaking News Ngay
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary rounded-pill px-3 py-2" onclick="resetForm()" title="Soạn bản tin mới">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- KHỐI 3: LỊCH SỬ CÁC BẢN TIN ĐÃ ĐĂNG -->
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4 pb-2 d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-warning"></i>
+                        Lịch Sử Bản Tin Đã Đăng
+                    </h5>
+                    <p class="text-muted small mb-0">Quản lý và kích hoạt lại các bản tin cũ</p>
+                </div>
+                <span class="badge bg-light text-dark border font-monospace">@Model.History.Count bản tin</span>
+            </div>
+            <div class="card-body p-0">
+                @if (!Model.History.Any())
+                {
+                    <div class="text-center py-5 text-muted">
+                        <i class="fa-regular fa-folder-open fa-2x mb-2 opacity-50"></i>
+                        <p class="small mb-0">Chưa có bản tin nào từng được đăng.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive" style="max-height: 440px;">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr class="small text-muted text-uppercase">
+                                    <th class="ps-3 py-2">Nội dung</th>
+                                    <th class="py-2 text-center" style="width: 100px;">Trạng thái</th>
+                                    <th class="py-2" style="width: 110px;">Ngày tạo</th>
+                                    <th class="pe-3 py-2 text-end" style="width: 130px;">Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model.History)
+                                {
+                                    <tr class="@(item.IsActive ? "table-success-subtle" : "")">
+                                        <td class="ps-3">
+                                            <div class="fw-medium text-dark text-truncate" style="max-width: 240px;" title="@item.Content">
+                                                @item.Content
+                                            </div>
+                                            @if (!string.IsNullOrWhiteSpace(item.LinkUrl))
+                                            {
+                                                <div class="small text-muted font-monospace text-truncate" style="font-size: 0.72rem; max-width: 240px;">
+                                                    <i class="fa-solid fa-link me-1"></i>@item.LinkUrl
+                                                </div>
+                                            }
+                                        </td>
+                                        <td class="text-center">
+                                            @if (item.IsActive)
+                                            {
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 rounded-pill small">
+                                                    <span class="pulse-dot-red" style="width: 6px; height: 6px;"></span> Đang phát
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary-subtle text-secondary px-2 py-1 rounded-pill small">
+                                                    Tạm ẩn
+                                                </span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <span class="small text-muted" style="font-size: 0.75rem;">@item.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")</span>
+                                        </td>
+                                        <td class="pe-3 text-end">
+                                            <div class="d-flex align-items-center justify-content-end gap-1">
+                                                <!-- Nút Bật/Tắt -->
+                                                <form asp-area="Admin" asp-controller="Admin" asp-action="ToggleBreakingNews" method="post" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@item.Id" />
+                                                    <button type="submit" class="btn btn-sm @(item.IsActive ? "btn-outline-warning text-dark" : "btn-outline-success") rounded-circle p-1" style="width: 28px; height: 28px;" title="@(item.IsActive ? "Tắt bản tin" : "Bật phát bản tin này")">
+                                                        <i class="fa-solid @(item.IsActive ? "fa-pause" : "fa-play")" style="font-size: 0.75rem;"></i>
+                                                    </button>
+                                                </form>
+
+                                                <!-- Nút Nạp lên Form để sửa -->
+                                                <button type="button" class="btn btn-sm btn-outline-primary rounded-circle p-1" style="width: 28px; height: 28px;" 
+                                                        onclick="loadToForm(@item.Id, '@Html.Raw(item.Content.Replace("'", "\\'").Replace("\n", " ").Replace("\r", ""))', '@(item.LinkUrl ?? "")', @(item.IsActive ? "true" : "false"))" 
+                                                        title="Sửa bản tin này">
+                                                    <i class="fa-solid fa-pen" style="font-size: 0.75rem;"></i>
+                                                </button>
+
+                                                <!-- Nút Xóa -->
+                                                <form asp-area="Admin" asp-controller="Admin" asp-action="DeleteBreakingNews" method="post" class="d-inline" onsubmit="return confirm('Bạn có chắc muốn xóa bản tin này?');">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@item.Id" />
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-circle p-1" style="width: 28px; height: 28px;" title="Xóa bản tin">
+                                                        <i class="fa-regular fa-trash-can" style="font-size: 0.75rem;"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function updateCharCounter() {
+        var textarea = document.getElementById('inputNewsContent');
+        var counter = document.getElementById('contentCharCounter');
+        if (textarea && counter) {
+            counter.textContent = textarea.value.length + '/1000';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var textarea = document.getElementById('inputNewsContent');
+        if (textarea) {
+            textarea.addEventListener('input', updateCharCounter);
+            updateCharCounter();
+        }
+    });
+
+    function setQuickLink(url) {
+        document.getElementById('inputNewsLink').value = url;
+    }
+
+    function loadToForm(id, content, link, isActive) {
+        document.getElementById('inputNewsId').value = id;
+        document.getElementById('inputNewsContent').value = content;
+        document.getElementById('inputNewsLink').value = link;
+        document.getElementById('inputNewsActive').checked = isActive;
+        updateCharCounter();
+        document.getElementById('inputNewsContent').focus();
+        window.scrollTo({ top: 400, behavior: 'smooth' });
+    }
+
+    function resetForm() {
+        document.getElementById('inputNewsId').value = '';
+        document.getElementById('inputNewsContent').value = '';
+        document.getElementById('inputNewsLink').value = '';
+        document.getElementById('inputNewsActive').checked = true;
+        updateCharCounter();
+    }
+</script>

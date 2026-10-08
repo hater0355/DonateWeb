@@ -8,7 +8,27 @@ using DonateWeb.Areas.Admin.Services;
 using DonateWeb.Areas.Widgets.Services;
 using DonateWeb.Security;
 
-var builder = WebApplication.CreateBuilder(args);
+var projectDir = Directory.GetCurrentDirectory();
+if (!Directory.Exists(Path.Combine(projectDir, "Views")))
+{
+    var candidate = AppContext.BaseDirectory;
+    while (!string.IsNullOrEmpty(candidate) && !Directory.Exists(Path.Combine(candidate, "Views")))
+    {
+        var parent = Directory.GetParent(candidate);
+        if (parent == null) break;
+        candidate = parent.FullName;
+    }
+    if (!string.IsNullOrEmpty(candidate) && Directory.Exists(Path.Combine(candidate, "Views")))
+    {
+        projectDir = candidate;
+    }
+}
+
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = projectDir
+});
 
 // 1. Thêm cấu hình DbContext (Entity Framework Core với SQL Server)
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -24,6 +44,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IStreamerService, StreamerService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IWidgetService, WidgetService>();
+builder.Services.AddSingleton<IWindowsSpeechService, WindowsSpeechService>();
 builder.Services.AddScoped<IQrCodeService, QrCodeService>();
 
 // Đăng ký Phân hệ Bảo mật & Kiểm duyệt (Content Moderation, Rate Limiting & Webhook Security)
@@ -138,6 +159,11 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RequireViewerRole", policy => policy.RequireRole(UserRoles.Viewer));
 });
 
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "RequestVerificationToken";
+});
+
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
@@ -179,11 +205,16 @@ app.MapControllerRoute(
     pattern: "Admin/{action=Index}/{id?}",
     defaults: new { area = "Admin", controller = "Admin" });
 
+app.MapControllerRoute(
+    name: "shop_shortcut",
+    pattern: "Shop/{action=Index}/{id?}",
+    defaults: new { controller = "Shop", action = "Index" });
+
 // 7. Cấu hình Route cho Slug Streamer (ví dụ: domain.com/tenstreamer hoặc domain.com/domixi)
 // Sử dụng regex để tránh xung đột với các route controller hoặc tài nguyên tĩnh
 app.MapControllerRoute(
     name: "streamer_slug",
-    pattern: "{slug:regex(^(?!api|auth|admin|widgets|home|profile|streamer|wallet|coupons|effects|orders|transactions|guides|images|css|js|lib|favicon).*$)}",
+    pattern: "{slug:regex(^(?!api|auth|admin|widgets|home|profile|streamer|wallet|coupons|effects|orders|shop|transactions|guides|images|css|js|lib|favicon).*$)}",
     defaults: new { controller = "Streamer", action = "Donate" });
 
 // Route mặc định

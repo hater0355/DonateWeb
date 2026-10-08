@@ -93,8 +93,18 @@
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label asp-for="BannerUrl" class="form-label small fw-semibold text-dark-green"></label>
-                    <input asp-for="BannerUrl" class="form-control form-control-custom" placeholder="https://... hoặc /images/banner.jpg" />
+                    <label asp-for="BannerFile" class="form-label small fw-semibold text-dark-green">Ảnh bìa (Tải lên từ máy tính)</label>
+                    <div class="d-flex align-items-center gap-3">
+                        <img id="configBannerPreview"
+                             src="@(string.IsNullOrEmpty(Model.BannerUrl) ? "/images/default-banner.jpg" : Model.BannerUrl)"
+                             class="rounded border object-fit-cover flex-shrink-0" width="100" height="56" alt="Banner"
+                             onerror="this.src='/images/default-banner.jpg'" />
+                        <div class="w-100">
+                            <input type="file" name="bannerFile" asp-for="BannerFile" accept="image/*" class="form-control form-control-custom"
+                                   onchange="if(this.files && this.files[0]) document.getElementById('configBannerPreview').src = window.URL.createObjectURL(this.files[0]);" />
+                            <input type="hidden" asp-for="BannerUrl" />
+                        </div>
+                    </div>
                 </div>
             </div>
 

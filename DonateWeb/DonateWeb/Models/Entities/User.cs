@@ -70,5 +70,6 @@ namespace DonateWeb.Models.Entities
         public virtual ICollection<Donation> DonationsSent { get; set; } = new List<Donation>();
         public virtual ICollection<WalletTransaction> WalletTransactions { get; set; } = new List<WalletTransaction>();
         public virtual ICollection<WithdrawalRequest> WithdrawalRequests { get; set; } = new List<WithdrawalRequest>();
+        public virtual ICollection<StreamerFollow> FollowedStreamers { get; set; } = new List<StreamerFollow>();
     }
 }

@@ -1,0 +1,406 @@
+@model DonateWeb.Areas.Admin.ViewModels.AdminProductListViewModel
+@{
+    ViewData["Title"] = "Quản lý & Phê duyệt Sản phẩm Shop";
+}
+
+<!-- FILE: Areas/Admin/Views/Admin/Products.cshtml -->
+<!-- CHỨC NĂNG: QUẢN LÝ VÀ PHÊ DUYỆT SẢN PHẨM STREAMER TRÊN GIAN HÀNG SHOP -->
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+        <h4 class="fw-bold mb-1 text-dark">
+            <i class="fa-solid fa-boxes-stacked text-warning me-2"></i>Quản Lý & Phê Duyệt Sản Phẩm Shop
+        </h4>
+        <p class="text-muted small mb-0">Kiểm tra thông tin, hình ảnh và giá bán sản phẩm do Streamer tạo trước khi cho phép mở bán công khai</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="/Admin/Products" class="badge bg-light text-dark border text-decoration-none px-3 py-2 fs-6">
+            Tổng: <strong class="text-primary">@Model.TotalCount</strong>
+        </a>
+        <a href="/Admin/Products?statusFilter=pending" class="badge @(Model.PendingCount > 0 ? "bg-warning text-dark border border-warning shadow-sm" : "bg-light text-muted border") text-decoration-none px-3 py-2 fs-6">
+            <i class="fa-solid fa-clock me-1"></i> Chờ duyệt: <strong>@Model.PendingCount</strong>
+        </a>
+        <a href="/Admin/Products?statusFilter=approved" class="badge bg-success-subtle text-success border border-success-subtle text-decoration-none px-3 py-2 fs-6">
+            <i class="fa-solid fa-circle-check me-1"></i> Đã duyệt: <strong>@Model.ApprovedCount</strong>
+        </a>
+        @if (Model.RejectedCount > 0)
+        {
+            <a href="/Admin/Products?statusFilter=rejected" class="badge bg-danger-subtle text-danger border border-danger-subtle text-decoration-none px-3 py-2 fs-6">
+                <i class="fa-solid fa-circle-xmark me-1"></i> Bị từ chối: <strong>@Model.RejectedCount</strong>
+            </a>
+        }
+    </div>
+</div>
+
+<!-- Alert thông báo -->
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success border-0 shadow-sm rounded-4 d-flex align-items-center gap-2 p-3 mb-4">
+        <i class="fa-solid fa-circle-check fs-5 text-success"></i>
+        <div class="fw-semibold">@TempData["SuccessMessage"]</div>
+    </div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger border-0 shadow-sm rounded-4 d-flex align-items-center gap-2 p-3 mb-4">
+        <i class="fa-solid fa-triangle-exclamation fs-5 text-danger"></i>
+        <div class="fw-semibold">@TempData["ErrorMessage"]</div>
+    </div>
+}
+
+@if (Model.PendingCount > 0 && Model.StatusFilter != "pending")
+{
+    <!-- CẢNH BÁO CÓ SẢN PHẨM ĐANG CHỜ DUYỆT -->
+    <div class="alert alert-warning border-0 shadow-sm rounded-4 p-3 mb-4 d-flex justify-content-between align-items-center flex-wrap gap-2" style="background-color: #fef3c7; border-left: 5px solid #f59e0b !important;">
+        <div class="d-flex align-items-center gap-3">
+            <div class="bg-warning text-dark rounded-circle p-2 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
+                <i class="fa-solid fa-bell fs-5 text-dark"></i>
+            </div>
+            <div>
+                <h6 class="fw-bold mb-1 text-dark">Có @Model.PendingCount sản phẩm mới từ Streamer đang chờ xét duyệt!</h6>
+                <p class="small text-muted mb-0">Streamer cần phê duyệt để sản phẩm hiển thị trên sàn chung và gian hàng cá nhân.</p>
+            </div>
+        </div>
+        <a href="/Admin/Products?statusFilter=pending" class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-clipboard-check me-1"></i> Xem danh sách chờ duyệt (@Model.PendingCount)
+        </a>
+    </div>
+}
+
+<!-- KHUNG TÌM KIẾM VÀ BỘ LỌC -->
+<div class="card border-0 shadow-sm rounded-4 mb-4">
+    <div class="card-body p-3">
+        <form method="get" class="row g-2 align-items-center">
+            <!-- Tìm kiếm -->
+            <div class="col-12 col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                    <input type="text" name="search" class="form-control border-start-0 ps-0" 
+                           placeholder="Tìm theo tên sản phẩm, streamer, mô tả..." 
+                           value="@Model.SearchTerm" />
+                </div>
+            </div>
+
+            <!-- Lọc trạng thái -->
+            <div class="col-6 col-md-3">
+                <select name="statusFilter" class="form-select">
+                    <option value="all" selected="@(Model.StatusFilter == "all")">-- Tất cả trạng thái --</option>
+                    <option value="pending" selected="@(Model.StatusFilter == "pending")">⏳ Chờ duyệt (@Model.PendingCount)</option>
+                    <option value="approved" selected="@(Model.StatusFilter == "approved")">✅ Đã duyệt (@Model.ApprovedCount)</option>
+                    <option value="rejected" selected="@(Model.StatusFilter == "rejected")">❌ Bị từ chối (@Model.RejectedCount)</option>
+                </select>
+            </div>
+
+            <!-- Lọc theo Streamer -->
+            <div class="col-6 col-md-2">
+                <select name="streamerId" class="form-select">
+                    <option value="">-- Tất cả Streamer --</option>
+                    @foreach (var s in Model.Streamers)
+                    {
+                        <option value="@s.Id" selected="@(Model.StreamerIdFilter == s.Id)">@s.DisplayName</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Nút bấm -->
+            <div class="col-12 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-grow-1">
+                    <i class="fa-solid fa-filter me-1"></i> Lọc
+                </button>
+                <a href="/Admin/Products" class="btn btn-outline-secondary" title="Đặt lại bộ lọc">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- BẢNG DANH SÁCH SẢN PHẨM -->
+<div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+    <div class="card-body p-0">
+        @if (!Model.Products.Any())
+        {
+            <div class="text-center py-5">
+                <i class="fa-solid fa-box-open fa-3x text-muted mb-3 opacity-50"></i>
+                <h5 class="fw-bold text-dark">Không có sản phẩm nào phù hợp</h5>
+                <p class="text-muted small mb-0">Thử thay đổi bộ lọc tìm kiếm hoặc quay lại sau.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr class="small text-muted text-uppercase">
+                            <th class="ps-3" style="width: 70px;">Hình ảnh</th>
+                            <th style="min-width: 220px;">Sản phẩm</th>
+                            <th style="min-width: 170px;">Kênh Streamer</th>
+                            <th class="text-end" style="width: 120px;">Giá bán</th>
+                            <th class="text-center" style="width: 90px;">Tồn kho</th>
+                            <th class="text-center" style="min-width: 160px;">Kiểm duyệt Admin</th>
+                            <th style="min-width: 130px;">Ngày gửi</th>
+                            <th class="pe-3 text-center" style="min-width: 180px;">Thao tác Quản trị</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var prod in Model.Products)
+                        {
+                            <tr class="@(prod.ApprovalStatus == DonateWeb.Models.Enums.ProductApprovalStatus.Pending ? "table-warning-subtle" : "")">
+                                <td class="ps-3">
+                                    <div class="position-relative preview-thumb-btn" style="width: 54px; height: 54px; cursor: pointer;" 
+                                         data-img="@(string.IsNullOrWhiteSpace(prod.ImageUrl) ? "/images/default-banner.jpg" : prod.ImageUrl)" 
+                                         data-title="@prod.Name">
+                                        <img src="@(string.IsNullOrWhiteSpace(prod.ImageUrl) ? "/images/default-banner.jpg" : prod.ImageUrl)" 
+                                             alt="@prod.Name" 
+                                             class="rounded-3 border w-100 h-100 object-fit-cover shadow-xs" 
+                                             onerror="this.src='/images/default-banner.jpg';" />
+                                        <span class="position-absolute bottom-0 end-0 bg-dark text-white rounded-circle p-1 d-flex align-items-center justify-content-center" style="width: 16px; height: 16px; font-size: 8px;">
+                                            <i class="fa-solid fa-magnifying-glass-plus"></i>
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-dark">@prod.Name</div>
+                                    @if (!string.IsNullOrWhiteSpace(prod.Description))
+                                    {
+                                        <div class="text-muted small text-truncate" style="max-width: 280px;" title="@prod.Description">
+                                            @prod.Description
+                                        </div>
+                                    }
+                                    <div class="small text-muted font-monospace" style="font-size: 0.72rem;">ID: #@prod.Id</div>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <img src="@(string.IsNullOrWhiteSpace(prod.StreamerAvatarUrl) ? "/images/default-avatar.png" : prod.StreamerAvatarUrl)" 
+                                             alt="@prod.StreamerDisplayName" 
+                                             class="rounded-circle border" 
+                                             style="width: 32px; height: 32px; object-fit: cover;" 
+                                             onerror="this.src='/images/default-avatar.png';" />
+                                        <div>
+                                            <a href="/Shop/StreamerShop?slug=@prod.StreamerSlug" target="_blank" class="fw-semibold text-decoration-none text-dark small d-block">
+                                                @prod.StreamerDisplayName <i class="fa-solid fa-arrow-up-right-from-square text-muted" style="font-size: 0.7rem;"></i>
+                                            </a>
+                                            <span class="text-muted font-monospace small" style="font-size: 0.72rem;">@@@prod.StreamerOwnerUsername</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-end">
+                                    <span class="fw-bold text-success font-monospace">@prod.Price.ToString("N0") đ</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-light text-dark border font-monospace">@prod.StockQuantity</span>
+                                </td>
+                                <td class="text-center">
+                                    @if (prod.ApprovalStatus == DonateWeb.Models.Enums.ProductApprovalStatus.Pending)
+                                    {
+                                        <span class="badge bg-warning text-dark border border-warning px-2.5 py-1.5 rounded-pill fw-bold">
+                                            <i class="fa-solid fa-clock me-1"></i> Chờ duyệt
+                                        </span>
+                                        <div class="text-muted small mt-1" style="font-size: 0.72rem;">Chưa được bán</div>
+                                    }
+                                    else if (prod.ApprovalStatus == DonateWeb.Models.Enums.ProductApprovalStatus.Approved)
+                                    {
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1 rounded-pill fw-semibold">
+                                            <i class="fa-solid fa-circle-check me-1"></i> Đã duyệt
+                                        </span>
+                                        @if (prod.ApprovedAt.HasValue)
+                                        {
+                                            <div class="text-muted small mt-1" style="font-size: 0.7rem;">
+                                                Duyệt bởi: @(prod.ApprovedBy ?? "Admin")
+                                            </div>
+                                        }
+                                    }
+                                    else if (prod.ApprovalStatus == DonateWeb.Models.Enums.ProductApprovalStatus.Rejected)
+                                    {
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2.5 py-1 rounded-pill fw-semibold">
+                                            <i class="fa-solid fa-circle-xmark me-1"></i> Bị từ chối
+                                        </span>
+                                        @if (!string.IsNullOrWhiteSpace(prod.RejectionReason))
+                                        {
+                                            <div class="text-danger small mt-1 text-truncate" style="max-width: 200px; font-size: 0.72rem;" title="@prod.RejectionReason">
+                                                <i class="fa-solid fa-info-circle me-1"></i>@prod.RejectionReason
+                                            </div>
+                                        }
+                                    }
+                                </td>
+                                <td>
+                                    <span class="small text-muted">@prod.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+                                </td>
+                                <td class="pe-3 text-center">
+                                    <div class="d-flex align-items-center justify-content-center gap-1 flex-wrap">
+                                        @if (prod.ApprovalStatus != DonateWeb.Models.Enums.ProductApprovalStatus.Approved)
+                                        {
+                                            <!-- Nút Phê duyệt -->
+                                            <form asp-area="Admin" asp-controller="Admin" asp-action="ApproveProduct" method="post" class="d-inline" onsubmit="return confirm('Xác nhận phê duyệt sản phẩm này để mở bán trên gian hàng?');">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@prod.Id" />
+                                                <button type="submit" class="btn btn-sm btn-success rounded-pill px-2.5 py-1 fw-semibold" title="Phê duyệt sản phẩm">
+                                                    <i class="fa-solid fa-check me-1"></i> Duyệt
+                                                </button>
+                                            </form>
+                                        }
+
+                                        @if (prod.ApprovalStatus != DonateWeb.Models.Enums.ProductApprovalStatus.Rejected)
+                                        {
+                                            <!-- Nút Từ chối (Mở Modal nhập lý do) -->
+                                            <button type="button" class="btn btn-sm btn-outline-warning text-dark rounded-pill px-2.5 py-1 fw-semibold btn-reject-prod" 
+                                                    data-id="@prod.Id" data-name="@prod.Name" title="Từ chối duyệt sản phẩm">
+                                                <i class="fa-solid fa-xmark me-1 text-danger"></i> Từ chối
+                                            </button>
+                                        }
+
+                                        <!-- Nút Xóa -->
+                                        <form asp-area="Admin" asp-controller="Admin" asp-action="DeleteProduct" method="post" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn xóa vĩnh viễn sản phẩm này?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@prod.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" title="Xóa sản phẩm">
+                                                <i class="fa-regular fa-trash-can"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- PHÂN TRANG -->
+            @if (Model.TotalPages > 1)
+            {
+                <div class="p-3 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span class="small text-muted">Trang @Model.CurrentPage / @Model.TotalPages (Tổng @Model.TotalCount sản phẩm)</span>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            @if (Model.CurrentPage > 1)
+                            {
+                                <li class="page-item">
+                                    <a class="page-link" href="/Admin/Products?search=@Model.SearchTerm&statusFilter=@Model.StatusFilter&streamerId=@Model.StreamerIdFilter&page=@(Model.CurrentPage - 1)">«</a>
+                                </li>
+                            }
+                            @for (int p = 1; p <= Model.TotalPages; p++)
+                            {
+                                <li class="page-item @(p == Model.CurrentPage ? "active" : "")">
+                                    <a class="page-link" href="/Admin/Products?search=@Model.SearchTerm&statusFilter=@Model.StatusFilter&streamerId=@Model.StreamerIdFilter&page=@p">@p</a>
+                                </li>
+                            }
+                            @if (Model.CurrentPage < Model.TotalPages)
+                            {
+                                <li class="page-item">
+                                    <a class="page-link" href="/Admin/Products?search=@Model.SearchTerm&statusFilter=@Model.StatusFilter&streamerId=@Model.StreamerIdFilter&page=@(Model.CurrentPage + 1)">»</a>
+                                </li>
+                            }
+                        </ul>
+                    </nav>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<!-- MODAL TỪ CHỐI PHÊ DUYỆT SẢN PHẨM -->
+<div class="modal fade" id="rejectProductModal" tabindex="-1" aria-labelledby="rejectProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow-lg overflow-hidden">
+            <form asp-area="Admin" asp-controller="Admin" asp-action="RejectProduct" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="rejectProductId" value="" />
+
+                <div class="modal-header bg-danger text-white py-3 border-0">
+                    <h5 class="modal-title fw-bold fs-6 d-flex align-items-center gap-2" id="rejectProductModalLabel">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        Từ Chối Phê Duyệt Sản Phẩm
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body p-4">
+                    <p class="small text-muted mb-3">
+                        Bạn đang từ chối duyệt sản phẩm: <strong id="rejectProductName" class="text-dark"></strong>.
+                        Vui lòng cung cấp lý do từ chối để Streamer có thể chỉnh sửa lại.
+                    </p>
+
+                    <!-- Gợi ý lý do nhanh -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">Chọn lý do phổ biến:</label>
+                        <div class="d-flex flex-wrap gap-1">
+                            <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill small py-1 px-2" style="font-size: 0.78rem;" onclick="setRejectReason('Hình ảnh mờ hoặc không phù hợp tiêu chuẩn')">
+                                Ảnh không phù hợp
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill small py-1 px-2" style="font-size: 0.78rem;" onclick="setRejectReason('Tên hoặc mô tả sản phẩm vi phạm chính sách cộng đồng')">
+                                Vi phạm chính sách
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill small py-1 px-2" style="font-size: 0.78rem;" onclick="setRejectReason('Giá bán không thực tế hoặc thiếu thông tin mô tả chi tiết')">
+                                Giá/Mô tả bất hợp lý
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill small py-1 px-2" style="font-size: 0.78rem;" onclick="setRejectReason('Sản phẩm thuộc danh mục hàng cấm / bị hạn chế kinh doanh')">
+                                Mặt hàng cấm
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-dark">Chi tiết lý do từ chối <span class="text-danger">*</span></label>
+                        <textarea name="reason" id="rejectReasonInput" class="form-control rounded-3" rows="3" 
+                                  placeholder="Nhập lý do chi tiết để thông báo tới streamer..." required maxlength="500"></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light border-0 py-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Hủy bỏ</button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold">
+                        <i class="fa-solid fa-xmark me-1"></i> Xác Nhận Từ Chối
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL XEM ẢNH PHÓNG TO -->
+<div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow-lg overflow-hidden bg-transparent">
+            <div class="modal-body p-0 position-relative text-center bg-dark rounded-4 overflow-hidden">
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3 z-3" data-bs-dismiss="modal" aria-label="Close"></button>
+                <img id="modalPreviewImg" src="" alt="Product Preview" class="img-fluid" style="max-height: 80vh; object-fit: contain;" />
+                <div id="modalPreviewTitle" class="text-white small p-2 bg-dark bg-opacity-75"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.btn-reject-prod').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                openRejectModal(this.dataset.id, this.dataset.name);
+            });
+        });
+
+        document.querySelectorAll('.preview-thumb-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                showImagePreviewModal(this.dataset.img, this.dataset.title);
+            });
+        });
+    });
+
+    function openRejectModal(productId, productName) {
+        document.getElementById('rejectProductId').value = productId;
+        document.getElementById('rejectProductName').textContent = productName;
+        document.getElementById('rejectReasonInput').value = '';
+        var modal = new bootstrap.Modal(document.getElementById('rejectProductModal'));
+        modal.show();
+    }
+
+    function setRejectReason(reason) {
+        document.getElementById('rejectReasonInput').value = reason;
+    }
+
+    function showImagePreviewModal(imgUrl, title) {
+        document.getElementById('modalPreviewImg').src = imgUrl;
+        document.getElementById('modalPreviewTitle').textContent = title;
+        var modal = new bootstrap.Modal(document.getElementById('imagePreviewModal'));
+        modal.show();
+    }
+</script>

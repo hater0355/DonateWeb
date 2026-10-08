@@ -39,6 +39,9 @@ namespace DonateWeb.ViewModels.Streamer
         [Display(Name = "URL Ảnh bìa (Banner / Cover)")]
         public string? BannerUrl { get; set; } = "/images/default-banner.jpg";
 
+        [Display(Name = "Tải ảnh bìa từ máy tính")]
+        public IFormFile? BannerFile { get; set; }
+
         [Required(ErrorMessage = "Vui lòng nhập mức donate tối thiểu")]
         [Range(1000, 100000000, ErrorMessage = "Mức donate tối thiểu từ 1,000 VNĐ đến 100,000,000 VNĐ")]
         [Display(Name = "Mức donate tối thiểu (VNĐ)")]

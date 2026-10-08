@@ -14,7 +14,7 @@
             <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value == "/" ? "active-nav" : "text-muted")" href="/"><i class="fa-solid fa-home me-1"></i> Home</a></li>
             <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value?.StartsWith("/Streamer/Register", StringComparison.OrdinalIgnoreCase) == true ? "active-nav" : "text-muted")" href="/Streamer/Register"><i class="fa-solid fa-video me-1"></i> New Streamer</a></li>
             <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value?.StartsWith("/Guides") == true ? "active-nav" : "text-muted")" href="/Guides"><i class="fa-solid fa-book me-1"></i> Guides</a></li>
-            <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value?.StartsWith("/Orders") == true ? "active-nav" : "text-muted")" href="/Orders"><i class="fa-solid fa-store me-1"></i> Shop</a></li>
+            <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value?.StartsWith("/Shop", StringComparison.OrdinalIgnoreCase) == true ? "active-nav" : "text-muted")" href="/Shop"><i class="fa-solid fa-store me-1"></i> Shop</a></li>
         </ul>
 
         <!-- Thanh Tìm kiếm (Search Bar) -->
@@ -150,6 +150,7 @@
                         {
                             <li><h6 class="dropdown-header text-uppercase" style="font-size: 0.7rem;">Kênh Streamer &amp; Số dư</h6></li>
                             <li><a class="dropdown-item text-success fw-semibold" href="/@(string.IsNullOrEmpty(streamerSlug) ? "Streamer/Donate" : streamerSlug)"><i class="fa-solid fa-id-card me-2"></i>Trang cá nhân (@(!string.IsNullOrEmpty(streamerSlug) ? "/" + streamerSlug : ""))</a></li>
+                            <li><a class="dropdown-item fw-semibold text-warning" href="/Shop/MyProducts"><i class="fa-solid fa-boxes-stacked me-2"></i>Quản lý sản phẩm (Shop)</a></li>
                             <li><a class="dropdown-item fw-semibold text-primary" href="/Wallet/Withdraw"><i class="fa-solid fa-money-bill-transfer me-2"></i>Rút tiền doanh thu</a></li>
                             <li><a class="dropdown-item" href="/Streamer/Config"><i class="fa-solid fa-sliders me-2 text-muted"></i>Cấu hình nâng cao</a></li>
                             <li><a class="dropdown-item" href="/Streamer/Overview"><i class="fa-solid fa-chart-line me-2 text-muted"></i>Thống kê donate</a></li>
@@ -176,7 +177,9 @@
                         }
 
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="/Transactions"><i class="fa-solid fa-receipt me-2 text-muted"></i>Lịch sử giao dịch</a></li>
+                        <li><a class="dropdown-item fw-semibold text-dark-green" href="/Orders"><i class="fa-solid fa-receipt me-2 text-success"></i>Lịch sử đơn hàng &amp; Donate</a></li>
+                        <li><a class="dropdown-item" href="/Shop/History"><i class="fa-solid fa-bag-shopping me-2 text-muted"></i>Lịch sử đơn hàng Shop</a></li>
+                        <li><a class="dropdown-item" href="/Transactions"><i class="fa-solid fa-wallet me-2 text-muted"></i>Lịch sử giao dịch ví</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li>
                             <form asp-action="Logout" asp-controller="Auth" method="post" class="d-inline">

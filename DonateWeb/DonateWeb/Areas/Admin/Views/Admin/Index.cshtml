@@ -42,6 +42,25 @@
     </div>
 }
 
+@if (Model.PendingProductsCount > 0)
+{
+    <!-- THÔNG BÁO CÓ SẢN PHẨM STREAMER CHỜ DUYỆT -->
+    <div class="alert alert-warning border-0 shadow-sm rounded-4 p-3 mb-4 d-flex justify-content-between align-items-center flex-wrap gap-2" style="background-color: #fffbeb; border-left: 5px solid #d97706 !important;">
+        <div class="d-flex align-items-center gap-3">
+            <div class="bg-warning text-dark rounded-circle p-2 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 42px; height: 42px;">
+                <i class="fa-solid fa-boxes-stacked fs-5 text-dark"></i>
+            </div>
+            <div>
+                <h6 class="fw-bold mb-1 text-dark">Có @Model.PendingProductsCount sản phẩm từ Streamer đang chờ Admin kiểm duyệt!</h6>
+                <p class="small text-muted mb-0">Các mặt hàng mới do streamer đăng bán cần được kiểm duyệt thông tin và hình ảnh trước khi mở bán công khai trên sàn.</p>
+            </div>
+        </div>
+        <a href="/Admin/Products?statusFilter=pending" class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-clipboard-check me-1"></i> Kiểm Duyệt Sản Phẩm Ngay (@Model.PendingProductsCount)
+        </a>
+    </div>
+}
+
 <!-- KHỐI 1: 4 THẺ CHỈ SỐ KPI DÒNG TIỀN TRỌNG TÂM -->
 <div class="row g-3 mb-4">
     <!-- 1. Dòng tiền vào -->

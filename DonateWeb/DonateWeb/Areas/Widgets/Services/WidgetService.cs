@@ -179,7 +179,7 @@ namespace DonateWeb.Areas.Widgets.Services
                 entity = new AlertBoxConfig
                 {
                     StreamerProfileId = profile.Id,
-                    WidgetToken = string.IsNullOrWhiteSpace(model.WidgetToken) ? Guid.NewGuid().ToString("N") : model.WidgetToken,
+                    WidgetToken = Guid.NewGuid().ToString("N"),
                     CreatedAt = DateTime.UtcNow
                 };
                 _context.AlertBoxConfigs.Add(entity);
@@ -202,8 +202,6 @@ namespace DonateWeb.Areas.Widgets.Services
             entity.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-
-            model.WidgetToken = entity.WidgetToken;
 
             // Cập nhật Cache in-memory
             model.StreamerProfileId = profile.Id;
@@ -662,6 +660,7 @@ namespace DonateWeb.Areas.Widgets.Services
             var testAlert = new AlertPollResultDto
             {
                 DonationId = 0, // 0 biểu thị alert thử nghiệm
+                TtsToken = config.WidgetToken,
                 DonorName = "Khán Giả Thử Nghiệm",
                 Amount = 50000,
                 FormattedAmount = "50.000đ",

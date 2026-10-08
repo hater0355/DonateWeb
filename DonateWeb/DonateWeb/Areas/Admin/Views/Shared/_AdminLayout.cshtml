@@ -201,6 +201,18 @@
                 <i class="fa-solid fa-file-shield text-warning"></i>
                 <span>Log & Khiếu nại (Dispute)</span>
             </a>
+
+            <!-- 4. Quản lý & Duyệt sản phẩm Shop Streamer -->
+            <a href="/Admin/Products" class="admin-nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "Products" ? "active" : "")">
+                <i class="fa-solid fa-boxes-stacked text-warning"></i>
+                <span>Duyệt sản phẩm Shop</span>
+            </a>
+
+            <!-- 5. Đăng & Quản lý Breaking News -->
+            <a href="/Admin/BreakingNews" class="admin-nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "BreakingNews" ? "active" : "")">
+                <i class="fa-solid fa-bullhorn text-danger"></i>
+                <span>Đăng Breaking News</span>
+            </a>
         </nav>
 
         <div class="px-3 py-2 mt-4 text-uppercase text-muted small fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">

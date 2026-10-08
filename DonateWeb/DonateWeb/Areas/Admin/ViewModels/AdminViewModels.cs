@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using DonateWeb.Models.Entities;
 using DonateWeb.Models.Enums;
 
 namespace DonateWeb.Areas.Admin.ViewModels
@@ -41,6 +42,9 @@ namespace DonateWeb.Areas.Admin.ViewModels
 
         /// <summary>Số lượng đơn đăng ký streamer đang chờ Quản trị viên duyệt</summary>
         public int PendingStreamersCount { get; set; }
+
+        /// <summary>Số lượng sản phẩm bán từ streamer đang chờ Quản trị viên duyệt</summary>
+        public int PendingProductsCount { get; set; }
 
         // Dữ liệu phục vụ vẽ biểu đồ dòng tiền (Chart.js)
         public List<string> ChartLabels { get; set; } = new();
@@ -223,5 +227,85 @@ namespace DonateWeb.Areas.Admin.ViewModels
         public string? Note { get; set; }
         public string PerformedBy { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
+    }
+
+    // ====================================================================
+    // 4. VIEWMODELS CHO TÍNH NĂNG: QUẢN LÝ & PHÊ DUYỆT SẢN PHẨM SHOP STREAMER
+    // ====================================================================
+
+    public class AdminProductListViewModel
+    {
+        public List<AdminProductItemViewModel> Products { get; set; } = new();
+
+        // Tiêu chí tìm kiếm & lọc
+        public string? SearchTerm { get; set; }
+        public string StatusFilter { get; set; } = "all"; // all, pending, approved, rejected
+        public int? StreamerIdFilter { get; set; }
+        public List<AdminProductStreamerOption> Streamers { get; set; } = new();
+
+        // Thống kê
+        public int TotalCount { get; set; }
+        public int PendingCount { get; set; }
+        public int ApprovedCount { get; set; }
+        public int RejectedCount { get; set; }
+
+        // Phân trang
+        public int CurrentPage { get; set; } = 1;
+        public int TotalPages { get; set; } = 1;
+        public int PageSize { get; set; } = 15;
+    }
+
+    public class AdminProductItemViewModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public decimal Price { get; set; }
+        public string? ImageUrl { get; set; }
+        public int StockQuantity { get; set; }
+        public bool IsActive { get; set; }
+        public ProductApprovalStatus ApprovalStatus { get; set; }
+        public string? RejectionReason { get; set; }
+        public DateTime? ApprovedAt { get; set; }
+        public string? ApprovedBy { get; set; }
+        public DateTime CreatedAt { get; set; }
+
+        // Streamer
+        public int StreamerProfileId { get; set; }
+        public string StreamerDisplayName { get; set; } = string.Empty;
+        public string StreamerSlug { get; set; } = string.Empty;
+        public string? StreamerAvatarUrl { get; set; }
+        public string StreamerOwnerUsername { get; set; } = string.Empty;
+    }
+
+    public class AdminProductStreamerOption
+    {
+        public int Id { get; set; }
+        public string DisplayName { get; set; } = string.Empty;
+    }
+
+    // ====================================================================
+    // 5. VIEWMODELS CHO TÍNH NĂNG: ĐĂNG & QUẢN LÝ BREAKING NEWS
+    // ====================================================================
+
+    public class BreakingNewsManageViewModel
+    {
+        public BreakingNewsInputModel Input { get; set; } = new();
+        public BreakingNews? CurrentActiveNews { get; set; }
+        public List<BreakingNews> History { get; set; } = new();
+    }
+
+    public class BreakingNewsInputModel
+    {
+        public int? Id { get; set; }
+
+        [Required(ErrorMessage = "Vui lòng nhập nội dung Breaking News")]
+        [MaxLength(1000, ErrorMessage = "Nội dung tin tức tối đa 1000 ký tự")]
+        public string Content { get; set; } = string.Empty;
+
+        [MaxLength(500, ErrorMessage = "Đường dẫn tối đa 500 ký tự")]
+        public string? LinkUrl { get; set; }
+
+        public bool IsActive { get; set; } = true;
     }
 }

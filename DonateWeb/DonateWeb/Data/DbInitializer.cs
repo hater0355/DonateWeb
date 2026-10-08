@@ -49,6 +49,118 @@ namespace DonateWeb.Data
                             ALTER TABLE dbo.Users ADD AccountId NVARCHAR(10) NULL;
                         END
                     END
+
+                    -- Bảng Sản phẩm Gian hàng Streamer
+                    IF OBJECT_ID('dbo.ShopProducts', 'U') IS NULL
+                    BEGIN
+                        CREATE TABLE dbo.ShopProducts (
+                            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                            StreamerProfileId INT NOT NULL,
+                            Name NVARCHAR(200) NOT NULL,
+                            Description NVARCHAR(MAX) NULL,
+                            Price DECIMAL(18,2) NOT NULL,
+                            ImageUrl NVARCHAR(500) NULL,
+                            StockQuantity INT NOT NULL DEFAULT 999,
+                            IsActive BIT NOT NULL DEFAULT 1,
+                            ApprovalStatus INT NOT NULL DEFAULT 0,
+                            RejectionReason NVARCHAR(500) NULL,
+                            ApprovedAt DATETIME2 NULL,
+                            ApprovedBy NVARCHAR(100) NULL,
+                            CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                            UpdatedAt DATETIME2 NULL,
+                            CONSTRAINT FK_ShopProducts_StreamerProfiles FOREIGN KEY (StreamerProfileId) REFERENCES dbo.StreamerProfiles(Id) ON DELETE CASCADE
+                        );
+                    END
+                    ELSE
+                    BEGIN
+                        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ShopProducts') AND name = 'ApprovalStatus')
+                        BEGIN
+                            ALTER TABLE dbo.ShopProducts ADD ApprovalStatus INT NOT NULL DEFAULT 1;
+                            ALTER TABLE dbo.ShopProducts ADD RejectionReason NVARCHAR(500) NULL;
+                            ALTER TABLE dbo.ShopProducts ADD ApprovedAt DATETIME2 NULL;
+                            ALTER TABLE dbo.ShopProducts ADD ApprovedBy NVARCHAR(100) NULL;
+                        END
+                    END
+
+                    -- Bảng Đơn hàng Mua hàng Streamer
+                    IF OBJECT_ID('dbo.ShopOrders', 'U') IS NULL
+                    BEGIN
+                        CREATE TABLE dbo.ShopOrders (
+                            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                            OrderCode NVARCHAR(50) NOT NULL,
+                            StreamerProfileId INT NOT NULL,
+                            BuyerUserId INT NULL,
+                            BuyerName NVARCHAR(100) NOT NULL,
+                            BuyerPhone NVARCHAR(30) NULL,
+                            BuyerAddress NVARCHAR(300) NULL,
+                            Note NVARCHAR(500) NULL,
+                            TotalAmount DECIMAL(18,2) NOT NULL,
+                            PaymentMethod NVARCHAR(50) NOT NULL DEFAULT 'Wallet',
+                            PaymentStatus NVARCHAR(50) NOT NULL DEFAULT 'Pending',
+                            TransactionCode NVARCHAR(100) NULL,
+                            CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                            PaidAt DATETIME2 NULL,
+                            CONSTRAINT FK_ShopOrders_StreamerProfiles FOREIGN KEY (StreamerProfileId) REFERENCES dbo.StreamerProfiles(Id) ON DELETE NO ACTION,
+                            CONSTRAINT FK_ShopOrders_Users FOREIGN KEY (BuyerUserId) REFERENCES dbo.Users(Id) ON DELETE SET NULL
+                        );
+                    END
+
+                    -- Bảng Chi tiết mặt hàng trong đơn hàng
+                    IF OBJECT_ID('dbo.ShopOrderItems', 'U') IS NULL
+                    BEGIN
+                        CREATE TABLE dbo.ShopOrderItems (
+                            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                            ShopOrderId INT NOT NULL,
+                            ShopProductId INT NOT NULL,
+                            ProductName NVARCHAR(200) NOT NULL,
+                            Price DECIMAL(18,2) NOT NULL,
+                            Quantity INT NOT NULL DEFAULT 1,
+                            CONSTRAINT FK_ShopOrderItems_ShopOrders FOREIGN KEY (ShopOrderId) REFERENCES dbo.ShopOrders(Id) ON DELETE CASCADE,
+                            CONSTRAINT FK_ShopOrderItems_ShopProducts FOREIGN KEY (ShopProductId) REFERENCES dbo.ShopProducts(Id) ON DELETE NO ACTION
+                        );
+                    END
+
+                    -- Bảng Breaking News
+                    IF OBJECT_ID('dbo.BreakingNews', 'U') IS NULL
+                    BEGIN
+                        CREATE TABLE dbo.BreakingNews (
+                            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                            Content NVARCHAR(1000) NOT NULL,
+                            LinkUrl NVARCHAR(500) NULL,
+                            IsActive BIT NOT NULL DEFAULT 1,
+                            CreatedBy NVARCHAR(100) NULL,
+                            CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                            UpdatedAt DATETIME2 NULL
+                        );
+                    END
+
+                    -- Bảng StreamerFollows (Theo dõi Streamer - Streamer Yêu Thích)
+                    IF OBJECT_ID('dbo.StreamerFollows', 'U') IS NULL
+                    BEGIN
+                        CREATE TABLE dbo.StreamerFollows (
+                            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                            UserId INT NOT NULL,
+                            StreamerProfileId INT NOT NULL,
+                            CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                            CONSTRAINT FK_StreamerFollows_Users FOREIGN KEY (UserId) REFERENCES dbo.Users(Id) ON DELETE CASCADE,
+                            CONSTRAINT FK_StreamerFollows_StreamerProfiles FOREIGN KEY (StreamerProfileId) REFERENCES dbo.StreamerProfiles(Id) ON DELETE NO ACTION,
+                            CONSTRAINT UQ_StreamerFollows_User_Streamer UNIQUE (UserId, StreamerProfileId)
+                        );
+                    END
+
+                    -- Bảng StreamerStatuses (Status / Bài viết của Streamer)
+                    IF OBJECT_ID('dbo.StreamerStatuses', 'U') IS NULL
+                    BEGIN
+                        CREATE TABLE dbo.StreamerStatuses (
+                            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                            StreamerProfileId INT NOT NULL,
+                            Content NVARCHAR(MAX) NOT NULL,
+                            ImageUrl NVARCHAR(500) NULL,
+                            LikeCount INT NOT NULL DEFAULT 0,
+                            CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                            CONSTRAINT FK_StreamerStatuses_StreamerProfiles FOREIGN KEY (StreamerProfileId) REFERENCES dbo.StreamerProfiles(Id) ON DELETE CASCADE
+                        );
+                    END
                 ");
 
                 var accountIdService = scope.ServiceProvider.GetRequiredService<IAccountIdService>();
@@ -585,6 +697,98 @@ namespace DonateWeb.Data
                     {
                         context.StreamerGoals.RemoveRange(sampleGoals);
                         await context.SaveChangesAsync();
+                    }
+                }
+
+                // 8. Seed Sản phẩm mẫu cho Gian hàng Streamer nếu chưa có
+                if (!await context.ShopProducts.AnyAsync())
+                {
+                    var allActiveStreamers = await context.StreamerProfiles.Where(s => s.IsActive).ToListAsync();
+                    var sampleProducts = new List<ShopProduct>();
+
+                    foreach (var s in allActiveStreamers)
+                    {
+                        sampleProducts.Add(new ShopProduct
+                        {
+                            StreamerProfileId = s.Id,
+                            Name = $"Áo Thun Fan Kênh {s.DisplayName} (Edition 2026)",
+                            Description = "Chất liệu cotton 100% thoáng mát, co giãn 4 chiều, in hình logo độc quyền sắc nét phong cách streetwear năng động.",
+                            Price = 250000,
+                            ImageUrl = "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?q=80&w=800&auto=format&fit=crop",
+                            StockQuantity = 100,
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                        sampleProducts.Add(new ShopProduct
+                        {
+                            StreamerProfileId = s.Id,
+                            Name = $"Lót Chuột Gaming Speed Pro ({s.DisplayName} Edition)",
+                            Description = "Kích thước lớn 900x400x4mm, bề mặt vải dệt micro-weave tối ưu mắt đọc cảm biến chuột, đế cao su chống trượt tuyệt đối.",
+                            Price = 180000,
+                            ImageUrl = "https://images.unsplash.com/photo-1616588589676-62b3bd4ff6d2?q=80&w=800&auto=format&fit=crop",
+                            StockQuantity = 150,
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                        sampleProducts.Add(new ShopProduct
+                        {
+                            StreamerProfileId = s.Id,
+                            Name = $"Móc Khóa Mica Khắc Tên Kênh {s.DisplayName}",
+                            Description = "Móc khóa mica acrylic 2 lớp cao cấp dày 3mm, chống trầy xước, kèm chuông và móc kim loại không gỉ sang trọng.",
+                            Price = 45000,
+                            ImageUrl = "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=800&auto=format&fit=crop",
+                            StockQuantity = 200,
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                        sampleProducts.Add(new ShopProduct
+                        {
+                            StreamerProfileId = s.Id,
+                            Name = $"Bình Nước Giữ Nhiệt {s.DisplayName} 500ml",
+                            Description = "Inox 304 tiêu chuẩn thực phẩm, giữ nhiệt nóng/lạnh 12 tiếng, nắp cảm ứng hiển thị nhiệt độ LED thông minh.",
+                            Price = 195000,
+                            ImageUrl = "https://images.unsplash.com/photo-1602143407151-7111542de6e8?q=80&w=800&auto=format&fit=crop",
+                            StockQuantity = 80,
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+
+                    if (sampleProducts.Any())
+                    {
+                        await context.ShopProducts.AddRangeAsync(sampleProducts);
+                        await context.SaveChangesAsync();
+                        logger.LogInformation("Đã seed {count} sản phẩm gian hàng mẫu cho các Streamer thành công.", sampleProducts.Count);
+                    }
+                }
+
+                // Seed bài viết Status mẫu cho Streamer nếu chưa có
+                if (!await context.StreamerStatuses.AnyAsync())
+                {
+                    var allActiveStreamers = await context.StreamerProfiles.Where(s => s.IsActive).Take(3).ToListAsync();
+                    if (allActiveStreamers.Any())
+                    {
+                        var sampleStatuses = new List<StreamerStatus>();
+                        int index = 0;
+                        foreach (var st in allActiveStreamers)
+                        {
+                            sampleStatuses.Add(new StreamerStatus
+                            {
+                                StreamerProfileId = st.Id,
+                                Content = index == 0
+                                    ? $"Chào cả nhà! Tối nay 20h00 mình lên sóng livestream giao lưu cùng mọi người nhé. Có rất nhiều quà tặng hấp dẫn đang chờ đón anh em! ❤️🎮"
+                                    : $"Cảm ơn tất cả mọi người đã luôn ủng hộ và đồng hành cùng {st.DisplayName} trong suốt thời gian qua! Chúc đại gia đình một ngày tràn ngập niềm vui ✨🍀",
+                                ImageUrl = index == 0
+                                    ? "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800&auto=format&fit=crop"
+                                    : "https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=800&auto=format&fit=crop",
+                                LikeCount = 15 + index * 8,
+                                CreatedAt = DateTime.UtcNow.AddHours(-2 - index * 3)
+                            });
+                            index++;
+                        }
+                        await context.StreamerStatuses.AddRangeAsync(sampleStatuses);
+                        await context.SaveChangesAsync();
+                        logger.LogInformation("Đã seed {count} status mẫu cho các Streamer.", sampleStatuses.Count);
                     }
                 }
             }

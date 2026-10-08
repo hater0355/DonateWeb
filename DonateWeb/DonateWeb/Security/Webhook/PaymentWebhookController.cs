@@ -250,16 +250,6 @@ namespace DonateWeb.Security.Webhook
                     if (alertDto != null)
                     {
                         await _hubContext.Clients.Group("Streamer_" + streamerSlug).SendAsync("ReceiveAlert", alertDto);
-                        if (alertDto.IsTtsEnabled)
-                        {
-                            await _hubContext.Clients.Group("Tts_" + streamerSlug).SendAsync("ReceiveTtsAlert", new DonateWeb.Areas.Widgets.ViewModels.TtsDonationAlertDto
-                            {
-                                DonationId = alertDto.DonationId,
-                                DonorName = alertDto.DonorName,
-                                Amount = alertDto.Amount,
-                                Message = alertDto.Message ?? string.Empty
-                            });
-                        }
                     }
                 }
                 await _hubContext.Clients.Group("Tx_" + orderCode).SendAsync("DonationSuccess", new { orderCode, amount = donation.Amount, isPaid = true });
@@ -731,17 +721,6 @@ namespace DonateWeb.Security.Webhook
                     // Bắn đến toàn bộ Browser Source OBS đang cắm đường dẫn widget của streamer này
                     await _hubContext.Clients.Group("Streamer_" + streamerSlug)
                         .SendAsync("ReceiveAlert", alertDto);
-
-                    if (alertDto.IsTtsEnabled)
-                    {
-                        await _hubContext.Clients.Group("Tts_" + streamerSlug).SendAsync("ReceiveTtsAlert", new DonateWeb.Areas.Widgets.ViewModels.TtsDonationAlertDto
-                        {
-                            DonationId = alertDto.DonationId,
-                            DonorName = alertDto.DonorName,
-                            Amount = alertDto.Amount,
-                            Message = alertDto.Message ?? string.Empty
-                        });
-                    }
 
                     _logger.LogInformation(
                         "[SIGNALR OBS ALERT] Đã bắn sự kiện ReceiveAlert lên màn hình OBS cho Streamer {StreamerSlug}",

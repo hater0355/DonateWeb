@@ -20,6 +20,16 @@ namespace DonateWeb.ViewModels.Streamer
         public string? LockReason { get; set; }
 
         /// <summary>
+        /// Trạng thái người dùng hiện tại đã nhấn "Theo dõi" streamer này hay chưa
+        /// </summary>
+        public bool IsFollowedByCurrentUser { get; set; } = false;
+
+        /// <summary>
+        /// Người dùng đang đăng nhập có phải là chủ sở hữu kênh streamer này không
+        /// </summary>
+        public bool IsCurrentUserOwner { get; set; } = false;
+
+        /// <summary>
         /// Nội dung giới thiệu bản thân (Bio / About Me) của Streamer, dạng HTML.
         /// Hiển thị trên trang donate công khai để Viewer xem.
         /// </summary>

@@ -509,5 +509,84 @@ namespace DonateWeb.Services
 
             return (true, $"Đã hủy tư cách Streamer thành công cho kênh '{profileName}'. Tài khoản của bạn đã trở về vai trò Viewer với mã ID: {user.AccountId}.", user);
         }
+
+        public async Task<bool> IsFollowingAsync(int userId, int streamerProfileId)
+        {
+            if (userId <= 0 || streamerProfileId <= 0) return false;
+            return await _context.StreamerFollows
+                .AnyAsync(f => f.UserId == userId && f.StreamerProfileId == streamerProfileId);
+        }
+
+        public async Task<(bool IsFollowing, int FollowerCount, string Message)> ToggleFollowAsync(int userId, int streamerProfileId)
+        {
+            if (userId <= 0)
+            {
+                return (false, 0, "Vui lòng đăng nhập để theo dõi Streamer.");
+            }
+
+            var streamer = await _context.StreamerProfiles.FindAsync(streamerProfileId);
+            if (streamer == null)
+            {
+                return (false, 0, "Không tìm thấy hồ sơ Streamer.");
+            }
+
+            if (streamer.UserId == userId)
+            {
+                return (false, streamer.FollowerCount, "Bạn không thể theo dõi chính kênh của mình.");
+            }
+
+            var existingFollow = await _context.StreamerFollows
+                .FirstOrDefaultAsync(f => f.UserId == userId && f.StreamerProfileId == streamerProfileId);
+
+            bool isFollowing;
+            if (existingFollow != null)
+            {
+                _context.StreamerFollows.Remove(existingFollow);
+                isFollowing = false;
+            }
+            else
+            {
+                var newFollow = new StreamerFollow
+                {
+                    UserId = userId,
+                    StreamerProfileId = streamerProfileId,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.StreamerFollows.Add(newFollow);
+                isFollowing = true;
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Cập nhật lại FollowerCount chính xác trong StreamerProfile
+            var actualCount = await _context.StreamerFollows.CountAsync(f => f.StreamerProfileId == streamerProfileId);
+            streamer.FollowerCount = actualCount;
+            await _context.SaveChangesAsync();
+
+            var message = isFollowing
+                ? $"Đã theo dõi {streamer.DisplayName}! Kênh đã được thêm vào danh sách Streamer Yêu Thích của bạn."
+                : $"Đã hủy theo dõi {streamer.DisplayName}.";
+
+            return (isFollowing, actualCount, message);
+        }
+
+        public async Task<List<StreamerProfile>> GetFollowedStreamersAsync(int userId)
+        {
+            if (userId <= 0) return new List<StreamerProfile>();
+
+            return await _context.StreamerFollows
+                .Where(f => f.UserId == userId && f.StreamerProfile.IsActive)
+                .Include(f => f.StreamerProfile)
+                    .ThenInclude(sp => sp.User)
+                .OrderByDescending(f => f.CreatedAt)
+                .Select(f => f.StreamerProfile)
+                .ToListAsync();
+        }
+
+        public async Task<int> GetFollowerCountAsync(int streamerProfileId)
+        {
+            if (streamerProfileId <= 0) return 0;
+            return await _context.StreamerFollows.CountAsync(f => f.StreamerProfileId == streamerProfileId);
+        }
     }
 }

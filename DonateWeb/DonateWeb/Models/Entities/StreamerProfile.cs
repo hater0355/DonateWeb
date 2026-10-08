@@ -124,5 +124,9 @@ namespace DonateWeb.Models.Entities
 
         // Navigation property
         public virtual ICollection<Donation> DonationsReceived { get; set; } = new List<Donation>();
+        public virtual ICollection<ShopProduct> ShopProducts { get; set; } = new List<ShopProduct>();
+        public virtual ICollection<ShopOrder> ShopOrders { get; set; } = new List<ShopOrder>();
+        public virtual ICollection<StreamerFollow> Followers { get; set; } = new List<StreamerFollow>();
+        public virtual ICollection<StreamerStatus> Statuses { get; set; } = new List<StreamerStatus>();
     }
 }

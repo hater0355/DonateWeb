@@ -189,14 +189,75 @@ main {
     font-size: 0.85rem;
 }
 
-/* Breaking News Banner */
+/* Breaking News Banner & Horizontal Marquee */
 .breaking-news-banner {
-    background-color: var(--banner-dark-green);
+    background: linear-gradient(135deg, #1b4533 0%, #29503e 100%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    min-height: 52px;
 }
 
 .badge-breaking {
-    background-color: var(--badge-dark-green);
+    background-color: #143627;
     color: white;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.breaking-pulse-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #ef4444;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    animation: breakingPulse 1.5s infinite;
+}
+
+@keyframes breakingPulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.breaking-marquee-container {
+    white-space: nowrap;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+}
+
+.breaking-marquee-track {
+    display: inline-block;
+    white-space: nowrap;
+    padding-left: 100%;
+    animation: marqueeScroll 22s linear infinite;
+    cursor: pointer;
+}
+
+.breaking-marquee-track:hover {
+    animation-play-state: paused;
+}
+
+.breaking-marquee-text {
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    transition: color 0.2s;
+}
+
+.breaking-marquee-track:hover .breaking-marquee-text {
+    color: #a7f3d0;
+    text-decoration: underline;
+}
+
+@keyframes marqueeScroll {
+    0% {
+        transform: translate3d(0, 0, 0);
+    }
+    100% {
+        transform: translate3d(-100%, 0, 0);
+    }
 }
 
 /* Forms */

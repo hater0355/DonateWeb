@@ -58,27 +58,6 @@
                 </div>
             </div>
         </div>
-
-        <div class="widget-card p-3 mt-3 border border-info border-opacity-50">
-            <h5 class="text-white mb-2"><i class="fa-brands fa-windows text-info me-2"></i>Trợ lý đọc donate bằng giọng Windows</h5>
-            <p class="text-secondary small mb-2">Lưu cấu hình Alert Box trước khi dùng trợ lý. Token này là bí mật, chỉ nhập vào ứng dụng Windows của bạn.</p>
-            <div class="small text-secondary">Địa chỉ VPS</div>
-            <div class="copy-box d-flex align-items-center justify-content-between mb-2">
-                <code id="ttsServerUrl" class="text-info text-truncate me-2">@GetBaseUrlForTts()</code>
-                <button type="button" class="btn btn-sm btn-outline-info" onclick="copyToClipboard(document.getElementById('ttsServerUrl').innerText)"><i class="fa-regular fa-copy"></i> Sao chép</button>
-            </div>
-            <div class="small text-secondary">Slug streamer</div>
-            <div class="copy-box d-flex align-items-center justify-content-between mb-2">
-                <code id="ttsStreamerSlug" class="text-info">@Model.StreamerSlug</code>
-                <button type="button" class="btn btn-sm btn-outline-info" onclick="copyToClipboard(document.getElementById('ttsStreamerSlug').innerText)"><i class="fa-regular fa-copy"></i> Sao chép</button>
-            </div>
-            <div class="small text-secondary">Widget Token</div>
-            <div class="copy-box d-flex align-items-center justify-content-between">
-                <code id="ttsWidgetToken" class="text-warning text-break me-2">@Model.WidgetToken</code>
-                <button type="button" class="btn btn-sm btn-outline-warning" onclick="copyToClipboard(document.getElementById('ttsWidgetToken').innerText)"><i class="fa-regular fa-copy"></i> Sao chép</button>
-            </div>
-            <p class="small text-secondary mt-3 mb-0">Trong OBS, thêm <strong>Application Audio Capture</strong> và chọn DonateWeb.TtsCompanion để thu riêng giọng đọc. Cần OBS 28+ và Windows 10 phiên bản 2004 trở lên hoặc Windows 11.</p>
-        </div>
     </div>
 
     <!-- Cột trái: Form cấu hình chi tiết -->
@@ -347,10 +326,6 @@
         </div>
     </div>
 </div>
-
-@functions {
-    private string GetBaseUrlForTts() => $"{Context.Request.Scheme}://{Context.Request.Host}";
-}
 
 <!-- Modal xác nhận khôi phục mặc định -->
 <div class="modal fade" id="confirmResetModal" tabindex="-1" aria-hidden="true">
