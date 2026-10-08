@@ -15,7 +15,6 @@
           "Microsoft.EntityFrameworkCore.SqlServer": "10.0.12",
           "QRCoder": "1.6.0",
           "System.IdentityModel.Tokens.Jwt": "8.6.0",
-          "System.Speech": "10.0.12",
           "payOS": "2.1.0"
         },
         "runtime": {
@@ -838,22 +837,6 @@
             "fileVersion": "9.0.1125.51716"
           }
         }
-      },
-      "System.Speech/10.0.12": {
-        "runtime": {
-          "lib/net10.0/System.Speech.dll": {
-            "assemblyVersion": "10.0.0.12",
-            "fileVersion": "10.0.1226.42308"
-          }
-        },
-        "runtimeTargets": {
-          "runtimes/win/lib/net10.0/System.Speech.dll": {
-            "rid": "win",
-            "assetType": "runtime",
-            "assemblyVersion": "10.0.0.12",
-            "fileVersion": "10.0.1226.42308"
-          }
-        }
       }
     }
   },
@@ -1205,13 +1188,6 @@
       "sha512": "sha512-s8yUYuYYu+PAwvBdhLG1KyrGrk9gkYeuPxfAsXsTqqWyepwSyEw8hAaflW4nO98NG52YpYI1am2+9o+79h2RtQ==",
       "path": "system.security.cryptography.protecteddata/9.0.11",
       "hashPath": "system.security.cryptography.protecteddata.9.0.11.nupkg.sha512"
-    },
-    "System.Speech/10.0.12": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-IrIKdPfbeCtgDeKQvJE2EtS8sSLxxpBRzCCpkg/4jORLwmhSUrVZtIrnbbaWQxo3tjnXK6aHH6MNsvi3S3PuTg==",
-      "path": "system.speech/10.0.12",
-      "hashPath": "system.speech.10.0.12.nupkg.sha512"
     }
   }
 }

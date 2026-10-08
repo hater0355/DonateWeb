@@ -26,7 +26,6 @@ public static class DonationAlertFactory
         return new AlertPollResultDto
         {
             DonationId = donation.Id,
-            TtsToken = config.WidgetToken,
             DonorName = donorName,
             Amount = donation.Amount,
             FormattedAmount = $"{donation.Amount:N0}đ",
