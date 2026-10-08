@@ -181,8 +181,7 @@ public class WalletAndWidgetSecurityTests
         await database.Context.SaveChangesAsync();
 
         var widgetService = new Mock<IWidgetService>();
-        var controller = new WidgetsConfigController(widgetService.Object, NullLogger<WidgetsConfigController>.Instance, database.Context,
-            Mock.Of<Microsoft.AspNetCore.SignalR.IHubContext<DonateWeb.Hubs.PaymentHub>>())
+        var controller = new WidgetsConfigController(widgetService.Object, NullLogger<WidgetsConfigController>.Instance, database.Context)
         {
             ControllerContext = new ControllerContext
             {
@@ -220,7 +219,7 @@ public class WalletAndWidgetSecurityTests
             widgetService.Object,
             NullLogger<WidgetsApiController>.Instance,
             database.Context,
-            Mock.Of<IContentModerationService>())
+            Mock.Of<IWindowsSpeechService>())
         {
             ControllerContext = new ControllerContext
             {
