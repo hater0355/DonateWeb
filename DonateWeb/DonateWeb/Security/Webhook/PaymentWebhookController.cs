@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using DonateWeb.Areas.Widgets.Services;
+using DonateWeb.Areas.Widgets.ViewModels;
 using DonateWeb.Data;
 using DonateWeb.Hubs;
 using DonateWeb.Models.Entities;
@@ -250,6 +251,11 @@ namespace DonateWeb.Security.Webhook
                     if (alertDto != null)
                     {
                         await _hubContext.Clients.Group("Streamer_" + streamerSlug).SendAsync("ReceiveAlert", alertDto);
+                        if (alertDto.IsTtsEnabled)
+                        {
+                            await _hubContext.Clients.Group("Tts_" + streamerSlug)
+                                .SendAsync("ReceiveTtsAlert", ToTtsAlert(alertDto));
+                        }
                     }
                 }
                 await _hubContext.Clients.Group("Tx_" + orderCode).SendAsync("DonationSuccess", new { orderCode, amount = donation.Amount, isPaid = true });
@@ -721,6 +727,11 @@ namespace DonateWeb.Security.Webhook
                     // Bắn đến toàn bộ Browser Source OBS đang cắm đường dẫn widget của streamer này
                     await _hubContext.Clients.Group("Streamer_" + streamerSlug)
                         .SendAsync("ReceiveAlert", alertDto);
+                    if (alertDto.IsTtsEnabled)
+                    {
+                        await _hubContext.Clients.Group("Tts_" + streamerSlug)
+                            .SendAsync("ReceiveTtsAlert", ToTtsAlert(alertDto));
+                    }
 
                     _logger.LogInformation(
                         "[SIGNALR OBS ALERT] Đã bắn sự kiện ReceiveAlert lên màn hình OBS cho Streamer {StreamerSlug}",
@@ -760,6 +771,14 @@ namespace DonateWeb.Security.Webhook
                 status = donation.Status.ToString()
             });
         }
+
+        private static TtsDonationAlertDto ToTtsAlert(AlertPollResultDto alert) => new()
+        {
+            DonationId = alert.DonationId,
+            DonorName = alert.DonorName,
+            Amount = alert.Amount,
+            Message = alert.Message ?? string.Empty
+        };
 
         // =========================================================================================
         // HÀM HỖ TRỢ TRÍCH XUẤT MÃ GIAO DỊCH TỪ NỘI DUNG CHUYỂN KHOẢN (REGEX & TEXT MATCHING)

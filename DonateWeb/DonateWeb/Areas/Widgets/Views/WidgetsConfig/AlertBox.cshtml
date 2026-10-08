@@ -60,6 +60,37 @@
         </div>
     </div>
 
+    <div class="col-12">
+    <div class="widget-card p-4 mb-4">
+        <h5 class="fw-bold mb-3 text-white"><i class="fa-brands fa-windows text-info me-2"></i> Trợ lý đọc donate trên Windows</h5>
+        <p class="text-secondary small mb-3">Nhập địa chỉ website, slug và khóa dưới đây vào DonateWeb TTS trên máy livestream. Giữ kín khóa này.</p>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label text-light" for="ttsServerUrl">Địa chỉ website</label>
+                <div class="input-group">
+                    <input id="ttsServerUrl" class="form-control" readonly value="@(Context.Request.Scheme + "://" + Context.Request.Host)" />
+                    <button type="button" class="btn btn-outline-info" onclick="copyTtsValue('ttsServerUrl')" title="Sao chép địa chỉ"><i class="fa-regular fa-copy"></i></button>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label text-light" for="ttsStreamerSlug">Slug streamer</label>
+                <div class="input-group">
+                    <input id="ttsStreamerSlug" class="form-control" readonly value="@Model.StreamerSlug" />
+                    <button type="button" class="btn btn-outline-info" onclick="copyTtsValue('ttsStreamerSlug')" title="Sao chép slug"><i class="fa-regular fa-copy"></i></button>
+                </div>
+            </div>
+            <div class="col-12">
+                <label class="form-label text-light" for="ttsWidgetToken">Widget Token</label>
+                <div class="input-group">
+                    <input id="ttsWidgetToken" class="form-control font-monospace" type="password" readonly value="@Model.WidgetToken" autocomplete="off" />
+                    <button type="button" class="btn btn-outline-secondary" onclick="toggleTtsToken()" title="Hiện hoặc ẩn khóa"><i id="ttsTokenIcon" class="fa-regular fa-eye"></i></button>
+                    <button type="button" class="btn btn-outline-info" onclick="copyTtsValue('ttsWidgetToken')" title="Sao chép khóa"><i class="fa-regular fa-copy"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+
     <!-- Cột trái: Form cấu hình chi tiết -->
     <div class="col-xl-7 col-lg-6">
         <div class="widget-card p-4">
@@ -259,7 +290,7 @@
                                 Đọc tin nhắn tự động (Text-To-Speech)
                             </label>
                         </div>
-                    <small class="text-muted d-block">OBS đọc tên người ủng hộ, số tiền và tối đa 240 ký tự lời nhắn bằng giọng tiếng Việt có sẵn trên máy chạy OBS. Nếu không có voice tiếng Việt, alert hình vẫn xuất hiện nhưng không phát giọng đọc.</small>
+                    <small class="text-muted d-block">Khi bật, trợ lý DonateWeb TTS trên máy Windows đọc tên, số tiền và tối đa 220 ký tự lời nhắn. VPS chỉ gửi alert, không tạo âm thanh.</small>
                     </div>
                 </div>
 
@@ -502,6 +533,17 @@
                     previewAlertBox.className = 'text-center p-3 animate__animated animate__' + animIn;
                 }, 1000);
             }, durationSec * 1000);
+        }
+
+        function copyTtsValue(id) {
+            navigator.clipboard.writeText(document.getElementById(id).value);
+        }
+
+        function toggleTtsToken() {
+            const token = document.getElementById('ttsWidgetToken');
+            const icon = document.getElementById('ttsTokenIcon');
+            token.type = token.type === 'password' ? 'text' : 'password';
+            icon.className = token.type === 'password' ? 'fa-regular fa-eye' : 'fa-regular fa-eye-slash';
         }
 
         // Nút Bắn Test Alert lên OBS qua AJAX

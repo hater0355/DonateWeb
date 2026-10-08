@@ -84,7 +84,6 @@ public class DonationAlertFactoryTests
         Assert.Equal("Clean name donated 25,000: clean message", alert.DisplayText);
         Assert.Equal("25,000đ", alert.FormattedAmount);
         Assert.True(alert.IsTtsEnabled);
-        Assert.Equal("widget-token", alert.TtsToken);
         Assert.Equal(35, alert.SoundVolume);
     }
 }

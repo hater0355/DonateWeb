@@ -139,7 +139,14 @@ namespace DonateWeb.Areas.Widgets.Services
                 };
             }
 
-            _alertConfigsCache[cleanSlug] = model;
+            if (profile != null && entity == null)
+            {
+                await SaveAlertBoxConfigAsync(model);
+            }
+            else
+            {
+                _alertConfigsCache[cleanSlug] = model;
+            }
             return model;
         }
 
@@ -185,6 +192,8 @@ namespace DonateWeb.Areas.Widgets.Services
                 _context.AlertBoxConfigs.Add(entity);
             }
 
+            model.WidgetToken = entity.WidgetToken;
+
             // Cập nhật các trường cấu hình
             entity.MediaType = model.MediaType;
             entity.MediaUrl = mediaUrl;
@@ -206,6 +215,7 @@ namespace DonateWeb.Areas.Widgets.Services
             // Cập nhật Cache in-memory
             model.StreamerProfileId = profile.Id;
             model.DisplayName = profile.DisplayName;
+            model.WidgetToken = entity.WidgetToken;
             _alertConfigsCache[cleanSlug] = model;
 
             return true;
@@ -660,7 +670,6 @@ namespace DonateWeb.Areas.Widgets.Services
             var testAlert = new AlertPollResultDto
             {
                 DonationId = 0, // 0 biểu thị alert thử nghiệm
-                TtsToken = config.WidgetToken,
                 DonorName = "Khán Giả Thử Nghiệm",
                 Amount = 50000,
                 FormattedAmount = "50.000đ",

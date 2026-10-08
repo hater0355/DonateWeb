@@ -8,7 +8,7 @@ namespace DonateWeb.Data
 {
     public static class DbInitializer
     {
-        public static async Task InitializeAsync(IServiceProvider serviceProvider)
+        public static async Task InitializeAsync(IServiceProvider serviceProvider, bool seedDemoData)
         {
             using var scope = serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -163,9 +163,7 @@ namespace DonateWeb.Data
                     END
                 ");
 
-                var accountIdService = scope.ServiceProvider.GetRequiredService<IAccountIdService>();
-
-                // 1. Seed Roles (RBAC: Admin, Streamer, Viewer)
+                // Roles are required in every environment; demo accounts and content are development-only.
                 if (!await context.Roles.AnyAsync())
                 {
                     var roles = new List<Role>
@@ -180,6 +178,12 @@ namespace DonateWeb.Data
                     logger.LogInformation("Seeded roles: Admin, Streamer, Viewer successfully.");
                 }
 
+                if (!seedDemoData)
+                    logger.LogInformation("Database schema and roles initialized; demo data seeding is disabled.");
+
+                if (seedDemoData)
+                {
+                var accountIdService = scope.ServiceProvider.GetRequiredService<IAccountIdService>();
                 var adminRole = await context.Roles.FirstAsync(r => r.Name == UserRoles.Admin);
                 var streamerRole = await context.Roles.FirstAsync(r => r.Name == UserRoles.Streamer);
                 var viewerRole = await context.Roles.FirstAsync(r => r.Name == UserRoles.Viewer);
@@ -304,7 +308,6 @@ namespace DonateWeb.Data
                 if (adminExisting != null)
                 {
                     adminExisting.FullName = "Quản Trị Viên Hệ Thống";
-                    adminExisting.WalletBalance = 0;
                 }
 
                 var streamerExisting = await context.Users.FirstOrDefaultAsync(u => u.Username == "tenstreamer");
@@ -392,6 +395,7 @@ namespace DonateWeb.Data
                 {
                     await context.SaveChangesAsync();
                     logger.LogInformation("Đã đồng bộ phần tên miền trang cá nhân của tất cả streamer thành mã ID của streamer đó.");
+                }
                 }
 
                 // 6. Tự động kiểm tra và tạo bảng / cột mới cho Admin Panel nếu chạy trên máy khác
@@ -599,33 +603,8 @@ namespace DonateWeb.Data
                     END
                 ");
 
-                // 7. Xóa các dữ liệu mẫu (giao dịch mẫu, audit log mẫu, goal mẫu và doanh thu ảo) nếu đã tồn tại từ trước
-                // để trang Admin hoàn toàn sạch dữ liệu cũ và chỉ hiển thị dữ liệu mới khi thêm vào
-                var sampleTxCodes = new[] { "DON_SAMPLE_001", "DON_DISPUTE_001", "DON_REFUND_002", "DON_20260924013736_76EF90" };
-                var sampleDonations = await context.Donations
-                    .Where(d => d.TransactionCode != null && sampleTxCodes.Contains(d.TransactionCode))
-                    .ToListAsync();
-
-                if (sampleDonations.Any())
-                {
-                    var sampleDonationIds = sampleDonations.Select(d => d.Id).ToList();
-                    var sampleLogs = await context.TransactionAuditLogs
-                        .Where(l => sampleDonationIds.Contains(l.DonationId) || sampleTxCodes.Contains(l.TransactionCode))
-                        .ToListAsync();
-
-                    if (sampleLogs.Any())
-                    {
-                        context.TransactionAuditLogs.RemoveRange(sampleLogs);
-                    }
-
-                    context.Donations.RemoveRange(sampleDonations);
-                    await context.SaveChangesAsync();
-                    logger.LogInformation("Đã xóa các giao dịch mẫu và nhật ký log mẫu trong trang Admin.");
-                }
-
-                // Đồng bộ lại TotalReceived và WalletBalance của tất cả Streamer theo đúng tổng tiền donate thành công thực tế
+                // Refresh the reporting total without deriving or overwriting spendable wallet balances.
                 var allStreamerProfiles = await context.StreamerProfiles
-                    .Include(sp => sp.User)
                     .ToListAsync();
                 foreach (var sp in allStreamerProfiles)
                 {
@@ -638,21 +617,6 @@ namespace DonateWeb.Data
                         sp.TotalReceived = actualTotal;
                     }
 
-                    if (sp.User != null)
-                    {
-                        if (actualTotal == 0m)
-                        {
-                            // Chưa có dữ liệu donate -> đặt số dư của Streamer về 0
-                            sp.User.WalletBalance = 0m;
-                        }
-                        else
-                        {
-                            var totalWithdrawn = await context.WithdrawalRequests
-                                .Where(wr => wr.UserId == sp.UserId && (wr.Status == 0 || wr.Status == 1))
-                                .SumAsync(wr => (decimal?)wr.Amount) ?? 0m;
-                            sp.User.WalletBalance = Math.Max(0m, actualTotal - totalWithdrawn);
-                        }
-                    }
                 }
                 await context.SaveChangesAsync();
 
@@ -660,7 +624,7 @@ namespace DonateWeb.Data
                 var tenstreamerProfile = await context.StreamerProfiles
                     .Include(s => s.User)
                     .FirstOrDefaultAsync(s => s.Slug == "tenstreamer" || (s.User != null && s.User.Username == "tenstreamer"));
-                if (tenstreamerProfile != null)
+                if (seedDemoData && tenstreamerProfile != null)
                 {
                     if (!await context.AlertBoxConfigs.AnyAsync(a => a.StreamerProfileId == tenstreamerProfile.Id))
                     {
@@ -701,7 +665,7 @@ namespace DonateWeb.Data
                 }
 
                 // 8. Seed Sản phẩm mẫu cho Gian hàng Streamer nếu chưa có
-                if (!await context.ShopProducts.AnyAsync())
+                if (seedDemoData && !await context.ShopProducts.AnyAsync())
                 {
                     var allActiveStreamers = await context.StreamerProfiles.Where(s => s.IsActive).ToListAsync();
                     var sampleProducts = new List<ShopProduct>();
@@ -763,7 +727,7 @@ namespace DonateWeb.Data
                 }
 
                 // Seed bài viết Status mẫu cho Streamer nếu chưa có
-                if (!await context.StreamerStatuses.AnyAsync())
+                if (seedDemoData && !await context.StreamerStatuses.AnyAsync())
                 {
                     var allActiveStreamers = await context.StreamerProfiles.Where(s => s.IsActive).Take(3).ToListAsync();
                     if (allActiveStreamers.Any())
@@ -795,6 +759,10 @@ namespace DonateWeb.Data
             catch (Exception ex)
             {
                 logger.LogError(ex, "Lỗi xảy ra trong quá trình khởi tạo và seed cơ sở dữ liệu.");
+                if (!seedDemoData)
+                {
+                    throw;
+                }
             }
         }
     }

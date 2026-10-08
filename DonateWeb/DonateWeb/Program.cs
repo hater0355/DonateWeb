@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using DonateWeb.Data;
 using DonateWeb.Models.Enums;
@@ -44,7 +46,6 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IStreamerService, StreamerService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IWidgetService, WidgetService>();
-builder.Services.AddSingleton<IWindowsSpeechService, WindowsSpeechService>();
 builder.Services.AddScoped<IQrCodeService, QrCodeService>();
 
 // Đăng ký Phân hệ Bảo mật & Kiểm duyệt (Content Moderation, Rate Limiting & Webhook Security)
@@ -164,6 +165,19 @@ builder.Services.AddAntiforgery(options =>
     options.HeaderName = "RequestVerificationToken";
 });
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+{
+    builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+}
+
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
@@ -171,7 +185,7 @@ var app = builder.Build();
 // 5. Tự động khởi tạo Database và Seed dữ liệu mẫu (Roles, Admin, Streamer tenstreamer, Viewer)
 using (var scope = app.Services.CreateScope())
 {
-    await DbInitializer.InitializeAsync(app.Services);
+    await DbInitializer.InitializeAsync(app.Services, app.Environment.IsDevelopment());
 }
 
 if (!app.Environment.IsDevelopment())
@@ -180,6 +194,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+app.UseForwardedHeaders();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
@@ -191,6 +206,8 @@ app.UseAuthorization();
 
 // Ánh xạ SignalR Hub
 app.MapHub<DonateWeb.Hubs.PaymentHub>("/paymentHub");
+app.MapGet("/health", async (AppDbContext context, CancellationToken cancellationToken) =>
+    await context.Database.CanConnectAsync(cancellationToken) ? Results.Ok(new { status = "healthy" }) : Results.StatusCode(StatusCodes.Status503ServiceUnavailable));
 
 // Ánh xạ các API Controllers (bao gồm PaymentWebhookController và WidgetsApiController)
 app.MapControllers();

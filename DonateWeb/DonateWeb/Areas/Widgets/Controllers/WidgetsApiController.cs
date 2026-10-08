@@ -5,7 +5,9 @@ using Microsoft.EntityFrameworkCore;
 using DonateWeb.Data;
 using DonateWeb.Models.Enums;
 using DonateWeb.Areas.Widgets.Services;
-using System.Collections.Concurrent;
+using DonateWeb.Areas.Widgets.ViewModels;
+using DonateWeb.Hubs;
+using Microsoft.AspNetCore.SignalR;
 
 namespace DonateWeb.Areas.Widgets.Controllers
 {
@@ -13,76 +15,61 @@ namespace DonateWeb.Areas.Widgets.Controllers
     public class WidgetsApiController : ControllerBase
     {
         private readonly IWidgetService _widgetService;
-        private readonly ILogger<WidgetsApiController> _logger;
         private readonly AppDbContext _context;
-        private readonly IWindowsSpeechService _windowsSpeechService;
-        private static readonly ConcurrentDictionary<string, DateTimeOffset> LastSpeechRequestByToken = new();
+        private readonly IHubContext<PaymentHub> _hubContext;
 
         public WidgetsApiController(
             IWidgetService widgetService,
-            ILogger<WidgetsApiController> logger,
             AppDbContext context,
-            IWindowsSpeechService windowsSpeechService)
+            IHubContext<PaymentHub> hubContext)
         {
             _widgetService = widgetService;
-            _logger = logger;
             _context = context;
-            _windowsSpeechService = windowsSpeechService;
+            _hubContext = hubContext;
         }
 
-        [HttpPost("api/widgets/alertbox/tts/{slug}")]
-        [RequestSizeLimit(4096)]
-        public async Task<IActionResult> SynthesizeAlertSpeech(string slug, [FromBody] AlertSpeechRequest request, CancellationToken cancellationToken)
+        [HttpGet("api/widgets/tts/alerts/{slug}")]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        public async Task<IActionResult> GetTtsAlerts(
+            string slug,
+            [FromHeader(Name = "X-Widget-Token")] string? widgetToken,
+            [FromQuery] int? afterId,
+            CancellationToken cancellationToken)
         {
-            if (string.IsNullOrWhiteSpace(request.Text) || request.Text.Length > 500 || string.IsNullOrWhiteSpace(request.Token))
+            var cleanSlug = (slug ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(widgetToken) || afterId < 0)
+                return Unauthorized();
+
+            var config = await _widgetService.GetAlertBoxConfigAsync(cleanSlug, string.Empty);
+            if (!FixedTimeEquals(widgetToken, config.WidgetToken))
+                return Unauthorized();
+
+            var baseQuery = _context.Donations.AsNoTracking()
+                .Where(d => d.StreamerProfileId == config.StreamerProfileId && d.Status == DonationStatus.Success);
+            var latestId = await baseQuery.MaxAsync(d => (int?)d.Id, cancellationToken) ?? 0;
+            if (!afterId.HasValue || !config.IsTtsEnabled)
+                return Ok(new TtsCatchupResultDto { Cursor = latestId });
+
+            var donations = await baseQuery
+                .Where(d => d.Id > afterId.Value && d.Amount >= config.MinAmountToAlert)
+                .OrderBy(d => d.Id)
+                .Take(100)
+                .ToListAsync(cancellationToken);
+
+            var result = new TtsCatchupResultDto
             {
-                return BadRequest();
+                Cursor = donations.Count == 100 ? donations[^1].Id : latestId
+            };
+            foreach (var donation in donations)
+            {
+                var alert = await _widgetService.CreateDonationAlertAsync(donation, cleanSlug);
+                if (alert is not null && alert.IsTtsEnabled)
+                {
+                    result.Alerts.Add(ToTtsAlert(alert));
+                }
             }
 
-            var cleanSlug = slug.Trim().ToLowerInvariant();
-            var config = await _widgetService.GetAlertBoxConfigAsync(cleanSlug, "");
-            if (!FixedTimeEquals(request.Token, config.WidgetToken))
-            {
-                return NotFound();
-            }
-
-            var now = DateTimeOffset.UtcNow;
-            if (LastSpeechRequestByToken.TryGetValue(request.Token, out var lastRequest) && now - lastRequest < TimeSpan.FromMilliseconds(750))
-            {
-                return StatusCode(StatusCodes.Status429TooManyRequests);
-            }
-            LastSpeechRequestByToken[request.Token] = now;
-
-            try
-            {
-                var wave = await _windowsSpeechService.SynthesizeVietnameseAsync(request.Text.Trim(), cancellationToken);
-                Response.Headers.CacheControl = "no-store";
-                return File(wave, "audio/wav");
-            }
-            catch (InvalidOperationException ex)
-            {
-                _logger.LogWarning(ex, "Windows Vietnamese TTS is unavailable for widget {StreamerSlug}.", cleanSlug);
-                return StatusCode(StatusCodes.Status503ServiceUnavailable);
-            }
-            catch (PlatformNotSupportedException ex)
-            {
-                _logger.LogWarning(ex, "Windows TTS was requested on an unsupported host for widget {StreamerSlug}.", cleanSlug);
-                return StatusCode(StatusCodes.Status503ServiceUnavailable);
-            }
-        }
-
-        private static bool FixedTimeEquals(string provided, string expected)
-        {
-            var providedBytes = System.Text.Encoding.UTF8.GetBytes(provided);
-            var expectedBytes = System.Text.Encoding.UTF8.GetBytes(expected);
-            return providedBytes.Length == expectedBytes.Length &&
-                   System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes);
-        }
-
-        public sealed class AlertSpeechRequest
-        {
-            public string Token { get; set; } = string.Empty;
-            public string Text { get; set; } = string.Empty;
+            return Ok(result);
         }
 
         /// <summary>
@@ -129,12 +116,39 @@ namespace DonateWeb.Areas.Widgets.Controllers
             }
 
             await _widgetService.TriggerTestAlertAsync(ownedSlug.Trim().ToLowerInvariant());
+            var config = await _widgetService.GetAlertBoxConfigAsync(ownedSlug, string.Empty);
+            if (config.IsTtsEnabled)
+            {
+                await _hubContext.Clients.Group("Tts_" + ownedSlug.Trim().ToLowerInvariant())
+                    .SendAsync("ReceiveTtsTest", new TtsDonationAlertDto
+                    {
+                        DonorName = "Khán giả thử nghiệm",
+                        Amount = 50000m,
+                        Message = "Đây là lời nhắn thử giọng đọc donate."
+                    });
+            }
 
             return Ok(new
             {
                 success = true,
                 message = "Đã gửi thông báo thử nghiệm thành công lên OBS!"
             });
+        }
+
+        private static TtsDonationAlertDto ToTtsAlert(AlertPollResultDto alert) => new()
+        {
+            DonationId = alert.DonationId,
+            DonorName = alert.DonorName,
+            Amount = alert.Amount,
+            Message = alert.Message ?? string.Empty
+        };
+
+        private static bool FixedTimeEquals(string provided, string expected)
+        {
+            var providedBytes = System.Text.Encoding.UTF8.GetBytes(provided);
+            var expectedBytes = System.Text.Encoding.UTF8.GetBytes(expected);
+            return providedBytes.Length == expectedBytes.Length &&
+                   System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes);
         }
 
         /// <summary>

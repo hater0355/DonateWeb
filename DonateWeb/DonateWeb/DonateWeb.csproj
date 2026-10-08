@@ -19,7 +19,6 @@
     <PackageReference Include="payOS" Version="2.1.0" />
     <PackageReference Include="QRCoder" Version="1.6.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.6.0" />
-    <PackageReference Include="System.Speech" Version="10.0.12" />
   </ItemGroup>
 
 </Project>

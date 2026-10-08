@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -18,6 +19,7 @@ using DonateWeb.Security.Uploads;
 using DonateWeb.Services;
 using DonateWeb.Tests;
 using DonateWeb.ViewModels.Streamer;
+using DonateWeb.ViewModels.Shop;
 using Xunit;
 
 namespace DonateWeb.Tests;
@@ -106,6 +108,50 @@ public class WalletAndWidgetSecurityTests
     }
 
     [SqlServerFact]
+    public async Task ConcurrentShopCheckoutsCannotSpendTheSameWalletBalanceTwice()
+    {
+        await using var database = await SqlServerDatabase.CreateAsync();
+        var streamerUser = new User { Username = $"shop-owner-{Guid.NewGuid():N}", Email = $"{Guid.NewGuid():N}@example.test" };
+        var buyer = new User { Username = $"shop-buyer-{Guid.NewGuid():N}", Email = $"{Guid.NewGuid():N}@example.test", WalletBalance = 90000m };
+        database.Context.Users.AddRange(streamerUser, buyer);
+        await database.Context.SaveChangesAsync();
+        var profile = new StreamerProfile
+        {
+            UserId = streamerUser.Id,
+            Slug = $"shop-{Guid.NewGuid():N}",
+            DisplayName = "Concurrent checkout streamer",
+            ApprovalStatus = StreamerApprovalStatus.Approved
+        };
+        database.Context.StreamerProfiles.Add(profile);
+        await database.Context.SaveChangesAsync();
+        var product = new ShopProduct
+        {
+            StreamerProfileId = profile.Id,
+            Name = "Test item",
+            Price = 60000m,
+            IsActive = true,
+            ApprovalStatus = ProductApprovalStatus.Approved
+        };
+        database.Context.ShopProducts.Add(product);
+        await database.Context.SaveChangesAsync();
+
+        await using var firstContext = database.CreateContext();
+        await using var secondContext = database.CreateContext();
+        var firstTask = CreateShopController(firstContext, buyer.Id).Checkout(CreateWalletCheckout(profile.Id, product.Id));
+        var secondTask = CreateShopController(secondContext, buyer.Id).Checkout(CreateWalletCheckout(profile.Id, product.Id));
+
+        var results = await Task.WhenAll(firstTask, secondTask);
+
+        Assert.Single(results, result => IsJsonSuccess(result));
+        Assert.Single(results, result => !IsJsonSuccess(result));
+        await database.Context.Entry(buyer).ReloadAsync();
+        await database.Context.Entry(streamerUser).ReloadAsync();
+        Assert.Equal(30000m, buyer.WalletBalance);
+        Assert.Equal(60000m, streamerUser.WalletBalance);
+        Assert.Single(await database.Context.ShopOrders.ToListAsync());
+    }
+
+    [SqlServerFact]
     public async Task ConcurrentDonationsPreserveStreamerBalanceAndReceivedTotal()
     {
         await using var database = await SqlServerDatabase.CreateAsync();
@@ -181,7 +227,11 @@ public class WalletAndWidgetSecurityTests
         await database.Context.SaveChangesAsync();
 
         var widgetService = new Mock<IWidgetService>();
-        var controller = new WidgetsConfigController(widgetService.Object, NullLogger<WidgetsConfigController>.Instance, database.Context)
+        var controller = new WidgetsConfigController(
+            widgetService.Object,
+            NullLogger<WidgetsConfigController>.Instance,
+            database.Context,
+            Mock.Of<Microsoft.AspNetCore.SignalR.IHubContext<DonateWeb.Hubs.PaymentHub>>())
         {
             ControllerContext = new ControllerContext
             {
@@ -217,9 +267,8 @@ public class WalletAndWidgetSecurityTests
         var widgetService = new Mock<IWidgetService>();
         var controller = new WidgetsApiController(
             widgetService.Object,
-            NullLogger<WidgetsApiController>.Instance,
             database.Context,
-            Mock.Of<IWindowsSpeechService>())
+            Mock.Of<Microsoft.AspNetCore.SignalR.IHubContext<DonateWeb.Hubs.PaymentHub>>())
         {
             ControllerContext = new ControllerContext
             {
@@ -232,6 +281,38 @@ public class WalletAndWidgetSecurityTests
 
         Assert.IsType<ForbidResult>(await controller.TriggerTestAlert("someone-else"));
         widgetService.Verify(service => service.TriggerTestAlertAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [SqlServerFact]
+    public async Task WidgetTokenRemainsEqualToPersistedTokenWhenFirstSavingConfiguration()
+    {
+        await using var database = await SqlServerDatabase.CreateAsync();
+        var owner = new User { Username = $"widget-owner-{Guid.NewGuid():N}", Email = $"{Guid.NewGuid():N}@example.test" };
+        database.Context.Users.Add(owner);
+        await database.Context.SaveChangesAsync();
+        var profile = new StreamerProfile
+        {
+            UserId = owner.Id,
+            Slug = $"widget-{Guid.NewGuid():N}",
+            DisplayName = "Widget owner"
+        };
+        database.Context.StreamerProfiles.Add(profile);
+        await database.Context.SaveChangesAsync();
+        var service = new WidgetService(
+            database.Context,
+            Mock.Of<IContentModerationService>(),
+            NullLogger<WidgetService>.Instance);
+
+        var config = await service.GetAlertBoxConfigAsync(profile.Slug, string.Empty);
+        config.WidgetToken = "attacker-supplied-token";
+
+        Assert.True(await service.SaveAlertBoxConfigAsync(config));
+        var storedToken = await database.Context.AlertBoxConfigs
+            .Where(saved => saved.StreamerProfileId == profile.Id)
+            .Select(saved => saved.WidgetToken)
+            .SingleAsync();
+        Assert.Equal(storedToken, config.WidgetToken);
+        Assert.NotEqual("attacker-supplied-token", storedToken);
     }
 
     [Fact]
@@ -283,4 +364,31 @@ public class WalletAndWidgetSecurityTests
         DonorName = "Test donor",
         PaymentMethod = PaymentMethod.Wallet
     };
+
+    private static ShopController CreateShopController(AppDbContext context, int userId) => new(context, Mock.Of<IWebHostEnvironment>())
+    {
+        ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = CreateStreamerPrincipal(userId)
+            }
+        }
+    };
+
+    private static CheckoutRequestViewModel CreateWalletCheckout(int streamerProfileId, int productId) => new()
+    {
+        StreamerProfileId = streamerProfileId,
+        Items = [new CartItemInputModel { ProductId = productId, Quantity = 1 }],
+        BuyerName = "Test buyer",
+        BuyerPhone = "0900000000",
+        BuyerAddress = "Test address",
+        PaymentMethod = "Wallet"
+    };
+
+    private static bool IsJsonSuccess(IActionResult result)
+    {
+        var value = Assert.IsType<JsonResult>(result).Value!;
+        return (bool)value.GetType().GetProperty("success")!.GetValue(value)!;
+    }
 }

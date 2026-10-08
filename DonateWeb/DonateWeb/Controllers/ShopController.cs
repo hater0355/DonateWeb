@@ -242,28 +242,42 @@ namespace DonateWeb.Controllers
                     return Json(new { success = false, message = "Vui lòng đăng nhập tài khoản để thanh toán bằng số dư Ví!" });
                 }
 
+                await using var walletTransaction = await _context.Database.BeginTransactionAsync();
                 var buyer = await _context.Users.FindAsync(currentUserId.Value);
                 if (buyer == null)
                 {
                     return Json(new { success = false, message = "Tài khoản người mua không hợp lệ." });
                 }
 
-                if (buyer.WalletBalance < totalAmount)
+                var deducted = await _context.Users
+                    .Where(user => user.Id == buyer.Id && user.WalletBalance >= totalAmount)
+                    .ExecuteUpdateAsync(update => update.SetProperty(
+                        user => user.WalletBalance,
+                        user => user.WalletBalance - totalAmount));
+                if (deducted == 0)
                 {
+                    await _context.Entry(buyer).ReloadAsync();
                     return Json(new { 
                         success = false, 
                         message = $"Số dư ví của bạn không đủ ({buyer.WalletBalance:N0} VNĐ) để thanh toán đơn hàng {totalAmount:N0} VNĐ. Vui lòng nạp thêm tiền hoặc chọn thanh toán quét mã QR!" 
                     });
                 }
 
-                // Trừ tiền người mua
-                buyer.WalletBalance -= totalAmount;
+                await _context.Entry(buyer).ReloadAsync();
+                var buyerBalanceAfter = buyer.WalletBalance;
 
                 // Cộng tiền doanh thu cho Streamer
                 var streamerUser = await _context.Users.FindAsync(streamer.UserId);
+                decimal? streamerBalanceAfter = null;
                 if (streamerUser != null)
                 {
-                    streamerUser.WalletBalance += totalAmount;
+                    await _context.Users
+                        .Where(user => user.Id == streamerUser.Id)
+                        .ExecuteUpdateAsync(update => update.SetProperty(
+                            user => user.WalletBalance,
+                            user => user.WalletBalance + totalAmount));
+                    await _context.Entry(streamerUser).ReloadAsync();
+                    streamerBalanceAfter = streamerUser.WalletBalance;
                 }
 
                 // Ghi nhận lịch sử giao dịch ví cho Người mua
@@ -273,8 +287,8 @@ namespace DonateWeb.Controllers
                     TransactionCode = $"WTX-{orderCode}-BUY",
                     TransactionType = "PURCHASE",
                     Amount = totalAmount,
-                    BalanceBefore = buyer.WalletBalance + totalAmount,
-                    BalanceAfter = buyer.WalletBalance,
+                    BalanceBefore = buyerBalanceAfter + totalAmount,
+                    BalanceAfter = buyerBalanceAfter,
                     PaymentMethodName = "Ví số dư OnlyFan",
                     Status = WalletTransaction.StatusCompleted,
                     Note = $"Thanh toán đơn hàng #{orderCode} tại Shop của {streamer.DisplayName}",
@@ -290,8 +304,8 @@ namespace DonateWeb.Controllers
                         TransactionCode = $"WTX-{orderCode}-REV",
                         TransactionType = "SHOP_SALE",
                         Amount = totalAmount,
-                        BalanceBefore = streamerUser.WalletBalance - totalAmount,
-                        BalanceAfter = streamerUser.WalletBalance,
+                        BalanceBefore = streamerBalanceAfter!.Value - totalAmount,
+                        BalanceAfter = streamerBalanceAfter.Value,
                         PaymentMethodName = "Ví số dư OnlyFan",
                         Status = WalletTransaction.StatusCompleted,
                         Note = $"Doanh thu bán hàng đơn #{orderCode} từ khách {model.BuyerName.Trim()}",
@@ -324,6 +338,7 @@ namespace DonateWeb.Controllers
 
                 _context.ShopOrders.Add(paidOrder);
                 await _context.SaveChangesAsync();
+                await walletTransaction.CommitAsync();
 
                 return Json(new
                 {
