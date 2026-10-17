@@ -124,7 +124,7 @@
                 </div>
                 <h2 class="fw-bold mb-2 display-6">Sàn Sản Phẩm Của Các Streamer</h2>
                 <p class="mb-0 text-white-50" style="max-width: 650px;">
-                    Khám phá và đặt mua áo đấu, đồ lưu niệm, phụ kiện gaming độc quyền được thiết kế bởi chính các Idol Streamer bạn yêu mến. Hỗ trợ thanh toán nhanh bằng Ví số dư hoặc quét mã VietQR!
+                    Khám phá và đặt mua áo đấu, đồ lưu niệm, phụ kiện gaming độc quyền được thiết kế bởi chính các Idol Streamer bạn yêu mến. Hỗ trợ thanh toán bằng Ví số dư hoặc quét mã QR PayOS!
                 </p>
             </div>
             <div class="col-lg-4 text-lg-end">
@@ -278,7 +278,14 @@
                                 <span class="badge bg-light text-muted small fw-normal border">
                                     <i class="fa-solid fa-user-tie me-1 text-success"></i>Shop @item.StreamerName
                                 </span>
-                                <span class="small text-muted font-monospace">Kho: @item.StockQuantity</span>
+                                @if (item.StockQuantity > 0)
+                                {
+                                    <span class="small text-muted font-monospace">Kho: @item.StockQuantity</span>
+                                }
+                                else
+                                {
+                                    <span class="small text-danger fw-semibold">Hết hàng</span>
+                                }
                             </div>
 
                             <h6 class="fw-bold text-dark mb-1 text-truncate-2" style="min-height: 40px; line-height: 1.35;" title="@item.Name">

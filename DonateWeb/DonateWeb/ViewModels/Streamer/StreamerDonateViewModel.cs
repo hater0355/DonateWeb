@@ -84,6 +84,10 @@ namespace DonateWeb.ViewModels.Streamer
         /// </summary>
         public string? GeneratedQrBase64 { get; set; }
 
+        /// <summary>Mã QR cố định mở trang donate; mã thanh toán PayOS được tạo cho từng đơn.</summary>
+        public string DonatePageUrl { get; set; } = string.Empty;
+        public string? DonatePageQrBase64 { get; set; }
+
         // Trạng thái / Thông báo kết quả gửi donate
         public string? SuccessMessage { get; set; }
         public string? ErrorMessage { get; set; }

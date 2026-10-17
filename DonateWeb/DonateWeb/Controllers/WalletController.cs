@@ -9,6 +9,7 @@ using QRCoder;
 using DonateWeb.Data;
 using DonateWeb.Models.Entities;
 using DonateWeb.Models.Enums;
+using DonateWeb.Security.RateLimiting;
 using DonateWeb.Services;
 using DonateWeb.ViewModels.Wallet;
 
@@ -109,47 +110,6 @@ namespace DonateWeb.Controllers
         }
 
         /// <summary>
-        /// Đồng bộ số dư của Streamer theo dữ liệu donate thực tế:
-        /// Nếu chưa có dữ liệu donate (actualTotal == 0) thì số dư của Streamer được đặt về 0.
-        /// Nếu đã có dữ liệu donate thì số dư = Tổng donate thành công - Tổng tiền đã yêu cầu rút.
-        /// </summary>
-        private async Task SyncStreamerBalanceIfNeededAsync(User user)
-        {
-            if (user.StreamerProfile == null) return;
-
-            var actualTotalDonations = await _context.Donations
-                .Where(d => d.StreamerProfileId == user.StreamerProfile.Id && d.Status == DonationStatus.Success)
-                .SumAsync(d => (decimal?)d.Amount) ?? 0m;
-
-            var totalWithdrawn = await _context.WithdrawalRequests
-                .Where(wr => wr.UserId == user.Id && (wr.Status == 0 || wr.Status == 1))
-                .SumAsync(wr => (decimal?)wr.Amount) ?? 0m;
-
-            var expectedBalance = actualTotalDonations == 0m
-                ? 0m
-                : Math.Max(0m, actualTotalDonations - totalWithdrawn);
-
-            bool changed = false;
-            if (user.StreamerProfile.TotalReceived != actualTotalDonations)
-            {
-                user.StreamerProfile.TotalReceived = actualTotalDonations;
-                changed = true;
-            }
-
-            if (user.WalletBalance != expectedBalance)
-            {
-                user.WalletBalance = expectedBalance;
-                changed = true;
-            }
-
-            if (changed)
-            {
-                await _context.SaveChangesAsync();
-                await RefreshUserClaimsCookieAsync(user);
-            }
-        }
-
-        /// <summary>
         /// Điều hướng tự động theo Role của User:
         /// - Streamer -> Trang Rút tiền (/Wallet/Withdraw)
         /// - Viewer -> Trang Nạp tiền (/Wallet/Deposit)
@@ -241,6 +201,7 @@ namespace DonateWeb.Controllers
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [DonateRateLimit(5, 60, "wallet_deposit_create")]
         public async Task<IActionResult> CreateDeposit([FromForm] DepositRequestViewModel? request)
         {
             if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
@@ -579,14 +540,11 @@ namespace DonateWeb.Controllers
                 return RedirectToAction("Login", "Auth");
             }
 
-            // Chỉ cho phép tài khoản Streamer sử dụng trang Rút tiền
-            if (!User.IsInRole(UserRoles.Streamer) && user.StreamerProfile == null)
+            // Chỉ streamer đã được duyệt mới xem và thao tác với doanh thu.
+            if (user.StreamerProfile?.ApprovalStatus != StreamerApprovalStatus.Approved)
             {
-                return RedirectToAction(nameof(Deposit));
+                return Forbid();
             }
-
-            // Đồng bộ số dư của Streamer: nếu chưa có dữ liệu donate thì số dư để về 0
-            await SyncStreamerBalanceIfNeededAsync(user);
 
             var profile = user.StreamerProfile;
             var withdrawalHistory = await _context.WithdrawalRequests
@@ -605,11 +563,12 @@ namespace DonateWeb.Controllers
 
             var model = new WithdrawViewModel
             {
-                Amount = user.WalletBalance >= 50000 ? user.WalletBalance : 50000,
+                Amount = user.StreamerEarningsBalance >= 50000 ? user.StreamerEarningsBalance : 50000,
                 BankName = profile?.BankName ?? "MB Bank (Ngân Hàng Quân Đội)",
                 BankAccountNumber = profile?.BankAccountNumber ?? "",
                 BankAccountName = profile?.BankAccountName ?? user.FullName.ToUpper(),
-                CurrentBalance = user.WalletBalance,
+                CurrentBalance = user.StreamerEarningsBalance,
+                SpendingBalance = user.WalletBalance,
                 TotalReceived = profile?.TotalReceived ?? 0m,
                 TotalWithdrawn = totalWithdrawn,
                 PendingWithdrawalAmount = pendingAmount,
@@ -646,11 +605,13 @@ namespace DonateWeb.Controllers
                 return RedirectToAction(nameof(Deposit));
             }
 
-            // Đồng bộ số dư thực tế trước khi kiểm tra rút tiền
-            await SyncStreamerBalanceIfNeededAsync(userForSync);
+            if (userForSync.StreamerProfile?.ApprovalStatus != StreamerApprovalStatus.Approved)
+            {
+                return Forbid();
+            }
 
             // Sử dụng Database Transaction để đảm bảo kiểm tra số dư, trừ tiền và tạo yêu cầu rút đồng bộ tuyệt đối
-            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             try
             {
                 var user = await _context.Users
@@ -664,6 +625,12 @@ namespace DonateWeb.Controllers
 
                 var profile = user.StreamerProfile;
 
+                if (profile?.ApprovalStatus != StreamerApprovalStatus.Approved)
+                {
+                    await transaction.RollbackAsync();
+                    return Forbid();
+                }
+
                 // 1. Kiểm tra logic chặt chẽ: Số tiền rút hợp lệ và KHÔNG ĐƯỢC VƯỢT QUÁ SỐ DƯ HIỆN TẠI
                 if (model.Amount <= 0)
                 {
@@ -674,18 +641,19 @@ namespace DonateWeb.Controllers
                     ModelState.AddModelError(nameof(model.Amount), "Số tiền rút tối thiểu mỗi lần là 50.000 VNĐ.");
                 }
 
-                if (model.Amount > user.WalletBalance)
+                if (model.Amount > user.StreamerEarningsBalance)
                 {
                     ModelState.AddModelError(
                         nameof(model.Amount),
-                        $"Số tiền rút ({model.Amount:N0} VNĐ) không được vượt quá số dư khả dụng hiện tại của bạn ({user.WalletBalance:N0} VNĐ).");
+                        $"Số tiền rút ({model.Amount:N0} VNĐ) không được vượt quá doanh thu khả dụng ({user.StreamerEarningsBalance:N0} VNĐ).");
                 }
 
                 if (!ModelState.IsValid)
                 {
                     await transaction.RollbackAsync();
 
-                    model.CurrentBalance = user.WalletBalance;
+                    model.CurrentBalance = user.StreamerEarningsBalance;
+                    model.SpendingBalance = user.WalletBalance;
                     model.TotalReceived = profile?.TotalReceived ?? 0m;
                     model.StreamerDisplayName = profile?.DisplayName ?? user.FullName;
                     model.StreamerSlug = profile?.Slug ?? user.AccountId ?? user.Username;
@@ -706,10 +674,10 @@ namespace DonateWeb.Controllers
                     return View(model);
                 }
 
-                // 2. Trừ tiền trực tiếp trong số dư của Streamer và cập nhật đồng bộ
-                var balanceBefore = user.WalletBalance;
-                user.WalletBalance -= model.Amount;
-                var balanceAfter = user.WalletBalance;
+                // 2. Trừ tiền ở tài khoản doanh thu; ví dùng để donate không bị ảnh hưởng.
+                var balanceBefore = user.StreamerEarningsBalance;
+                user.StreamerEarningsBalance -= model.Amount;
+                var balanceAfter = user.StreamerEarningsBalance;
                 user.UpdatedAt = DateTime.UtcNow;
 
                 // Đồng bộ thông tin ngân hàng của StreamerProfile nếu có thay đổi
@@ -766,7 +734,7 @@ namespace DonateWeb.Controllers
                 // 5. Cập nhật đồng bộ Cookie Authentication để số dư trên Header và toàn hệ thống khớp 100%
                 await RefreshUserClaimsCookieAsync(user);
 
-                TempData["SuccessMessage"] = $"Tạo yêu cầu rút {model.Amount:N0} VNĐ thành công (Mã YC: {txCode})! Số dư còn lại của bạn: {user.WalletBalance:N0} VNĐ.";
+                TempData["SuccessMessage"] = $"Tạo yêu cầu rút {model.Amount:N0} VNĐ thành công (Mã YC: {txCode})! Doanh thu còn lại: {user.StreamerEarningsBalance:N0} VNĐ.";
                 return RedirectToAction(nameof(Withdraw));
             }
             catch (Exception ex)
@@ -774,6 +742,81 @@ namespace DonateWeb.Controllers
                 await transaction.RollbackAsync();
                 _logger.LogError(ex, "Lỗi khi tạo yêu cầu rút tiền cho Streamer UserId {UserId}", userId);
                 TempData["ErrorMessage"] = "Đã xảy ra lỗi hệ thống khi tạo yêu cầu rút tiền. Vui lòng thử lại.";
+                return RedirectToAction(nameof(Withdraw));
+            }
+        }
+
+        /// <summary>
+        /// Chuyển một phần doanh thu streamer sang ví tiêu dùng để donate hoặc mua hàng.
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> TransferEarningsToWallet(decimal amount)
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+            {
+                return RedirectToAction("Login", "Auth");
+            }
+
+            if (amount <= 0 || amount > 500000000m)
+            {
+                TempData["ErrorMessage"] = "Nhập số tiền chuyển từ 1 đến 500.000.000 VNĐ.";
+                return RedirectToAction(nameof(Withdraw));
+            }
+
+            await using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            try
+            {
+                var user = await _context.Users
+                    .Include(u => u.StreamerProfile)
+                    .FirstOrDefaultAsync(u => u.Id == userId);
+
+                if (user?.StreamerProfile?.ApprovalStatus != StreamerApprovalStatus.Approved)
+                {
+                    await transaction.RollbackAsync();
+                    return Forbid();
+                }
+
+                if (amount > user.StreamerEarningsBalance)
+                {
+                    await transaction.RollbackAsync();
+                    TempData["ErrorMessage"] = $"Doanh thu khả dụng chỉ còn {user.StreamerEarningsBalance:N0} VNĐ.";
+                    return RedirectToAction(nameof(Withdraw));
+                }
+
+                var earningsBefore = user.StreamerEarningsBalance;
+                var spendingBefore = user.WalletBalance;
+                user.StreamerEarningsBalance -= amount;
+                user.WalletBalance += amount;
+                user.UpdatedAt = DateTime.UtcNow;
+
+                var transferCode = $"TRF_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
+                _context.WalletTransactions.Add(new WalletTransaction
+                {
+                    UserId = user.Id,
+                    TransactionCode = transferCode,
+                    TransactionType = "EARNINGS_TRANSFER",
+                    Amount = amount,
+                    BalanceBefore = spendingBefore,
+                    BalanceAfter = user.WalletBalance,
+                    PaymentMethodName = "Doanh thu streamer",
+                    Status = WalletTransaction.StatusCompleted,
+                    Note = $"Chuyển {amount:N0} VNĐ từ doanh thu streamer sang ví donate. Doanh thu: {earningsBefore:N0} → {user.StreamerEarningsBalance:N0} VNĐ.",
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+                await RefreshUserClaimsCookieAsync(user);
+
+                TempData["SuccessMessage"] = $"Đã chuyển {amount:N0} VNĐ sang ví dùng để donate.";
+                return RedirectToAction(nameof(Withdraw));
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Lỗi chuyển doanh thu sang ví tiêu dùng cho UserId {UserId}", userId);
+                TempData["ErrorMessage"] = "Không thể chuyển tiền lúc này. Vui lòng thử lại.";
                 return RedirectToAction(nameof(Withdraw));
             }
         }

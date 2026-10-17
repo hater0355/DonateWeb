@@ -8,6 +8,7 @@ using DonateWeb.Areas.Widgets.Services;
 using DonateWeb.Areas.Widgets.ViewModels;
 using DonateWeb.Hubs;
 using Microsoft.AspNetCore.SignalR;
+using System.Globalization;
 
 namespace DonateWeb.Areas.Widgets.Controllers
 {
@@ -17,15 +18,118 @@ namespace DonateWeb.Areas.Widgets.Controllers
         private readonly IWidgetService _widgetService;
         private readonly AppDbContext _context;
         private readonly IHubContext<PaymentHub> _hubContext;
+        private readonly IElevenLabsTtsService? _elevenLabsTtsService;
+        private readonly IDonationTtsAudioCache? _ttsAudioCache;
+        private readonly ILogger<WidgetsApiController> _logger;
 
         public WidgetsApiController(
             IWidgetService widgetService,
             AppDbContext context,
-            IHubContext<PaymentHub> hubContext)
+            IHubContext<PaymentHub> hubContext,
+            IElevenLabsTtsService? elevenLabsTtsService = null,
+            IDonationTtsAudioCache? ttsAudioCache = null,
+            ILogger<WidgetsApiController>? logger = null)
         {
             _widgetService = widgetService;
             _context = context;
             _hubContext = hubContext;
+            _elevenLabsTtsService = elevenLabsTtsService;
+            _ttsAudioCache = ttsAudioCache;
+            _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<WidgetsApiController>.Instance;
+        }
+
+        /// <summary>
+        /// Tạo audio cho một donate gần đây đã thanh toán thành công.
+        /// OBS chỉ gửi ID giao dịch; nội dung được lấy lại từ CSDL và kiểm duyệt phía máy chủ.
+        /// ID bằng 0 chỉ phát một câu thử cố định, không nhận văn bản tùy ý từ trình duyệt.
+        /// </summary>
+        [HttpGet("api/widgets/tts/audio/{slug}/{donationId:int}")]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        public async Task<IActionResult> GetDonationTtsAudio(
+            string slug,
+            int donationId,
+            [FromHeader(Name = "X-Widget-Token")] string? widgetToken,
+            CancellationToken cancellationToken)
+        {
+            var cleanSlug = (slug ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(cleanSlug) || donationId < 0 || string.IsNullOrWhiteSpace(widgetToken))
+                return Unauthorized();
+
+            var config = await _widgetService.GetAlertBoxConfigAsync(cleanSlug, string.Empty);
+            if (config.StreamerProfileId <= 0 || !config.IsTtsEnabled ||
+                !FixedTimeEquals(widgetToken, config.WidgetToken))
+            {
+                return Unauthorized();
+            }
+
+            if (_elevenLabsTtsService?.IsConfigured != true || _ttsAudioCache is null)
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = "ElevenLabs chưa được cấu hình." });
+            }
+
+            Response.Headers.CacheControl = "private, no-store";
+            var cacheKey = $"{config.StreamerProfileId}:{donationId}";
+            if (_ttsAudioCache.TryGet(cacheKey, out var cachedAudio))
+                return File(cachedAudio, "audio/mpeg");
+
+            string spokenText;
+            if (donationId == 0)
+            {
+                // Câu cố định để nút thử Alert cũng có thể kiểm tra ElevenLabs.
+                // Giữ câu thử nghiệm trùng với lời nhắn đang hiển thị trong AlertBox.
+                spokenText = "Khán giả thử nghiệm ủng hộ 50.000 đồng. Lời nhắn: Chào streamer! Chúc kênh của bạn luôn phát triển và có thật nhiều niềm vui nhé!";
+            }
+            else
+            {
+                // Chỉ cho phép phát giao dịch thành công gần đây để token của widget không thể dùng để đọc lại cả lịch sử.
+                var recentCutoff = DateTime.UtcNow.AddMinutes(-30);
+                var donation = await _context.Donations.AsNoTracking()
+                    .FirstOrDefaultAsync(d => d.Id == donationId &&
+                        d.StreamerProfileId == config.StreamerProfileId &&
+                        d.Status == DonationStatus.Success &&
+                        d.Amount >= config.MinAmountToAlert &&
+                        d.CreatedAt >= recentCutoff,
+                        cancellationToken);
+
+                if (donation is null)
+                    return NotFound();
+
+                var alert = await _widgetService.CreateDonationAlertAsync(donation, cleanSlug);
+                if (alert is null || !alert.IsTtsEnabled)
+                    return NotFound();
+
+                var donorName = LimitSpeechText(alert.DonorName, 100);
+                var message = LimitSpeechText(alert.Message, 220);
+                if (string.IsNullOrWhiteSpace(donorName))
+                    donorName = "Người ủng hộ ẩn danh";
+                if (string.IsNullOrWhiteSpace(message))
+                    message = "Đã gửi ủng hộ";
+
+                spokenText = $"{donorName} ủng hộ {donation.Amount.ToString("N0", CultureInfo.GetCultureInfo("vi-VN"))} đồng. Lời nhắn: {message}";
+            }
+
+            try
+            {
+                var audio = await _elevenLabsTtsService.SynthesizeAsync(spokenText, cancellationToken);
+                _ttsAudioCache.Set(cacheKey, audio);
+                return File(audio, "audio/mpeg");
+            }
+            catch (HttpRequestException exception)
+            {
+                // Không trả nội dung lỗi của ElevenLabs cho trình duyệt để tránh lộ thông tin cấu hình.
+                _logger.LogWarning(exception, "Không tạo được audio ElevenLabs cho streamer {StreamerId}.", config.StreamerProfileId);
+                return StatusCode(StatusCodes.Status502BadGateway, new { message = "Không tạo được giọng đọc ElevenLabs." });
+            }
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return StatusCode(StatusCodes.Status504GatewayTimeout, new { message = "ElevenLabs phản hồi quá lâu." });
+            }
+        }
+
+        private static string LimitSpeechText(string? value, int maxLength)
+        {
+            var cleanValue = (value ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ').Trim();
+            return cleanValue.Length <= maxLength ? cleanValue : cleanValue[..maxLength];
         }
 
         [HttpGet("api/widgets/tts/alerts/{slug}")]

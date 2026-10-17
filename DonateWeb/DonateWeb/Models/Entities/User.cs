@@ -48,6 +48,13 @@ namespace DonateWeb.Models.Entities
         public decimal WalletBalance { get; set; } = 0;
 
         /// <summary>
+        /// Doanh thu streamer còn khả dụng để rút hoặc chuyển sang ví tiêu dùng.
+        /// Tách biệt với WalletBalance, là số dư dùng để donate/mua hàng.
+        /// </summary>
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal StreamerEarningsBalance { get; set; } = 0;
+
+        /// <summary>
         /// Alias cho WalletBalance để tương thích theo yêu cầu
         /// </summary>
         [NotMapped]

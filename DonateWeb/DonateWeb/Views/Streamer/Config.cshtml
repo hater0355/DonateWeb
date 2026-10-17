@@ -205,41 +205,67 @@
                     <h6 class="fw-bold text-dark-green mb-0 text-uppercase">
                         <i class="fa-solid fa-qrcode text-success me-2"></i> Mã QR Nhận Donate
                     </h6>
-                    <span class="badge bg-light-green text-dark-green border small">Cấu hình QR</span>
+                    <span class="badge bg-light-green text-dark-green border small">Tài khoản trung tâm</span>
                 </div>
 
-                <!-- Giữ ngầm thông tin ngân hàng cũ để đảm bảo dữ liệu không bị xung đột -->
-                <input type="hidden" asp-for="BankName" />
-                <input type="hidden" asp-for="BankAccountNumber" />
-                <input type="hidden" asp-for="BankAccountName" />
-
-                <div class="mb-3">
-                    <label asp-for="PaymentQrUrl" class="form-label small fw-semibold text-dark-green">URL hình ảnh Mã QR Donate</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-light"><i class="fa-solid fa-link text-muted"></i></span>
-                        <input asp-for="PaymentQrUrl" id="paymentQrUrlInput" class="form-control form-control-custom" placeholder="Dán link ảnh mã QR (Ví dụ: https://... hoặc /images/qr.png)" oninput="updateQrPreview()" />
+                <input type="hidden" asp-for="PaymentQrUrl" />
+                <div class="alert alert-info py-2 px-3 mb-3 small">
+                    Tất cả khoản donate chuyển vào tài khoản trung tâm của DonateWeb đã kết nối với SePay. Hệ thống phân bổ doanh thu vào tài khoản streamer; bạn có thể yêu cầu rút tiền để được quyết toán.
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label asp-for="BankName" class="form-label small fw-semibold text-dark-green">Ngân hàng nhận tiền rút của bạn</label>
+                        <input asp-for="BankName" class="form-control form-control-custom" placeholder="Tài khoản nhận quyết toán" autocomplete="off" />
+                        <span asp-validation-for="BankName" class="text-danger small"></span>
                     </div>
-                    <div class="form-text small text-muted mt-1">
-                        Dán đường dẫn ảnh mã QR cá nhân của bạn tại đây để hiển thị trực tiếp cho người xem khi quét donate.
+                    <div class="col-md-4">
+                        <label asp-for="BankAccountNumber" class="form-label small fw-semibold text-dark-green">Số tài khoản nhận tiền rút</label>
+                        <input asp-for="BankAccountNumber" class="form-control form-control-custom" placeholder="6–19 chữ cái hoặc chữ số" autocomplete="off" />
+                        <span asp-validation-for="BankAccountNumber" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-4">
+                        <label asp-for="BankAccountName" class="form-label small fw-semibold text-dark-green">Tên chủ tài khoản nhận tiền rút</label>
+                        <input asp-for="BankAccountName" class="form-control form-control-custom" placeholder="Tên hiển thị trong app ngân hàng" autocomplete="off" />
+                        <span asp-validation-for="BankAccountName" class="text-danger small"></span>
                     </div>
                 </div>
 
-                <!-- Preview QR Code -->
-                <div class="p-3 bg-light rounded-3 text-center border">
-                    <div class="small fw-semibold text-dark-green mb-2">Xem trước mã QR:</div>
-                    <div id="qrPreviewWrapper" class="d-inline-block p-2 bg-white rounded border shadow-sm">
-                        <img id="qrPreviewImg"
-                             src="@(!string.IsNullOrEmpty(Model.PaymentQrUrl) ? Model.PaymentQrUrl : "")"
-                             alt="QR Preview"
-                             class="img-fluid rounded @(string.IsNullOrEmpty(Model.PaymentQrUrl) ? "d-none" : "")"
-                             style="max-height: 180px; object-fit: contain;" />
-                        <div id="qrPlaceholderBox" class="p-4 d-flex flex-column align-items-center justify-content-center @(!string.IsNullOrEmpty(Model.PaymentQrUrl) ? "d-none" : "")" style="min-width: 170px; min-height: 170px;">
-                            <div class="p-3 rounded-circle bg-light-green mb-2">
-                                <i class="fa-solid fa-qrcode text-success fs-2"></i>
-                            </div>
-                            <span class="small fw-semibold text-dark-green">Chưa cài đặt mã QR</span>
-                            <span class="text-muted small mt-1" style="font-size: 0.72rem;">(Bạn có thể thiết lập mã QR sau)</span>
+                <div class="border-top pt-3">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                        <strong class="text-dark-green"><i class="fa-solid fa-building-columns text-success me-1"></i> QR chuyển khoản vào tài khoản trung tâm</strong>
+                        <span class="badge bg-light-green text-dark-green border">Không khóa số tiền</span>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(Model.BankDonationQrBase64))
+                    {
+                        <div class="text-center p-3 bg-light rounded-3 border">
+                            <img src="@Model.BankDonationQrBase64" alt="QR donate cho @Model.DisplayName qua tài khoản trung tâm" class="img-fluid rounded bg-white p-2" style="max-width: 280px; height: auto;" />
+                            <div class="small text-muted mt-2">@Model.CentralBankName · @Model.CentralBankAccountNumber · @Model.CentralBankAccountName</div>
+                            <a href="@Model.BankDonationQrBase64" download="QR_ChuyenKhoan_@(Model.Slug).png" class="btn btn-outline-success btn-sm mt-2">
+                                <i class="fa-solid fa-download me-1"></i> Tải QR chuyển khoản PNG
+                            </a>
                         </div>
+                        <div class="alert alert-info py-2 px-3 mt-3 mb-2 small">
+                            <div><strong>Mã có sẵn trong nội dung:</strong> <code>@Model.BankDonationTransferCode</code></div>
+                            <div>Người xem quét bằng app ngân hàng, tự nhập số tiền và thêm lời nhắn sau mã này. Tiền vào tài khoản trung tâm; giữ nguyên mã để hệ thống ghi nhận đúng streamer. Tên người chuyển được ẩn danh.</div>
+                        </div>
+                    }
+                    else
+                    {
+                        @if (string.IsNullOrWhiteSpace(Model.CentralBankName) || string.IsNullOrWhiteSpace(Model.CentralBankAccountNumber) || string.IsNullOrWhiteSpace(Model.CentralBankAccountName))
+                        {
+                            <div class="alert alert-warning py-2 px-3 mb-2 small">
+                                Tài khoản trung tâm chưa được cấu hình trên máy chủ. Vui lòng liên hệ quản trị viên để hoàn tất cấu hình SePay.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning py-2 px-3 mb-2 small">
+                                Không tạo được ảnh VietQR. Quản trị viên cần kiểm tra thông tin ngân hàng trung tâm đã cấu hình rồi tải lại trang.
+                            </div>
+                        }
+                    }
+                    <div class="small text-muted">
+                        Với mọi khoản donate qua SePay, PayOS hoặc ví, nền tảng giữ 10% và cộng 90% vào doanh thu streamer. Với đơn Shop, streamer nhận 70% số tiền khách thực trả sau mã giảm giá; phí nền tảng là 30%. AlertBox/TTS vẫn hiển thị đủ số tiền donate người xem đã gửi. Gửi yêu cầu rút tiền để được quyết toán.
                     </div>
                 </div>
             </div>

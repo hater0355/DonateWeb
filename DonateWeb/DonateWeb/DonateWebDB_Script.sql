@@ -49,6 +49,7 @@ CREATE TABLE dbo.Users (
     PhoneNumber NVARCHAR(20) NULL,
     AvatarUrl NVARCHAR(500) NOT NULL DEFAULT '/images/default-avatar.png',
     WalletBalance DECIMAL(18,2) NOT NULL DEFAULT 0,
+    StreamerEarningsBalance DECIMAL(18,2) NOT NULL DEFAULT 0,
     IsActive BIT NOT NULL DEFAULT 1,
     CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
     UpdatedAt DATETIME2 NULL,
@@ -127,6 +128,10 @@ CREATE TABLE dbo.StreamerProfiles (
     ApprovalStatus INT NOT NULL DEFAULT 1,    -- Trạng thái duyệt: 0: Chờ duyệt, 1: Đã duyệt, 2: Bị từ chối
     RejectionReason NVARCHAR(500) NULL,       -- Lý do từ chối duyệt
     ApprovedAt DATETIME2 NULL,                -- Thời điểm phê duyệt
+    IdentityDataProtected NVARCHAR(MAX) NULL, -- Thông tin CCCD đã mã hóa
+    CitizenIdFrontDocumentKey NVARCHAR(80) NULL, -- Khóa ảnh mặt trước trong vùng riêng tư
+    CitizenIdBackDocumentKey NVARCHAR(80) NULL,  -- Khóa ảnh mặt sau trong vùng riêng tư
+    IdentityDataConsentAt DATETIME2 NULL,      -- Thời điểm đồng ý xử lý dữ liệu CCCD
     IsActive BIT NOT NULL DEFAULT 1,          -- Trạng thái kênh: 1: Hoạt động, 0: Khóa vi phạm
     LockReason NVARCHAR(500) NULL,            -- Lý do khóa kênh vi phạm chính sách
     LockedAt DATETIME2 NULL,                  -- Thời điểm khóa
@@ -157,6 +162,7 @@ CREATE TABLE dbo.Donations (
     PaymentMethod INT NOT NULL DEFAULT 1,     -- 1: Ví, 2: Chuyển khoản QR, 3: MoMo, 4: VNPay
     [Status] INT NOT NULL DEFAULT 0,          -- 0: Pending, 1: Success, 2: Failed, 3: Cancelled, 4: Disputed, 5: Refunded
     TransactionCode NVARCHAR(100) NULL,
+    ExternalTransactionId NVARCHAR(100) NULL,
     IsDisputed BIT NOT NULL DEFAULT 0,        -- 1: Đang có khiếu nại tranh chấp
     DisputeReason NVARCHAR(500) NULL,         -- Lý do khiếu nại của người dùng
     AdminNote NVARCHAR(1000) NULL,            -- Ghi chú kiểm tra và phân xử của Admin
@@ -167,6 +173,9 @@ CREATE TABLE dbo.Donations (
     CONSTRAINT FK_Donations_StreamerProfiles FOREIGN KEY (StreamerProfileId) REFERENCES dbo.StreamerProfiles (Id),
     CONSTRAINT FK_Donations_Users FOREIGN KEY (DonorUserId) REFERENCES dbo.Users (Id) ON DELETE SET NULL
 );
+GO
+CREATE UNIQUE NONCLUSTERED INDEX IX_Donations_ExternalTransactionId
+    ON dbo.Donations (ExternalTransactionId) WHERE ExternalTransactionId IS NOT NULL;
 GO
 
 -- 3.7. Bảng TransactionAuditLogs (Nhật ký kiểm tra và xử lý khiếu nại/lỗi giao dịch)

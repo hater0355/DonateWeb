@@ -242,6 +242,11 @@
                                 <!-- Thao tác -->
                                 <td class="text-center">
                                     <div class="d-flex justify-content-center gap-1 flex-wrap">
+                                        <a asp-area="Admin" asp-controller="Admin" asp-action="IdentityReview" asp-route-id="@s.Id"
+                                           class="btn btn-sm @(s.HasIdentityDocuments ? "btn-outline-primary" : "btn-outline-secondary")"
+                                           title="Xem thông tin và ảnh CCCD (chỉ Admin)">
+                                            <i class="fa-solid fa-id-card me-1"></i> CCCD
+                                        </a>
                                         @if (s.ApprovalStatus == DonateWeb.Models.Enums.StreamerApprovalStatus.Pending)
                                         {
                                             <!-- NÚT DUYỆT STREAMER -->

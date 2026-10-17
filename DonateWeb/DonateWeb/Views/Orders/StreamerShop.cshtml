@@ -207,7 +207,11 @@
                                         </div>
                                         <button type="button" 
                                                 class="btn btn-dark-green rounded-pill px-3 py-1 fw-semibold small shadow-sm btn-add-to-cart"
-                                                onclick="addToCart(@prod.Id, '@Html.Raw(prod.Name.Replace("'", "\\'"))', @prod.Price, '@(string.IsNullOrWhiteSpace(prod.ImageUrl) ? "/images/default-banner.jpg" : prod.ImageUrl)', @prod.StockQuantity)">
+                                                data-product-id="@prod.Id"
+                                                data-product-name="@prod.Name"
+                                                data-product-price="@prod.Price"
+                                                data-product-image="@(string.IsNullOrWhiteSpace(prod.ImageUrl) ? "/images/default-banner.jpg" : prod.ImageUrl)"
+                                                data-product-stock="@prod.StockQuantity">
                                             <i class="fa-solid fa-cart-plus me-1"></i> Thêm vào giỏ
                                         </button>
                                     </div>
@@ -458,6 +462,22 @@
         renderCart();
     }
 
+    // Mã hóa chuỗi trước khi ghép vào HTML của giỏ để dữ liệu localStorage không thể chèn markup.
+    function escapeHtml(value) {
+        const element = document.createElement("span");
+        element.textContent = String(value ?? "");
+        return element.innerHTML;
+    }
+
+    // Nút thêm sản phẩm dùng data-* đã được Razor mã hóa theo HTML attribute.
+    document.addEventListener("click", function(event) {
+        const button = event.target.closest(".btn-add-to-cart");
+        if (!button) return;
+        addToCart(Number(button.dataset.productId), button.dataset.productName,
+            Number(button.dataset.productPrice), button.dataset.productImage,
+            Number(button.dataset.productStock));
+    });
+
     // Thêm sản phẩm vào giỏ
     function addToCart(id, name, price, imageUrl, maxStock) {
         const existing = cart.find(i => i.id === id);
@@ -544,9 +564,9 @@
 
             html += `
                 <div class="cart-item-row d-flex align-items-center gap-2">
-                    <img src="${item.imageUrl}" alt="${item.name}" class="rounded-2 border" style="width: 44px; height: 44px; object-fit: cover;" onerror="this.src='/images/default-banner.jpg';" />
+                    <img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}" class="rounded-2 border" style="width: 44px; height: 44px; object-fit: cover;" onerror="this.src='/images/default-banner.jpg';" />
                     <div class="flex-grow-1" style="min-width: 0;">
-                        <div class="fw-semibold text-dark text-truncate small" title="${item.name}">${item.name}</div>
+                        <div class="fw-semibold text-dark text-truncate small" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
                         <div class="small text-success fw-bold font-monospace">${item.price.toLocaleString("vi-VN")} đ</div>
                     </div>
                     <div class="d-flex align-items-center gap-1">

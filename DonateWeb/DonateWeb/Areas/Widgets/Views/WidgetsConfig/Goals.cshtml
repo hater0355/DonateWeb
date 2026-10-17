@@ -125,14 +125,15 @@
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
                         <label asp-for="NewGoal.TargetAmount" class="form-label fw-semibold text-light"></label>
-                        <input type="number" asp-for="NewGoal.TargetAmount" id="goalTargetInput" class="form-control widget-input" step="50000" min="10000" />
+                        <input type="number" asp-for="NewGoal.TargetAmount" id="goalTargetInput" class="form-control widget-input" step="1" min="10000" max="10000000000" inputmode="numeric" />
                         <span asp-validation-for="NewGoal.TargetAmount" class="text-danger small"></span>
+                        <small class="text-muted" style="font-size: 0.72rem;">Nhập số liền, không cần dấu chấm. Ví dụ: 1000000</small>
                     </div>
                     <div class="col-md-6">
                         <label asp-for="NewGoal.StartingAmount" class="form-label fw-semibold text-light"></label>
-                        <input type="number" asp-for="NewGoal.StartingAmount" id="goalStartingInput" class="form-control widget-input" step="10000" min="0" />
+                        <input type="number" asp-for="NewGoal.StartingAmount" id="goalStartingInput" class="form-control widget-input" step="1" min="0" max="10000000000" inputmode="numeric" />
                         <span asp-validation-for="NewGoal.StartingAmount" class="text-danger small"></span>
-                        <small class="text-muted" style="font-size: 0.72rem;">Số tiền khởi điểm (sẽ tự động cộng dồn donate)</small>
+                        <small class="text-muted" style="font-size: 0.72rem;">Nhập số liền, không cần dấu chấm. Tự động cộng dồn donate.</small>
                     </div>
                 </div>
 

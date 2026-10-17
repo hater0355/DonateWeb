@@ -191,7 +191,9 @@
                                 </div>
                                 <div class="p-3 d-flex flex-column flex-grow-1">
                                     <div class="d-flex align-items-center justify-content-between mb-1">
-                                        <span class="badge bg-light-green text-dark-green small font-monospace">Kho: @prod.StockQuantity</span>
+                                        <span class="badge @(prod.StockQuantity > 0 ? "bg-light-green text-dark-green" : "bg-danger-subtle text-danger") small font-monospace">
+                                            @(prod.StockQuantity > 0 ? $"Kho: {prod.StockQuantity}" : "Hết hàng")
+                                        </span>
                                         <span class="small text-muted" style="font-size: 0.75rem;">Mã SP: #@prod.Id</span>
                                     </div>
                                     <h6 class="fw-bold text-dark mb-1 text-truncate-2" style="min-height: 40px; line-height: 1.35;" title="@prod.Name">
@@ -207,7 +209,12 @@
                                         </div>
                                         <button type="button" 
                                                 class="btn btn-dark-green rounded-pill px-3 py-1 fw-semibold small shadow-sm btn-add-to-cart"
-                                                onclick="addToCart(@prod.Id, '@Html.Raw(prod.Name.Replace("'", "\\'"))', @prod.Price, '@(string.IsNullOrWhiteSpace(prod.ImageUrl) ? "/images/default-banner.jpg" : prod.ImageUrl)', @prod.StockQuantity)">
+                                                disabled="@(prod.StockQuantity <= 0)"
+                                                data-product-id="@prod.Id"
+                                                data-product-name="@prod.Name"
+                                                data-product-price="@prod.Price"
+                                                data-product-image="@(string.IsNullOrWhiteSpace(prod.ImageUrl) ? "/images/default-banner.jpg" : prod.ImageUrl)"
+                                                data-product-stock="@prod.StockQuantity">
                                             <i class="fa-solid fa-cart-plus me-1"></i> Thêm vào giỏ
                                         </button>
                                     </div>
@@ -257,11 +264,27 @@
                         <span class="text-muted small">Phí vận chuyển:</span>
                         <span class="fw-semibold text-success small">Miễn phí (Toàn quốc)</span>
                     </div>
+                    <div id="discountRow" class="d-flex align-items-center justify-content-between mb-1 d-none">
+                        <span class="text-success small">Mã giảm giá:</span>
+                        <span class="fw-semibold text-success font-monospace" id="discountDisplay">-0 đ</span>
+                    </div>
                     <hr class="my-2 border-secondary opacity-25">
                     <div class="d-flex align-items-center justify-content-between">
                         <span class="fw-bold text-dark">Tổng thanh toán:</span>
                         <span class="fw-bold text-dark-green fs-5 font-monospace" id="totalDisplay">0 đ</span>
                     </div>
+                </div>
+
+                <!-- Áp dụng mã giảm giá -->
+                <div class="mb-3">
+                    <label for="couponCodeInput" class="form-label fw-bold text-dark mb-2 small text-uppercase">
+                        <i class="fa-solid fa-ticket text-warning me-1"></i> Mã giảm giá
+                    </label>
+                    <div class="input-group">
+                        <input type="text" id="couponCodeInput" class="form-control text-uppercase" maxlength="50" placeholder="Nhập mã giảm giá" autocomplete="off" />
+                        <button type="button" id="btnApplyCoupon" class="btn btn-outline-success" onclick="applyCoupon()">Áp dụng</button>
+                    </div>
+                    <div id="couponFeedback" class="small mt-1 text-muted" aria-live="polite">Mã được kiểm tra với đơn hàng trước khi thanh toán.</div>
                 </div>
 
                 <!-- FORM ĐIỀN THÔNG TIN ĐẶT HÀNG -->
@@ -312,20 +335,20 @@
                         </label>
                     </div>
 
-                    <!-- 2. Thanh toán quét mã QR VietQR -->
+                    <!-- 2. Thanh toán bằng mã QR do PayOS tạo -->
                     <div>
-                        <input type="radio" name="paymentMethod" value="VietQR" id="payVietQR" class="d-none payment-radio" />
+                        <input type="radio" name="paymentMethod" value="PayOS" id="payVietQR" class="d-none payment-radio" />
                         <label for="payVietQR" class="payment-option-label">
                             <div class="rounded-circle p-2 bg-primary text-white d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
                                 <i class="fa-solid fa-qrcode fa-sm"></i>
                             </div>
                             <div class="flex-grow-1">
                                 <div class="d-flex align-items-center justify-content-between">
-                                    <span class="text-dark small fw-bold">Quét mã VietQR Napas247</span>
-                                    <span class="badge bg-primary text-white small">Tức thì</span>
+                                    <span class="text-dark small fw-bold">Quét mã QR PayOS</span>
+                                    <span class="badge bg-primary text-white small">Tự xác nhận</span>
                                 </div>
                                 <div class="small text-muted" style="font-size: 0.75rem;">
-                                    Tự động tạo mã QR chính xác số tiền & nội dung đơn
+                                    PayOS tạo mã theo đúng số tiền đơn hàng; hệ thống tự cập nhật khi nhận thanh toán
                                 </div>
                             </div>
                         </label>
@@ -337,14 +360,14 @@
                 {
                     <div id="insufficientBalanceAlert" class="alert alert-warning py-2 px-3 small rounded-3 d-none mb-3">
                         <i class="fa-solid fa-circle-exclamation me-1"></i>
-                        Số dư ví của bạn không đủ. Hãy <a href="/Wallet/Deposit" target="_blank" class="fw-bold text-dark text-decoration-underline">Nạp thêm ví</a> hoặc chọn phương thức <strong>Quét mã VietQR</strong>.
+                        Số dư ví của bạn không đủ. Hãy <a href="/Wallet/Deposit" target="_blank" class="fw-bold text-dark text-decoration-underline">Nạp thêm ví</a> hoặc chọn phương thức <strong>Quét mã QR PayOS</strong>.
                     </div>
                 }
                 else
                 {
                     <div id="unauthenticatedWalletAlert" class="alert alert-info py-2 px-3 small rounded-3 mb-3">
                         <i class="fa-solid fa-info-circle me-1"></i>
-                        Thanh toán bằng ví yêu cầu <a href="/Auth/Login" class="fw-bold text-dark text-decoration-underline">Đăng nhập</a>. Hoặc bạn có thể chọn ngay <strong>Quét mã VietQR</strong> không cần đăng nhập!
+                        Thanh toán bằng ví yêu cầu <a href="/Auth/Login" class="fw-bold text-dark text-decoration-underline">Đăng nhập</a>. Hoặc bạn có thể chọn ngay <strong>Quét mã QR PayOS</strong> không cần đăng nhập!
                     </div>
                 }
 
@@ -368,7 +391,7 @@
             <div class="modal-header bg-dark-green text-white py-3 border-0">
                 <h5 class="modal-title fw-bold fs-6 d-flex align-items-center gap-2" id="vietQrModalLabel">
                     <i class="fa-solid fa-qrcode text-warning"></i>
-                    Quét Mã VietQR Để Hoàn Tất Đơn Hàng
+                    Quét Mã QR PayOS Để Thanh Toán Đơn Hàng
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -377,18 +400,18 @@
                     ĐƠN HÀNG #ORD...
                 </div>
                 <p class="text-muted small mb-3">
-                    Mở ứng dụng Ngân hàng (MB, Vietcombank, Techcombank, TPBank...) hoặc ví điện tử bất kỳ và quét mã QR dưới đây:
+                    Dùng ứng dụng ngân hàng quét mã QR bên dưới hoặc mở trang thanh toán PayOS. Đơn hàng sẽ tự cập nhật sau khi thanh toán thành công.
                 </p>
 
                 <!-- Khung chứa ảnh QR -->
                 <div class="p-3 bg-light rounded-4 d-inline-block border shadow-sm mb-3">
-                    <img id="qrImageElement" src="" alt="Mã VietQR" class="img-fluid rounded-3" style="max-width: 250px; height: auto;" />
+                    <img id="qrImageElement" src="" alt="Mã QR PayOS" class="img-fluid rounded-3" style="max-width: 250px; height: auto;" />
                 </div>
 
                 <!-- Bảng chi tiết chuyển khoản -->
                 <div class="bg-light p-3 rounded-3 text-start small mb-3 border">
                     <div class="d-flex justify-content-between mb-1">
-                        <span class="text-muted">Ngân hàng thụ hưởng:</span>
+                        <span class="text-muted">Mã ngân hàng (BIN):</span>
                         <strong class="text-dark" id="qrBankName">MB Bank</strong>
                     </div>
                     <div class="d-flex justify-content-between align-items-center mb-1">
@@ -419,9 +442,17 @@
                     </div>
                 </div>
 
+                <div id="qrPaymentStatus" class="alert alert-info small py-2 mb-3" role="status">
+                    Đang chờ PayOS xác nhận thanh toán...
+                </div>
+
+                <a id="btnPayOsCheckout" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary w-100 mb-3">
+                    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Mở trang thanh toán PayOS
+                </a>
+
                 <div class="d-flex gap-2">
                     <a id="btnViewDetailOrder" href="#" class="btn btn-dark-green w-100 py-2 rounded-3 fw-bold">
-                        <i class="fa-solid fa-circle-check me-1"></i> Tôi đã quét mã chuyển tiền
+                        <i class="fa-solid fa-receipt me-1"></i> Xem chi tiết đơn hàng
                     </a>
                 </div>
             </div>
@@ -436,6 +467,17 @@
     const isAuthenticated = @(Model.IsViewerAuthenticated ? "true" : "false");
 
     let cart = [];
+    let paymentStatusTimer = null;
+    let paymentStatusRequestInFlight = false;
+    let paymentStatusPollCount = 0;
+    let appliedCouponCode = "";
+    let couponPreviewDiscount = 0;
+    let couponPreviewSubtotal = null;
+    let couponPreviewCartKey = "";
+
+    function getCartKey() {
+        return JSON.stringify(cart.map(item => ({ id: item.id, quantity: item.quantity })));
+    }
 
     // Tải giỏ hàng từ localStorage cho riêng Streamer này
     function loadCart() {
@@ -455,11 +497,39 @@
     // Lưu giỏ hàng vào localStorage của riêng Streamer này
     function saveCart() {
         localStorage.setItem(cartStorageKey, JSON.stringify(cart));
+        if (appliedCouponCode) {
+            appliedCouponCode = "";
+            couponPreviewDiscount = 0;
+            couponPreviewSubtotal = null;
+            couponPreviewCartKey = "";
+            document.getElementById("couponFeedback").className = "small mt-1 text-muted";
+            document.getElementById("couponFeedback").innerText = "Giỏ hàng đã thay đổi. Áp dụng lại mã để xem mức giảm mới.";
+        }
         renderCart();
     }
 
+    // Mã hóa chuỗi trước khi ghép vào HTML của giỏ để dữ liệu localStorage không thể chèn markup.
+    function escapeHtml(value) {
+        const element = document.createElement("span");
+        element.textContent = String(value ?? "");
+        return element.innerHTML;
+    }
+
+    // Nút thêm sản phẩm dùng data-* đã được Razor mã hóa theo HTML attribute.
+    document.addEventListener("click", function(event) {
+        const button = event.target.closest(".btn-add-to-cart");
+        if (!button) return;
+        addToCart(Number(button.dataset.productId), button.dataset.productName,
+            Number(button.dataset.productPrice), button.dataset.productImage,
+            Number(button.dataset.productStock));
+    });
+
     // Thêm sản phẩm vào giỏ
     function addToCart(id, name, price, imageUrl, maxStock) {
+        if (maxStock <= 0) {
+            alert("Sản phẩm này hiện đã hết hàng.");
+            return;
+        }
         const existing = cart.find(i => i.id === id);
         if (existing) {
             if (existing.quantity < maxStock) {
@@ -519,6 +589,8 @@
         const totalEl = document.getElementById("totalDisplay");
         const btnCheckoutText = document.getElementById("btnCheckoutText");
         const insufficientAlert = document.getElementById("insufficientBalanceAlert");
+        const discountRow = document.getElementById("discountRow");
+        const discountEl = document.getElementById("discountDisplay");
 
         if (!cart || cart.length === 0) {
             container.innerHTML = `
@@ -531,6 +603,8 @@
             subtotalEl.innerText = "0 đ";
             totalEl.innerText = "0 đ";
             btnCheckoutText.innerText = "Tiến hành đặt hàng (0 đ)";
+            discountRow.classList.add("d-none");
+            discountEl.innerText = "-0 đ";
             if (insufficientAlert) insufficientAlert.classList.add("d-none");
             return;
         }
@@ -544,9 +618,9 @@
 
             html += `
                 <div class="cart-item-row d-flex align-items-center gap-2">
-                    <img src="${item.imageUrl}" alt="${item.name}" class="rounded-2 border" style="width: 44px; height: 44px; object-fit: cover;" onerror="this.src='/images/default-banner.jpg';" />
+                    <img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}" class="rounded-2 border" style="width: 44px; height: 44px; object-fit: cover;" onerror="this.src='/images/default-banner.jpg';" />
                     <div class="flex-grow-1" style="min-width: 0;">
-                        <div class="fw-semibold text-dark text-truncate small" title="${item.name}">${item.name}</div>
+                        <div class="fw-semibold text-dark text-truncate small" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
                         <div class="small text-success fw-bold font-monospace">${item.price.toLocaleString("vi-VN")} đ</div>
                     </div>
                     <div class="d-flex align-items-center gap-1">
@@ -562,15 +636,21 @@
         });
 
         container.innerHTML = html;
-        const formattedTotal = total.toLocaleString("vi-VN") + " đ";
-        subtotalEl.innerText = formattedTotal;
-        totalEl.innerText = formattedTotal;
-        btnCheckoutText.innerText = `Tiến hành đặt hàng (${formattedTotal})`;
+        const previewIsCurrent = appliedCouponCode && couponPreviewSubtotal !== null
+            && couponPreviewCartKey === getCartKey();
+        const discount = previewIsCurrent ? couponPreviewDiscount : 0;
+        const displayedSubtotal = previewIsCurrent ? couponPreviewSubtotal : total;
+        const payableTotal = Math.max(0, displayedSubtotal - discount);
+        subtotalEl.innerText = displayedSubtotal.toLocaleString("vi-VN") + " đ";
+        totalEl.innerText = payableTotal.toLocaleString("vi-VN") + " đ";
+        discountEl.innerText = "-" + discount.toLocaleString("vi-VN") + " đ";
+        discountRow.classList.toggle("d-none", !previewIsCurrent);
+        btnCheckoutText.innerText = `Tiến hành đặt hàng (${payableTotal.toLocaleString("vi-VN")} đ)`;
 
         // Kiểm tra số dư ví
         const isWalletSelected = document.getElementById("payWallet") && document.getElementById("payWallet").checked;
         if (insufficientAlert) {
-            if (isWalletSelected && isAuthenticated && userWalletBalance < total) {
+            if (isWalletSelected && isAuthenticated && userWalletBalance < payableTotal) {
                 insufficientAlert.classList.remove("d-none");
             } else {
                 insufficientAlert.classList.add("d-none");
@@ -584,6 +664,72 @@
             renderCart();
         });
     });
+
+    document.getElementById("couponCodeInput").addEventListener("input", function() {
+        appliedCouponCode = "";
+        couponPreviewDiscount = 0;
+        couponPreviewSubtotal = null;
+        couponPreviewCartKey = "";
+        document.getElementById("couponFeedback").className = "small mt-1 text-muted";
+        document.getElementById("couponFeedback").innerText = "Nhấn Áp dụng để kiểm tra mã.";
+        renderCart();
+    });
+
+    async function applyCoupon() {
+        if (!cart || cart.length === 0) {
+            alert("Hãy thêm sản phẩm vào giỏ trước khi áp dụng mã.");
+            return;
+        }
+
+        const couponCode = document.getElementById("couponCodeInput").value.trim();
+        if (!couponCode) {
+            alert("Vui lòng nhập mã giảm giá.");
+            return;
+        }
+
+        const button = document.getElementById("btnApplyCoupon");
+        const feedback = document.getElementById("couponFeedback");
+        button.disabled = true;
+        feedback.className = "small mt-1 text-muted";
+        feedback.innerText = "Đang kiểm tra mã...";
+
+        try {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || "";
+            const response = await fetch("/Shop/PreviewCoupon", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "RequestVerificationToken": token },
+                body: JSON.stringify({
+                    streamerProfileId: streamerId,
+                    items: cart.map(item => ({ productId: item.id, quantity: item.quantity })),
+                    couponCode
+                })
+            });
+            const result = await response.json();
+            if (!result.success) {
+                appliedCouponCode = "";
+                couponPreviewDiscount = 0;
+                couponPreviewSubtotal = null;
+                couponPreviewCartKey = "";
+                feedback.className = "small mt-1 text-danger";
+                feedback.innerText = result.message || "Mã giảm giá không sử dụng được.";
+                renderCart();
+                return;
+            }
+
+            appliedCouponCode = result.couponCode;
+            couponPreviewDiscount = Number(result.discountAmount);
+            couponPreviewSubtotal = Number(result.subtotalAmount);
+            couponPreviewCartKey = getCartKey();
+            feedback.className = "small mt-1 text-success";
+            feedback.innerText = result.message;
+            renderCart();
+        } catch (error) {
+            feedback.className = "small mt-1 text-danger";
+            feedback.innerText = "Không kiểm tra được mã. Vui lòng thử lại.";
+        } finally {
+            button.disabled = false;
+        }
+    }
 
     // Xử lý gửi đơn hàng qua API
     async function processCheckout() {
@@ -616,16 +762,22 @@
             return;
         }
 
-        let total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const couponCode = document.getElementById("couponCodeInput").value.trim();
+        const previewIsCurrent = appliedCouponCode && couponPreviewSubtotal !== null
+            && couponPreviewCartKey === getCartKey();
+        const estimatedTotal = previewIsCurrent
+            ? Math.max(0, couponPreviewSubtotal - couponPreviewDiscount)
+            : subtotal;
 
         if (paymentMethod === "Wallet") {
             if (!isAuthenticated) {
-                alert("Vui lòng Đăng nhập tài khoản để thanh toán bằng số dư Ví, hoặc chọn phương thức 'Quét mã VietQR'.");
+                alert("Vui lòng đăng nhập để thanh toán bằng số dư Ví, hoặc chọn phương thức quét mã QR PayOS.");
                 window.location.href = "/Auth/Login?returnUrl=" + encodeURIComponent(window.location.pathname + window.location.search);
                 return;
             }
-            if (userWalletBalance < total) {
-                alert(`Số dư ví của bạn (${userWalletBalance.toLocaleString('vi-VN')} VNĐ) không đủ để thanh toán đơn hàng ${total.toLocaleString('vi-VN')} VNĐ. Vui lòng nạp thêm tiền hoặc chọn thanh toán quét mã QR!`);
+            if (userWalletBalance < estimatedTotal && !couponCode) {
+                alert(`Số dư ví của bạn (${userWalletBalance.toLocaleString('vi-VN')} VNĐ) không đủ để thanh toán đơn hàng ${estimatedTotal.toLocaleString('vi-VN')} VNĐ. Vui lòng nạp thêm tiền hoặc chọn thanh toán quét mã QR!`);
                 return;
             }
         }
@@ -644,6 +796,7 @@
             buyerPhone: buyerPhone,
             buyerAddress: buyerAddress,
             note: orderNote,
+            couponCode: couponCode,
             paymentMethod: paymentMethod
         };
 
@@ -666,25 +819,26 @@
                 return;
             }
 
-            // Xóa sạch giỏ hàng sau khi đặt thành công
-            cart = [];
-            localStorage.removeItem(cartStorageKey);
-            renderCart();
-
             if (res.isPaid) {
                 // Đã thanh toán thành công bằng Ví
+                clearCartAfterPayment();
                 alert(res.message || "Thanh toán bằng số dư ví thành công!");
                 window.location.href = `/Shop/Detail?orderCode=${encodeURIComponent(res.orderCode)}`;
             } else {
-                // Phương thức VietQR -> Hiển thị Popup QR
+                // PayOS trả QR payload; máy chủ đã tạo ảnh QR từ payload đó.
                 document.getElementById("qrModalOrderCode").innerText = `ĐƠN HÀNG #${res.orderCode}`;
                 document.getElementById("qrImageElement").src = res.qrBase64;
-                document.getElementById("qrBankName").innerText = res.bankName;
-                document.getElementById("qrBankAccountNo").innerText = res.bankAccountNumber;
-                document.getElementById("qrBankAccountName").innerText = res.bankAccountName;
+                document.getElementById("qrBankName").innerText = res.bankName || "PayOS";
+                document.getElementById("qrBankAccountNo").innerText = res.bankAccountNumber || "Thông tin trong trang PayOS";
+                document.getElementById("qrBankAccountName").innerText = res.bankAccountName || "PayOS";
                 document.getElementById("qrAmountDisplay").innerText = res.formattedAmount;
-                document.getElementById("qrContentDisplay").innerText = res.transferContent;
+                document.getElementById("qrContentDisplay").innerText = res.transferContent || "PayOS";
                 document.getElementById("btnViewDetailOrder").href = `/Shop/Detail?orderCode=${encodeURIComponent(res.orderCode)}`;
+                document.getElementById("btnPayOsCheckout").href = res.checkoutUrl || "#";
+                document.getElementById("qrPaymentStatus").className = "alert alert-info small py-2 mb-3";
+                document.getElementById("qrPaymentStatus").innerText = "Đang chờ PayOS xác nhận thanh toán...";
+                paymentStatusPollCount = 0;
+                startPaymentStatusPolling(res.orderCode);
 
                 const qrModal = new bootstrap.Modal(document.getElementById("vietQrModal"));
                 qrModal.show();
@@ -697,6 +851,60 @@
             btn.disabled = false;
             btn.innerHTML = originalBtnContent;
         }
+    }
+
+    function clearCartAfterPayment() {
+        cart = [];
+        localStorage.removeItem(cartStorageKey);
+        renderCart();
+    }
+
+    function startPaymentStatusPolling(orderCode) {
+        if (paymentStatusTimer) clearInterval(paymentStatusTimer);
+        const statusElement = document.getElementById("qrPaymentStatus");
+
+        const checkStatus = async () => {
+            if (paymentStatusRequestInFlight) return;
+            paymentStatusRequestInFlight = true;
+            paymentStatusPollCount++;
+            try {
+                const response = await fetch(`/Shop/CheckPaymentStatus?orderCode=${encodeURIComponent(orderCode)}`, {
+                    cache: "no-store",
+                    headers: { "Accept": "application/json" }
+                });
+                if (!response.ok) return;
+                const result = await response.json();
+                if (result.isPaid) {
+                    if (paymentStatusTimer) clearInterval(paymentStatusTimer);
+                    paymentStatusTimer = null;
+                    clearCartAfterPayment();
+                    statusElement.className = "alert alert-success small py-2 mb-3";
+                    statusElement.innerText = "PayOS đã xác nhận thanh toán. Đơn hàng của bạn đã được ghi nhận.";
+                    return;
+                }
+                if (result.status === "Cancelled") {
+                    if (paymentStatusTimer) clearInterval(paymentStatusTimer);
+                    paymentStatusTimer = null;
+                    statusElement.className = "alert alert-warning small py-2 mb-3";
+                    statusElement.innerText = "Đơn hàng không tạo được thanh toán. Vui lòng quay lại gian hàng để thử lại.";
+                }
+            } catch (error) {
+                console.warn("Không kiểm tra được trạng thái thanh toán PayOS:", error);
+            } finally {
+                paymentStatusRequestInFlight = false;
+                // Dừng polling sau 10 phút; người mua vẫn có thể mở chi tiết đơn để kiểm tra lại.
+                if (paymentStatusPollCount >= 200 && paymentStatusTimer) {
+                    clearInterval(paymentStatusTimer);
+                    paymentStatusTimer = null;
+                    if (statusElement.classList.contains("alert-info")) {
+                        statusElement.innerText = "Chưa nhận được xác nhận. Hãy mở chi tiết đơn để kiểm tra trạng thái.";
+                    }
+                }
+            }
+        };
+
+        paymentStatusTimer = setInterval(checkStatus, 3000);
+        checkStatus();
     }
 
     function copyToClipboard(elementId) {

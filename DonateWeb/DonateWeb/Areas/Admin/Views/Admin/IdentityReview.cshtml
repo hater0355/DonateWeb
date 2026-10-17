@@ -1,0 +1,69 @@
+@model DonateWeb.Areas.Admin.ViewModels.AdminStreamerIdentityReviewViewModel
+@{
+    ViewData["Title"] = "Xét duyệt CCCD";
+}
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold text-dark-green mb-1">Hồ sơ xác minh CCCD</h4>
+            <div class="text-muted">@Model.DisplayName · @Model.OwnerFullName · @Model.OwnerEmail</div>
+        </div>
+        <a asp-area="Admin" asp-controller="Admin" asp-action="Streamers" class="btn btn-outline-secondary">Quay lại</a>
+    </div>
+
+    @if (Model.Identity == null)
+    {
+        <div class="alert alert-warning">Hồ sơ chưa có thông tin CCCD mới hoặc dữ liệu không thể giải mã. Không duyệt hồ sơ này cho đến khi streamer gửi lại thông tin.</div>
+    }
+    else
+    {
+        <div class="card border-0 shadow-sm rounded-4 mb-4">
+            <div class="card-header bg-white fw-bold">Thông tin người đăng ký cung cấp</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Họ và tên</dt><dd class="col-sm-8">@Model.Identity.FullName</dd>
+                    <dt class="col-sm-4">Số CCCD</dt><dd class="col-sm-8 font-monospace">@Model.Identity.CitizenId</dd>
+                    <dt class="col-sm-4">Ngày sinh</dt><dd class="col-sm-8">@Model.Identity.DateOfBirth</dd>
+                    <dt class="col-sm-4">Giới tính</dt><dd class="col-sm-8">@Model.Identity.Gender</dd>
+                    <dt class="col-sm-4">Quốc tịch</dt><dd class="col-sm-8">@Model.Identity.Nationality</dd>
+                    <dt class="col-sm-4">Quê quán</dt><dd class="col-sm-8">@Model.Identity.PlaceOfOrigin</dd>
+                    <dt class="col-sm-4">Nơi sinh</dt><dd class="col-sm-8">@Model.Identity.PlaceOfBirth</dd>
+                    <dt class="col-sm-4">Nơi thường trú</dt><dd class="col-sm-8">@Model.Identity.PermanentAddress</dd>
+                    <dt class="col-sm-4">Địa chỉ hiện tại</dt><dd class="col-sm-8">@(Model.Identity.CurrentAddress ?? "Chưa cung cấp")</dd>
+                    <dt class="col-sm-4">Ngày cấp</dt><dd class="col-sm-8">@Model.Identity.IdentityIssuedDate</dd>
+                    <dt class="col-sm-4">Nơi cấp</dt><dd class="col-sm-8">@Model.Identity.IdentityIssuedBy</dd>
+                    <dt class="col-sm-4">Đồng ý xử lý dữ liệu</dt>
+                    <dd class="col-sm-8">@(Model.ConsentAtUtc?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "Chưa ghi nhận")</dd>
+                </dl>
+            </div>
+        </div>
+    }
+
+    <div class="row g-4">
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-header bg-white fw-bold">Mặt trước</div>
+                <div class="card-body text-center">
+                    @if (Model.HasFrontImage)
+                    {
+                        <img src="@Url.Action("IdentityDocument", "Admin", new { area = "Admin", id = Model.StreamerId, side = "front" })" class="img-fluid rounded border" alt="Mặt trước CCCD" />
+                    }
+                    else { <div class="text-muted py-5">Chưa có ảnh mặt trước.</div> }
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-header bg-white fw-bold">Mặt sau</div>
+                <div class="card-body text-center">
+                    @if (Model.HasBackImage)
+                    {
+                        <img src="@Url.Action("IdentityDocument", "Admin", new { area = "Admin", id = Model.StreamerId, side = "back" })" class="img-fluid rounded border" alt="Mặt sau CCCD" />
+                    }
+                    else { <div class="text-muted py-5">Chưa có ảnh mặt sau.</div> }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

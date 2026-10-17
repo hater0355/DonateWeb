@@ -22,14 +22,16 @@ namespace DonateWeb.Security.RateLimiting
     {
         private readonly int? _customMaxRequests;
         private readonly int? _customWindowSeconds;
+        private readonly string _actionKey;
 
         /// <summary>
         /// Khởi tạo filter với giới hạn tùy chọn, hoặc để trống để sử dụng giá trị từ appsettings.json
         /// </summary>
-        public DonateRateLimitAttribute(int maxRequests = 0, int windowSeconds = 0)
+        public DonateRateLimitAttribute(int maxRequests = 0, int windowSeconds = 0, string actionKey = "donate_create")
         {
             if (maxRequests > 0) _customMaxRequests = maxRequests;
             if (windowSeconds > 0) _customWindowSeconds = windowSeconds;
+            _actionKey = string.IsNullOrWhiteSpace(actionKey) ? "donate_create" : actionKey;
         }
 
         public override async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
@@ -50,7 +52,7 @@ namespace DonateWeb.Security.RateLimiting
             // Kiểm tra giới hạn tần suất
             var isAllowed = rateLimiter.CheckLimit(
                 clientIp,
-                actionKey: "donate_create",
+                actionKey: _actionKey,
                 maxRequests,
                 window,
                 out var remainingRequests,
@@ -70,7 +72,14 @@ namespace DonateWeb.Security.RateLimiting
                     || httpContext.Request.Headers.Accept.ToString().Contains("application/json")
                     || httpContext.Request.Path.StartsWithSegments("/api");
 
-                var warningMessage = $"⚠️ CẢNH BÁO CHỐNG SPAM BOT: Địa chỉ IP ({clientIp}) đã gửi quá nhiều yêu cầu Donate trong 1 phút (tối đa {maxRequests} lần). Vui lòng đợi {retrySeconds} giây trước khi gửi tiếp.";
+                var actionLabel = _actionKey switch
+                {
+                    "login" => "đăng nhập",
+                    "wallet_deposit_create" => "tạo đơn nạp ví",
+                    "bank_donation_create" => "tạo đơn donate",
+                    _ => "gửi yêu cầu"
+                };
+                var warningMessage = $"Địa chỉ IP ({clientIp}) đã gửi quá nhiều yêu cầu {actionLabel} trong 1 phút (tối đa {maxRequests} lần). Vui lòng đợi {retrySeconds} giây rồi thử lại.";
 
                 if (isApiOrAjax)
                 {
@@ -92,12 +101,20 @@ namespace DonateWeb.Security.RateLimiting
                 {
                     controller.ModelState.AddModelError(string.Empty, warningMessage);
 
-                    // Tìm model trong arguments để nạp lại vào View
+                    // Trả lại view cùng model cho mọi form MVC (đăng nhập, donate, cấu hình...).
                     var model = context.ActionArguments.Values.OfType<StreamerDonateViewModel>().FirstOrDefault();
                     if (model != null)
                     {
                         model.ErrorMessage = warningMessage;
                         context.Result = controller.View(model);
+                        return;
+                    }
+
+                    var actionModel = context.ActionArguments.Values.FirstOrDefault(value => value != null);
+                    if (actionModel != null)
+                    {
+                        controller.ModelState.AddModelError(string.Empty, warningMessage);
+                        context.Result = controller.View(actionModel);
                         return;
                     }
 

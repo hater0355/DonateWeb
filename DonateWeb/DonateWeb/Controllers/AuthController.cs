@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using DonateWeb.Models.Enums;
+using DonateWeb.Security.RateLimiting;
 using DonateWeb.Services;
 using DonateWeb.ViewModels.Auth;
 
@@ -41,6 +42,7 @@ namespace DonateWeb.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [DonateRateLimit(5, 60, "login")]
         public async Task<IActionResult> Login(LoginViewModel model)
         {
             if (!ModelState.IsValid)
@@ -139,34 +141,46 @@ namespace DonateWeb.Controllers
             return RedirectToAction("Index", "Home");
         }
 
-        // ==================== OAuth2 External Login (Google, Facebook, YouTube) ====================
+        // ==================== Đăng nhập OAuth bên thứ ba ====================
 
         [HttpGet]
         public IActionResult ExternalLogin(string provider, string? returnUrl = null)
         {
-            if (string.IsNullOrWhiteSpace(provider))
+            if (User.Identity?.IsAuthenticated == true)
             {
-                TempData["ErrorMessage"] = "Nhà cung cấp xác thực không hợp lệ.";
+                return RedirectToLocal(returnUrl);
+            }
+
+            var providerName = provider?.Trim().ToLowerInvariant() switch
+            {
+                "google" => "Google",
+                "facebook" => "Facebook",
+                _ => null
+            };
+
+            if (providerName == null)
+            {
+                TempData["ErrorMessage"] = "DonateWeb hiện hỗ trợ đăng nhập bằng Google và Facebook.";
                 return RedirectToAction(nameof(Login), new { returnUrl });
             }
 
-            // Kiểm tra cấu hình ClientId/AppId trong appsettings.json trước khi Challenge
-            bool isConfigured = provider switch
+            var (clientId, clientSecret, requiredSettings) = providerName switch
             {
-                "Google" => IsValidConfig(_configuration["Authentication:Google:ClientId"]) &&
-                            IsValidConfig(_configuration["Authentication:Google:ClientSecret"]),
-                "Facebook" => IsValidConfig(_configuration["Authentication:Facebook:AppId"]) &&
-                              IsValidConfig(_configuration["Authentication:Facebook:AppSecret"]),
-                "YouTube" => (IsValidConfig(_configuration["Authentication:YouTube:ClientId"]) &&
-                              IsValidConfig(_configuration["Authentication:YouTube:ClientSecret"])) ||
-                             (IsValidConfig(_configuration["Authentication:Google:ClientId"]) &&
-                              IsValidConfig(_configuration["Authentication:Google:ClientSecret"])),
-                _ => false
+                "Google" => (
+                    _configuration["Authentication:Google:ClientId"],
+                    _configuration["Authentication:Google:ClientSecret"],
+                    "GOOGLE_CLIENT_ID và GOOGLE_CLIENT_SECRET"),
+                _ => (
+                    _configuration["Authentication:Facebook:AppId"],
+                    _configuration["Authentication:Facebook:AppSecret"],
+                    "FACEBOOK_APP_ID và FACEBOOK_APP_SECRET")
             };
+
+            var isConfigured = IsValidConfig(clientId) && IsValidConfig(clientSecret);
 
             if (!isConfigured)
             {
-                TempData["ErrorMessage"] = $"Chức năng đăng nhập bằng {provider} cần được điền ClientId/AppId và ClientSecret/AppSecret thực tế trong file appsettings.json (Mục Authentication:{provider}).";
+                TempData["ErrorMessage"] = $"Đăng nhập {providerName} chưa được cấu hình. Cần đặt {requiredSettings} trong file .env của VPS.";
                 return RedirectToAction(nameof(Login), new { returnUrl });
             }
 
@@ -176,12 +190,12 @@ namespace DonateWeb.Controllers
                 RedirectUri = redirectUrl,
                 Items =
                 {
-                    { "LoginProvider", provider },
+                    { "LoginProvider", providerName },
                     { "returnUrl", returnUrl ?? string.Empty }
                 }
             };
 
-            return Challenge(properties, provider);
+            return Challenge(properties, providerName);
         }
 
         [HttpGet]
@@ -194,13 +208,8 @@ namespace DonateWeb.Controllers
                 return RedirectToAction(nameof(Login), new { returnUrl });
             }
 
-            // Đọc thông tin xác thực tạm thời từ ExternalCookie (hoặc fallback sang Cookie chính)
+            // Chỉ chấp nhận danh tính do nhà cung cấp vừa xác thực trong cookie OAuth tạm thời.
             var authenticateResult = await HttpContext.AuthenticateAsync("ExternalCookie");
-            if (!authenticateResult.Succeeded || authenticateResult.Principal == null)
-            {
-                authenticateResult = await HttpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            }
-
             if (!authenticateResult.Succeeded || authenticateResult.Principal == null)
             {
                 TempData["ErrorMessage"] = "Không thể lấy thông tin đăng nhập từ bên thứ 3. Vui lòng thử lại.";
@@ -213,17 +222,44 @@ namespace DonateWeb.Controllers
                 : (externalClaims.Identity?.AuthenticationType ?? "External");
 
             var providerKey = externalClaims.FindFirstValue(ClaimTypes.NameIdentifier)
-                              ?? externalClaims.FindFirstValue("sub")
-                              ?? Guid.NewGuid().ToString();
+                              ?? externalClaims.FindFirstValue("sub");
 
             var email = externalClaims.FindFirstValue(ClaimTypes.Email);
+            // Google OAuth v2 trả verified_email; OIDC có thể trả email_verified.
+            var emailVerifiedClaim = externalClaims.FindFirstValue("urn:google:email_verified_oidc")
+                                    ?? externalClaims.FindFirstValue("urn:google:email_verified")
+                                    ?? externalClaims.FindFirstValue("email_verified");
+            var googleEmailVerified = bool.TryParse(emailVerifiedClaim, out var verified) && verified;
             var displayName = externalClaims.FindFirstValue(ClaimTypes.Name)
                               ?? externalClaims.FindFirstValue(ClaimTypes.GivenName);
             var avatarUrl = externalClaims.FindFirstValue("urn:google:picture")
+                            ?? externalClaims.FindFirstValue("urn:facebook:picture")
                             ?? externalClaims.FindFirstValue("picture");
 
             // Xóa cookie tạm của phiên OAuth bên ngoài
             await HttpContext.SignOutAsync("ExternalCookie");
+
+            if ((!string.Equals(provider, "Google", StringComparison.OrdinalIgnoreCase) &&
+                 !string.Equals(provider, "Facebook", StringComparison.OrdinalIgnoreCase)) ||
+                string.IsNullOrWhiteSpace(providerKey))
+            {
+                TempData["ErrorMessage"] = "Nhà cung cấp không trả về mã tài khoản hợp lệ. Vui lòng thử đăng nhập lại.";
+                return RedirectToAction(nameof(Login), new { returnUrl });
+            }
+
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                TempData["ErrorMessage"] = string.Equals(provider, "Facebook", StringComparison.OrdinalIgnoreCase)
+                    ? "Facebook không cung cấp email. Hãy cho phép chia sẻ email trong Facebook Login hoặc đăng nhập bằng Google/tài khoản DonateWeb."
+                    : "Google không cung cấp email. Vui lòng thử lại hoặc dùng tài khoản DonateWeb.";
+                return RedirectToAction(nameof(Login), new { returnUrl });
+            }
+
+            if (string.Equals(provider, "Google", StringComparison.OrdinalIgnoreCase) && !googleEmailVerified)
+            {
+                TempData["ErrorMessage"] = "Tài khoản Google cần có địa chỉ email đã xác minh để đăng nhập DonateWeb.";
+                return RedirectToAction(nameof(Login), new { returnUrl });
+            }
 
             var (success, error, user, roles) = await _authService.ProcessExternalLoginAsync(
                 provider,
@@ -279,7 +315,9 @@ namespace DonateWeb.Controllers
 
         private static bool IsValidConfig(string? value)
         {
-            return !string.IsNullOrWhiteSpace(value) && !value.StartsWith("YOUR_", StringComparison.OrdinalIgnoreCase);
+            return !string.IsNullOrWhiteSpace(value) &&
+                   !value.StartsWith("YOUR_", StringComparison.OrdinalIgnoreCase) &&
+                   !value.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase);
         }
 
         [HttpGet]

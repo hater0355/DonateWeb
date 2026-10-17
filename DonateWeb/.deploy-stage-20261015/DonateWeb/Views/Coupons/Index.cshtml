@@ -1,0 +1,231 @@
+@{
+    ViewData["Title"] = "Lịch sử Coupon";
+}
+
+<div class="mb-3 d-flex align-items-center justify-content-between">
+    <h5 class="fw-bold text-dark-green mb-0 d-flex align-items-center gap-2">
+        LỊCH SỬ COUPON
+        <i class="fa-solid fa-circle-info fa-sm text-muted" style="cursor:pointer;" title="Thông tin coupon"></i>
+    </h5>
+    <button class="btn btn-dark-green fw-semibold px-3 py-2" data-bs-toggle="modal" data-bs-target="#addCouponModal">
+        <i class="fa-solid fa-plus me-1"></i> THÊM MÃ MỚI
+    </button>
+</div>
+
+<!-- Bộ lọc -->
+<div class="card card-custom p-3 mb-3 bg-light-green">
+    <div class="fw-semibold text-dark-green mb-3 small">TÌM KIẾM</div>
+    <div class="row g-2 mb-2">
+        <div class="col-12 col-md-6">
+            <div class="position-relative">
+                <input type="text" id="searchCoupon" class="form-control form-control-custom"
+                       placeholder="Nhập mã coupon, nội dung coupon" />
+                <span class="position-absolute top-50 end-0 translate-middle-y pe-3 text-muted">
+                    <i class="fa-solid fa-magnifying-glass fa-sm"></i>
+                </span>
+            </div>
+        </div>
+        <div class="col-12 col-md-3">
+            <input type="date" id="dateReceiveFrom" class="form-control form-control-custom" placeholder="Nhận được từ" />
+        </div>
+        <div class="col-12 col-md-3">
+            <input type="date" id="dateReceiveTo" class="form-control form-control-custom" placeholder="Đến ngày" />
+        </div>
+    </div>
+    <div class="row g-2 mb-3">
+        <div class="col-12 col-md-3">
+            <select id="couponStatus" class="form-select form-control-custom">
+                <option value="">Tình trạng coupon</option>
+                <option value="active">Còn hạn</option>
+                <option value="used">Đã dùng</option>
+                <option value="expired">Hết hạn</option>
+            </select>
+        </div>
+        <div class="col-12 col-md-3">
+            <select id="couponProvider" class="form-select form-control-custom">
+                <option value="">Nhà cung cấp</option>
+            </select>
+        </div>
+        <div class="col-12 col-md-3">
+            <input type="date" id="dateExpireFrom" class="form-control form-control-custom" placeholder="Hết hạn từ" />
+        </div>
+        <div class="col-12 col-md-3">
+            <input type="date" id="dateExpireTo" class="form-control form-control-custom" placeholder="Đến ngày" />
+        </div>
+    </div>
+    <div>
+        <button class="btn btn-dark-green px-4 py-2 fw-semibold" onclick="applyFilter()">
+            ÁP DỤNG
+        </button>
+    </div>
+</div>
+
+<!-- Bảng dữ liệu -->
+<div class="card card-custom bg-white">
+    <div class="table-responsive">
+        <table class="table mb-0">
+            <thead>
+                <tr style="background-color: var(--light-green);">
+                    <th class="py-3 px-3 text-dark-green fw-semibold small">Mã coupon</th>
+                    <th class="py-3 px-3 text-dark-green fw-semibold small">Nhà cung cấp</th>
+                    <th class="py-3 px-3 text-dark-green fw-semibold small">Nội dung</th>
+                    <th class="py-3 px-3 text-dark-green fw-semibold small">
+                        Ngày nhận
+                        <i class="fa-solid fa-arrow-up fa-xs ms-1"></i>
+                    </th>
+                    <th class="py-3 px-3 text-dark-green fw-semibold small">Ngày hết hạn</th>
+                    <th class="py-3 px-3 text-dark-green fw-semibold small">Tình trạng</th>
+                    <th class="py-3 px-3 text-dark-green fw-semibold small">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody id="couponsBody">
+                <tr>
+                    <td colspan="7" class="text-center py-5 text-muted small">
+                        Không có dữ liệu phù hợp
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <!-- Phân trang -->
+    <div class="d-flex justify-content-end align-items-center gap-2 px-3 py-2 border-top">
+        <span class="small text-muted">Rows per page:</span>
+        <select class="form-select form-select-sm" style="width:60px;" id="pageSize" onchange="renderTable()">
+            <option value="10" selected>10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+        </select>
+        <button class="btn btn-sm btn-outline-secondary" id="btnFirst" onclick="goPage(1)">
+            <i class="fa-solid fa-angles-left fa-xs"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" id="btnPrev" onclick="changePage(-1)">
+            <i class="fa-solid fa-chevron-left fa-xs"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" id="btnNext" onclick="changePage(1)">
+            <i class="fa-solid fa-chevron-right fa-xs"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" id="btnLast" onclick="goPage(999)">
+            <i class="fa-solid fa-angles-right fa-xs"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Modal Thêm mã mới -->
+<div class="modal fade" id="addCouponModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold text-dark-green">Thêm mã coupon mới</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-dark-green">Mã coupon</label>
+                    <input type="text" id="newCode" class="form-control form-control-custom" placeholder="Nhập mã coupon" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-dark-green">Nội dung</label>
+                    <input type="text" id="newContent" class="form-control form-control-custom" placeholder="Mô tả coupon" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-dark-green">Nhà cung cấp</label>
+                    <input type="text" id="newProvider" class="form-control form-control-custom" placeholder="Tên nhà cung cấp" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-dark-green">Ngày hết hạn</label>
+                    <input type="date" id="newExpire" class="form-control form-control-custom" />
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-dark-green fw-semibold" onclick="addCoupon()">Thêm mã</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    let allCoupons = [];
+    let filtered = [];
+    let currentPage = 1;
+
+    function applyFilter() {
+        const q = document.getElementById('searchCoupon').value.toLowerCase();
+        const status = document.getElementById('couponStatus').value;
+        const provider = document.getElementById('couponProvider').value;
+
+        filtered = allCoupons.filter(c =>
+            (!q || c.code.toLowerCase().includes(q) || c.content.toLowerCase().includes(q))
+            && (!status || c.status === status)
+            && (!provider || c.provider === provider)
+        );
+        currentPage = 1;
+        renderTable();
+    }
+
+    function renderTable() {
+        const size = parseInt(document.getElementById('pageSize').value);
+        const start = (currentPage - 1) * size;
+        const page = filtered.slice(start, start + size);
+        const body = document.getElementById('couponsBody');
+
+        if (page.length === 0) {
+            body.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-muted small">Không có dữ liệu phù hợp</td></tr>`;
+        } else {
+            body.innerHTML = page.map(c => {
+                const statusBadge = c.status === 'active'
+                    ? '<span class="badge bg-success rounded-pill">Còn hạn</span>'
+                    : c.status === 'used'
+                        ? '<span class="badge bg-secondary rounded-pill">Đã dùng</span>'
+                        : '<span class="badge bg-danger rounded-pill">Hết hạn</span>';
+                return `<tr class="border-bottom">
+                    <td class="py-3 px-3 small fw-semibold text-dark-green">${c.code}</td>
+                    <td class="py-3 px-3 small">${c.provider}</td>
+                    <td class="py-3 px-3 small">${c.content}</td>
+                    <td class="py-3 px-3 small text-muted">${c.received}</td>
+                    <td class="py-3 px-3 small text-muted">${c.expire}</td>
+                    <td class="py-3 px-3 small">${statusBadge}</td>
+                    <td class="py-3 px-3 small">
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCoupon('${c.code}')">
+                            <i class="fa-solid fa-trash fa-xs"></i>
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+        document.getElementById('btnPrev').disabled = currentPage === 1;
+        document.getElementById('btnFirst').disabled = currentPage === 1;
+        document.getElementById('btnNext').disabled = start + size >= filtered.length;
+        document.getElementById('btnLast').disabled = start + size >= filtered.length;
+    }
+
+    function changePage(dir) { currentPage += dir; renderTable(); }
+    function goPage(p) { currentPage = p === 999 ? Math.ceil(filtered.length / parseInt(document.getElementById('pageSize').value)) || 1 : p; renderTable(); }
+
+    function addCoupon() {
+        const code = document.getElementById('newCode').value.trim();
+        const content = document.getElementById('newContent').value.trim();
+        const provider = document.getElementById('newProvider').value.trim();
+        const expire = document.getElementById('newExpire').value;
+        if (!code) return alert('Vui lòng nhập mã coupon');
+        const today = new Date().toISOString().split('T')[0];
+        allCoupons.unshift({ code, content, provider, received: today, expire, status: 'active' });
+        bootstrap.Modal.getInstance(document.getElementById('addCouponModal')).hide();
+        document.getElementById('newCode').value = '';
+        document.getElementById('newContent').value = '';
+        document.getElementById('newProvider').value = '';
+        document.getElementById('newExpire').value = '';
+        applyFilter();
+    }
+
+    function deleteCoupon(code) {
+        if (!confirm('Xóa coupon ' + code + '?')) return;
+        allCoupons = allCoupons.filter(c => c.code !== code);
+        applyFilter();
+    }
+
+    filtered = [...allCoupons];
+    renderTable();
+</script>
+}

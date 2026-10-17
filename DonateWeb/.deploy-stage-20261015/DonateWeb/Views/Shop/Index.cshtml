@@ -1,0 +1,320 @@
+@model DonateWeb.ViewModels.Shop.ShopIndexViewModel
+@{
+    ViewData["Title"] = "Sàn Sản Phẩm & Shop Streamer";
+}
+
+<style>
+    .shop-hero {
+        background: linear-gradient(135deg, #1b4533 0%, #29503e 50%, #173d2c 100%);
+        border-radius: 20px;
+        color: white;
+        padding: 32px 36px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(27, 69, 51, 0.15);
+    }
+    .shop-hero::after {
+        content: "";
+        position: absolute;
+        top: -50px;
+        right: -50px;
+        width: 260px;
+        height: 260px;
+        background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, transparent 70%);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+    .product-card {
+        border-radius: 16px;
+        border: 1px solid rgba(163, 199, 181, 0.35);
+        background: #ffffff;
+        transition: all 0.28s ease;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+    }
+    .product-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 28px rgba(31, 69, 47, 0.12);
+        border-color: #29503e;
+    }
+    .product-thumb-wrap {
+        position: relative;
+        width: 100%;
+        padding-top: 80%;
+        overflow: hidden;
+        background-color: #f1f5f3;
+    }
+    .product-thumb {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.35s ease;
+    }
+    .product-card:hover .product-thumb {
+        transform: scale(1.06);
+    }
+    .product-badge-streamer {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background: rgba(15, 23, 42, 0.85);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #fff;
+        padding: 5px 10px;
+        border-radius: 30px;
+        font-size: 0.78rem;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        transition: 0.2s;
+    }
+    .product-badge-streamer:hover {
+        background: var(--dark-green, #1F452F);
+        color: #fff;
+    }
+    .streamer-avatar-sm {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 1px solid #fff;
+    }
+    .product-price-tag {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #1b4533;
+        letter-spacing: -0.02em;
+    }
+    .filter-chip {
+        display: inline-block;
+        padding: 6px 14px;
+        border-radius: 50px;
+        background: #e6f0e9;
+        color: #1b4533;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-decoration: none;
+        border: 1px solid transparent;
+        transition: 0.2s;
+        cursor: pointer;
+    }
+    .filter-chip:hover, .filter-chip.active {
+        background: #1b4533;
+        color: #ffffff;
+        border-color: #1b4533;
+    }
+</style>
+
+<div class="container-fluid px-0 pb-5">
+    <!-- Hero Banner -->
+    <div class="shop-hero mb-4">
+        <div class="row align-items-center g-3">
+            <div class="col-lg-8">
+                <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill mb-2" style="background: rgba(255,255,255,0.15); font-size: 0.82rem;">
+                    <i class="fa-solid fa-store text-warning"></i>
+                    <span>Sàn thương mại Streamer OnlyFan</span>
+                </div>
+                <h2 class="fw-bold mb-2 display-6">Sàn Sản Phẩm Của Các Streamer</h2>
+                <p class="mb-0 text-white-50" style="max-width: 650px;">
+                    Khám phá và đặt mua áo đấu, đồ lưu niệm, phụ kiện gaming độc quyền được thiết kế bởi chính các Idol Streamer bạn yêu mến. Hỗ trợ thanh toán nhanh bằng Ví số dư hoặc quét mã VietQR!
+                </p>
+            </div>
+            <div class="col-lg-4 text-lg-end">
+                <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                    @if (User.IsInRole(DonateWeb.Models.Enums.UserRoles.Streamer))
+                    {
+                        <a href="/Shop/MyProducts" class="btn btn-warning rounded-pill px-4 py-2 fw-bold text-dark shadow-sm">
+                            <i class="fa-solid fa-boxes-stacked me-2"></i>Quản lý gian hàng của bạn
+                        </a>
+                    }
+                    <a href="/Shop/History" class="btn btn-outline-light rounded-pill px-3 py-2 fw-semibold">
+                        <i class="fa-solid fa-receipt me-1"></i>Lịch sử đơn hàng
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Thanh tìm kiếm & Lọc dữ liệu -->
+    <div class="card border-0 shadow-sm rounded-4 p-3 mb-4 bg-white">
+        <form method="get" asp-controller="Shop" asp-action="Index">
+            <div class="row g-2 align-items-center">
+                <!-- Ô tìm kiếm tên sản phẩm / mô tả -->
+                <div class="col-12 col-md-5">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-0 ps-3">
+                            <i class="fa-solid fa-magnifying-glass text-muted"></i>
+                        </span>
+                        <input type="text"
+                               name="keyword"
+                               value="@Model.SearchKeyword"
+                               class="form-control bg-light border-0 py-2"
+                               placeholder="Tìm tên sản phẩm, phụ kiện, tên streamer..." />
+                    </div>
+                </div>
+
+                <!-- Lọc theo Streamer -->
+                <div class="col-12 col-md-3">
+                    <select name="streamerSlug" class="form-select bg-light border-0 py-2">
+                        <option value="">-- Tất cả Streamer --</option>
+                        @foreach (var s in Model.Streamers)
+                        {
+                            <option value="@s.Slug" selected="@(string.Equals(Model.SelectedStreamerSlug, s.Slug, StringComparison.OrdinalIgnoreCase))">
+                                Streamer: @s.DisplayName
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Sắp xếp theo giá -->
+                <div class="col-12 col-md-2">
+                    <select name="sortBy" class="form-select bg-light border-0 py-2">
+                        <option value="" selected="@(string.IsNullOrEmpty(Model.SortBy))">Mới nhất</option>
+                        <option value="price_asc" selected="@(Model.SortBy == "price_asc")">Giá tăng dần</option>
+                        <option value="price_desc" selected="@(Model.SortBy == "price_desc")">Giá giảm dần</option>
+                    </select>
+                </div>
+
+                <!-- Nút tìm kiếm & Reset -->
+                <div class="col-12 col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-dark-green fw-bold w-100 py-2 rounded-3">
+                        <i class="fa-solid fa-filter me-1"></i> Lọc
+                    </button>
+                    @if (!string.IsNullOrWhiteSpace(Model.SearchKeyword) || !string.IsNullOrWhiteSpace(Model.SelectedStreamerSlug) || !string.IsNullOrWhiteSpace(Model.SortBy))
+                    {
+                        <a href="/Shop" class="btn btn-outline-secondary py-2 rounded-3" title="Xóa bộ lọc">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </a>
+                    }
+                </div>
+            </div>
+
+            <!-- Chips Streamer nhanh -->
+            @if (Model.Streamers.Any())
+            {
+                <div class="d-flex align-items-center gap-2 flex-wrap mt-3 pt-2 border-top">
+                    <span class="small text-muted fw-semibold me-1"><i class="fa-solid fa-bolt text-warning me-1"></i>Streamer nổi bật:</span>
+                    <a href="/Shop" class="filter-chip @(string.IsNullOrEmpty(Model.SelectedStreamerSlug) ? "active" : "")">Tất cả</a>
+                    @foreach (var s in Model.Streamers.Take(6))
+                    {
+                        <a href="/Shop?streamerSlug=@s.Slug" class="filter-chip @(string.Equals(Model.SelectedStreamerSlug, s.Slug, StringComparison.OrdinalIgnoreCase) ? "active" : "")">
+                            @s.DisplayName
+                        </a>
+                    }
+                </div>
+            }
+        </form>
+    </div>
+
+    <!-- Thông báo kết quả -->
+    <div class="d-flex align-items-center justify-content-between mb-3 px-1">
+        <h5 class="fw-bold mb-0 text-dark-green d-flex align-items-center gap-2">
+            <i class="fa-solid fa-bag-shopping text-success"></i>
+            Danh Sách Sản Phẩm Trên Sàn
+            <span class="badge rounded-pill bg-light-green text-dark-green ms-1 font-monospace">@Model.TotalProducts sản phẩm</span>
+        </h5>
+        @if (!string.IsNullOrWhiteSpace(Model.SearchKeyword))
+        {
+            <span class="small text-muted">Kết quả tìm kiếm cho: <strong>"@Model.SearchKeyword"</strong></span>
+        }
+    </div>
+
+    <!-- Lưới sản phẩm -->
+    @if (!Model.Products.Any())
+    {
+        <div class="card border-0 shadow-sm rounded-4 p-5 text-center bg-white my-3">
+            <div class="py-4">
+                <i class="fa-solid fa-box-open fa-3x text-muted mb-3 opacity-50"></i>
+                <h5 class="fw-bold text-dark">Chưa có sản phẩm nào phù hợp</h5>
+                <p class="text-muted small mb-3">Hiện chưa có sản phẩm nào được đăng bán phù hợp với tiêu chí tìm kiếm của bạn.</p>
+                <a href="/Shop" class="btn btn-dark-green rounded-pill px-4 fw-semibold">
+                    Xem tất cả sản phẩm trên sàn
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-3 g-xl-4">
+            @foreach (var item in Model.Products)
+            {
+                <div class="col">
+                    <div class="product-card">
+                        <!-- Hình ảnh sản phẩm + Streamer Badge -->
+                        <div class="product-thumb-wrap">
+                            <img src="@item.ImageUrl"
+                                 alt="@item.Name"
+                                 class="product-thumb"
+                                 loading="lazy"
+                                 onerror="this.src='/images/default-banner.jpg';" />
+
+                            <!-- Badge thông tin Streamer bán mặt hàng này -->
+                            <a href="/@(string.IsNullOrEmpty(item.StreamerSlug) ? "Shop/StreamerShop?slug=" + item.StreamerProfileId : item.StreamerSlug)" 
+                               class="product-badge-streamer shadow-sm"
+                               title="Xem kênh Streamer @item.StreamerName">
+                                <img src="@item.StreamerAvatar" 
+                                     alt="@item.StreamerName" 
+                                     class="streamer-avatar-sm"
+                                     onerror="this.src='/images/default-avatar.png';" />
+                                <span class="fw-semibold text-truncate" style="max-width: 120px;">@item.StreamerName</span>
+                                @if (item.IsVerified)
+                                {
+                                    <i class="fa-solid fa-circle-check text-success small" title="Đã xác minh"></i>
+                                }
+                            </a>
+                        </div>
+
+                        <!-- Nội dung sản phẩm -->
+                        <div class="p-3 d-flex flex-column flex-grow-1">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <span class="badge bg-light text-muted small fw-normal border">
+                                    <i class="fa-solid fa-user-tie me-1 text-success"></i>Shop @item.StreamerName
+                                </span>
+                                <span class="small text-muted font-monospace">Kho: @item.StockQuantity</span>
+                            </div>
+
+                            <h6 class="fw-bold text-dark mb-1 text-truncate-2" style="min-height: 40px; line-height: 1.35;" title="@item.Name">
+                                @item.Name
+                            </h6>
+
+                            @if (!string.IsNullOrWhiteSpace(item.Description))
+                            {
+                                <p class="text-muted small mb-2 text-truncate-2" style="font-size: 0.8rem; min-height: 36px; line-height: 1.35;">
+                                    @item.Description
+                                </p>
+                            }
+                            else
+                            {
+                                <p class="text-muted small mb-2 fst-italic" style="font-size: 0.8rem; min-height: 36px;">
+                                    Sản phẩm chính thức từ @item.StreamerName
+                                </p>
+                            }
+
+                            <!-- Giá và nút hành động -->
+                            <div class="mt-auto pt-2 border-top d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="small text-muted" style="font-size: 0.72rem;">GIÁ BÁN</div>
+                                    <div class="product-price-tag">@item.Price.ToString("N0") <span style="font-size: 0.85rem; font-weight: 600;">đ</span></div>
+                                </div>
+                                <a href="/Shop/StreamerShop?slug=@item.StreamerSlug" 
+                                   class="btn btn-dark-green rounded-pill px-3 py-2 fw-semibold d-flex align-items-center gap-1 shadow-sm"
+                                   title="Vào gian hàng & Giỏ hàng của @item.StreamerName để mua">
+                                    <i class="fa-solid fa-cart-plus"></i>
+                                    <span class="small">Mua ngay</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>

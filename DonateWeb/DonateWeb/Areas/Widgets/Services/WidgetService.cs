@@ -370,6 +370,13 @@ namespace DonateWeb.Areas.Widgets.Services
         /// </summary>
         public async Task<bool> SaveGoalAsync(string streamerSlug, StreamerGoalViewModel model)
         {
+            if (model == null || string.IsNullOrWhiteSpace(model.Title) ||
+                model.TargetAmount < 10000 || model.TargetAmount > 10000000000m ||
+                model.StartingAmount < 0 || model.StartingAmount > 10000000000m)
+            {
+                return false;
+            }
+
             var cleanSlug = (streamerSlug ?? "tenstreamer").Trim().ToLower();
             var profile = await _context.StreamerProfiles.FirstOrDefaultAsync(p => p.Slug.ToLower() == cleanSlug);
             if (profile == null) return false;
@@ -380,33 +387,32 @@ namespace DonateWeb.Areas.Widgets.Services
                 var existing = await _context.StreamerGoals
                     .FirstOrDefaultAsync(g => g.Id == model.Id && g.StreamerProfileId == profile.Id);
 
-                if (existing != null)
+                if (existing == null) return false;
+
+                existing.Title = model.Title.Trim();
+                existing.TargetAmount = model.TargetAmount;
+                existing.StartingAmount = model.StartingAmount;
+                existing.ProgressBarColor = model.ProgressBarColor?.Trim() ?? "#10b981";
+                existing.EndDate = model.EndDate;
+                existing.UpdatedAt = DateTime.UtcNow;
+
+                if (model.IsActive && !existing.IsActive)
                 {
-                    existing.Title = model.Title.Trim();
-                    existing.TargetAmount = model.TargetAmount;
-                    existing.StartingAmount = model.StartingAmount;
-                    existing.ProgressBarColor = model.ProgressBarColor?.Trim() ?? "#10b981";
-                    existing.EndDate = model.EndDate;
-                    existing.UpdatedAt = DateTime.UtcNow;
+                    // Tắt các mục tiêu khác của streamer để chỉ có 1 mục tiêu active
+                    var otherGoals = await _context.StreamerGoals
+                        .Where(g => g.StreamerProfileId == profile.Id && g.Id != existing.Id)
+                        .ToListAsync();
+                    foreach (var og in otherGoals) og.IsActive = false;
 
-                    if (model.IsActive && !existing.IsActive)
-                    {
-                        // Tắt các mục tiêu khác của streamer để chỉ có 1 mục tiêu active
-                        var otherGoals = await _context.StreamerGoals
-                            .Where(g => g.StreamerProfileId == profile.Id && g.Id != existing.Id)
-                            .ToListAsync();
-                        foreach (var og in otherGoals) og.IsActive = false;
-
-                        existing.IsActive = true;
-                    }
-                    else if (!model.IsActive && existing.IsActive)
-                    {
-                        existing.IsActive = false;
-                    }
-
-                    await _context.SaveChangesAsync();
-                    return true;
+                    existing.IsActive = true;
                 }
+                else if (!model.IsActive && existing.IsActive)
+                {
+                    existing.IsActive = false;
+                }
+
+                await _context.SaveChangesAsync();
+                return true;
             }
 
             // Tạo mục tiêu mới

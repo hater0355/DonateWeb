@@ -1,0 +1,87 @@
+<!-- FILE: Views/Transactions/Index.cshtml -->
+@model List<DonateWeb.ViewModels.TransactionViewModel>
+@using DonateWeb.Models.Enums
+@{
+    ViewData["Title"] = "Lịch sử giao dịch & Số dư";
+    var currentBalance = (decimal)(ViewBag.CurrentBalance ?? 0m);
+    var isStreamer = User.IsInRole(UserRoles.Streamer);
+    var isViewer = User.IsInRole(UserRoles.Viewer);
+}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+    <div class="d-flex align-items-center gap-2">
+        <i class="fa-solid fa-clock-rotate-left fs-4 text-dark-green"></i>
+        <div>
+            <h5 class="fw-bold text-dark-green mb-0">QUẢN LÝ SỐ DƯ &amp; LỊCH SỬ GIAO DỊCH</h5>
+            <small class="text-muted">Số dư ví hiện tại: <strong class="text-success">@currentBalance.ToString("N0") VNĐ</strong></small>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        @if (isViewer)
+        {
+            <a href="/Wallet/Deposit" class="btn btn-dark-green rounded-pill px-4 fw-bold shadow-sm">
+                <i class="fa-solid fa-circle-plus me-1"></i> NẠP TIỀN VÀO VÍ (VIEWER)
+            </a>
+        }
+        @if (isStreamer)
+        {
+            <a href="/Wallet/Withdraw" class="btn btn-dark-green rounded-pill px-4 fw-bold shadow-sm">
+                <i class="fa-solid fa-money-bill-transfer me-1"></i> RÚT TIỀN DOANH THU (STREAMER)
+            </a>
+        }
+    </div>
+</div>
+
+<div class="card card-custom border-0 bg-light-green p-0 overflow-hidden shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-borderless table-hover align-middle mb-0">
+            <thead class="border-bottom border-success border-opacity-25">
+                <tr>
+                    <th class="py-3 px-4 text-dark-green fs-7">MÃ GIAO DỊCH</th>
+                    <th class="py-3 px-4 text-dark-green fs-7">THỜI GIAN</th>
+                    <th class="py-3 px-4 text-dark-green fs-7">NỘI DUNG GIAO DỊCH</th>
+                    <th class="py-3 px-4 text-dark-green fs-7">SỐ TIỀN BIẾN ĐỘNG</th>
+                    <th class="py-3 px-4 text-dark-green fs-7">TRẠNG THÁI</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model != null && Model.Any())
+                {
+                    foreach (var tx in Model)
+                    {
+                        var isPositive = tx.TotalAmount != null && tx.TotalAmount.StartsWith("+");
+                        <tr class="border-bottom border-success border-opacity-10">
+                            <td class="py-3 px-4 fw-semibold"><code>@tx.TransactionId</code></td>
+                            <td class="py-3 px-4 small text-muted">@tx.Time</td>
+                            <td class="py-3 px-4 fw-medium text-dark-green">@tx.Type</td>
+                            <td class="py-3 px-4 fw-bold @(isPositive ? "text-success" : "text-danger")">@tx.TotalAmount</td>
+                            <td class="py-3 px-4">
+                                @if (tx.Status == "Thành công")
+                                {
+                                    <span class="badge bg-success rounded-pill px-3 py-1">@tx.Status</span>
+                                }
+                                else if (tx.Status == "Đang chờ duyệt")
+                                {
+                                    <span class="badge bg-warning text-dark rounded-pill px-3 py-1">@tx.Status</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary rounded-pill px-3 py-1">@tx.Status</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="5" class="text-center py-5">
+                            @await Html.PartialAsync("_EmptyState")
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

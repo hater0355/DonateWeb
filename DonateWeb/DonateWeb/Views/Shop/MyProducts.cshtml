@@ -41,11 +41,11 @@
                 </div>
                 <h2 class="fw-bold mb-1 display-6">Quản Lý Sản Phẩm Gian Hàng</h2>
                 <p class="mb-0 text-white-50 small">
-                    Thêm và quản lý các sản phẩm bạn muốn bán cho người xem. Khi thêm mới, sản phẩm sẽ được gửi tới <strong>Quản trị viên (Admin) xét duyệt</strong> trước khi hiển thị chính thức trên sàn và gian hàng.
+                    Chỉ Streamer đã được Admin phê duyệt mới được quản lý gian hàng. Sản phẩm mới hoặc thông tin bán hàng vừa chỉnh sửa sẽ chờ Admin duyệt trước khi hiển thị. Phí nền tảng là 30%; bạn nhận 70% số tiền khách thực trả sau mã giảm giá.
                 </p>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <a href="/Shop/StreamerShop?slug=@Model.StreamerProfileId" class="btn btn-outline-light rounded-pill px-3 py-2 fw-semibold" target="_blank">
+                <a asp-controller="Shop" asp-action="StreamerShop" asp-route-slug="@Model.StreamerSlug" class="btn btn-outline-light rounded-pill px-3 py-2 fw-semibold" target="_blank">
                     <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Xem gian hàng của bạn
                 </a>
                 <button type="button" class="btn btn-warning rounded-pill px-4 py-2 fw-bold text-dark shadow-sm" data-bs-toggle="modal" data-bs-target="#addProductModal">
@@ -74,7 +74,7 @@
     <!-- THANH BỘ LỌC TRẠNG THÁI DUYỆT -->
     <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
         <a href="/Shop/MyProducts?status=all" class="btn btn-sm rounded-pill px-3 fw-semibold @(Model.StatusFilter == "all" ? "btn-dark" : "btn-outline-secondary")">
-            Tất cả (@(Model.PendingCount + Model.ApprovedCount + Model.RejectedCount))
+            Tất cả (@Model.TotalCount)
         </a>
         <a href="/Shop/MyProducts?status=pending" class="btn btn-sm rounded-pill px-3 fw-semibold @(Model.StatusFilter == "pending" ? "btn-warning text-dark fw-bold shadow-sm" : "btn-outline-warning text-dark")">
             <i class="fa-solid fa-clock me-1 text-warning"></i> Chờ duyệt (@Model.PendingCount)
@@ -86,6 +86,12 @@
         {
             <a href="/Shop/MyProducts?status=rejected" class="btn btn-sm rounded-pill px-3 fw-semibold @(Model.StatusFilter == "rejected" ? "btn-danger shadow-sm" : "btn-outline-danger")">
                 <i class="fa-solid fa-circle-xmark me-1"></i> Bị từ chối (@Model.RejectedCount)
+            </a>
+        }
+        @if (Model.DeletedCount > 0)
+        {
+            <a href="/Shop/MyProducts?status=deleted" class="btn btn-sm rounded-pill px-3 fw-semibold @(Model.StatusFilter == "deleted" ? "btn-secondary text-white shadow-sm" : "btn-outline-secondary")">
+                <i class="fa-solid fa-box-archive me-1"></i> Đã xóa (@Model.DeletedCount)
             </a>
         }
     </div>
@@ -151,10 +157,36 @@
                                     <span class="fw-bold text-dark-green font-monospace fs-6">@prod.Price.ToString("N0") đ</span>
                                 </td>
                                 <td>
-                                    <span class="badge bg-light text-dark border font-monospace">@prod.StockQuantity</span>
+                                    @if (prod.IsActive)
+                                    {
+                                        <form asp-controller="Shop" asp-action="UpdateStock" method="post" class="d-flex align-items-center gap-1">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@prod.Id" />
+                                            <input type="number" name="stockQuantity" value="@prod.StockQuantity" min="0" max="999999"
+                                                   class="form-control form-control-sm font-monospace" style="width: 92px" aria-label="Tồn kho của @prod.Name" />
+                                            <button type="submit" class="btn btn-sm btn-outline-success" title="Lưu tồn kho" aria-label="Lưu tồn kho">
+                                                <i class="fa-solid fa-floppy-disk"></i>
+                                            </button>
+                                        </form>
+                                        @if (prod.StockQuantity == 0)
+                                        {
+                                            <span class="small text-danger">Hết hàng</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">Đã lưu trữ</span>
+                                    }
                                 </td>
                                 <td>
-                                    @if (prod.ApprovalStatus == DonateWeb.Models.Enums.ProductApprovalStatus.Pending)
+                                    @if (!prod.IsActive)
+                                    {
+                                        <span class="badge bg-secondary-subtle text-secondary border px-2 py-1 rounded-pill small fw-semibold">
+                                            <i class="fa-solid fa-box-archive me-1"></i> Đã xóa khỏi gian hàng
+                                        </span>
+                                        <div class="text-muted small mt-1" style="font-size: 0.75rem;">Lịch sử đơn hàng vẫn được giữ</div>
+                                    }
+                                    else if (prod.ApprovalStatus == DonateWeb.Models.Enums.ProductApprovalStatus.Pending)
                                     {
                                         <span class="badge bg-warning-subtle text-dark border border-warning px-2 py-1 rounded-pill small fw-semibold">
                                             <i class="fa-solid fa-clock me-1 text-warning"></i> Chờ Admin duyệt
@@ -192,14 +224,24 @@
                                 <td>
                                     <span class="small text-muted">@prod.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
                                 </td>
-                                <td class="pe-4 text-end">
-                                    <form asp-controller="Shop" asp-action="DeleteProduct" method="post" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn xóa sản phẩm này khỏi gian hàng?');">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="id" value="@prod.Id" />
-                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3" title="Xóa sản phẩm">
-                                            <i class="fa-regular fa-trash-can me-1"></i> Xóa
-                                        </button>
-                                    </form>
+                                <td class="pe-4 text-end text-nowrap">
+                                    @if (prod.IsActive)
+                                    {
+                                        <a asp-controller="Shop" asp-action="EditProduct" asp-route-id="@prod.Id" class="btn btn-sm btn-outline-primary rounded-pill px-3 me-1">
+                                            <i class="fa-regular fa-pen-to-square me-1"></i> Sửa
+                                        </a>
+                                        <form asp-controller="Shop" asp-action="DeleteProduct" method="post" class="d-inline" onsubmit="return confirm('Ẩn sản phẩm này khỏi gian hàng? Lịch sử đơn hàng sẽ được giữ lại.');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@prod.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3" title="Xóa sản phẩm khỏi gian hàng">
+                                                <i class="fa-regular fa-trash-can me-1"></i> Xóa
+                                            </button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">Không có thao tác</span>
+                                    }
                                 </td>
                             </tr>
                         }
@@ -251,7 +293,7 @@
                         <!-- Số lượng tồn kho -->
                         <div class="col-12 col-md-4">
                             <label class="form-label fw-semibold text-dark small">Số lượng tồn kho</label>
-                            <input type="number" name="StockQuantity" class="form-control rounded-3" value="100" min="1" max="99999" />
+                            <input type="number" name="StockQuantity" class="form-control rounded-3" value="100" min="0" max="999999" />
                         </div>
 
                         <!-- Chọn hình ảnh từ máy tính (File Upload) -->

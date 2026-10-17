@@ -1,53 +1,97 @@
-<!-- FILE: Views/Effects/Index.cshtml -->
-@model List<DonateWeb.ViewModels.EffectViewModel>
+@model DonateWeb.ViewModels.SpecialEffectsViewModel
 @{
     ViewData["Title"] = "Hiệu ứng đặc biệt";
 }
 
-<h5 class="fw-bold text-dark-green mb-3">HIỆU ỨNG ĐẶC BIỆT</h5>
+<div class="container py-4">
+    <div class="mb-4">
+        <h3 class="fw-bold text-dark-green"><i class="fa-solid fa-wand-magic-sparkles me-2"></i>Hiệu ứng sự kiện</h3>
+        <p class="text-muted mb-0">Admin lên lịch sự kiện; streamer có thể bật hoặc tắt hiệu ứng riêng cho kênh của mình.</p>
+    </div>
 
-<ul class="nav nav-pills nav-fill gap-3 mb-4 effect-tabs" id="effectTabs" role="tablist">
-    <li class="nav-item" role="presentation">
-        <button class="nav-link active" data-bs-toggle="pill" type="button" role="tab">CHƯA KÍCH HOẠT</button>
-    </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" data-bs-toggle="pill" type="button" role="tab">ĐÃ KÍCH HOẠT, CÒN HẠN SỬ DỤNG</button>
-    </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" data-bs-toggle="pill" type="button" role="tab">ĐÃ HẾT HẠN</button>
-    </li>
-</ul>
-
-<div class="row g-4">
-    @if (Model != null && Model.Any())
+    @if (TempData["SuccessMessage"] is string success)
     {
-        @foreach (var eff in Model)
-        {
-            <div class="col-12 col-md-6 col-lg-4">
-                <div class="card card-custom border-success border-opacity-25 h-100 p-1">
-                    <div class="bg-white rounded-3 d-flex align-items-center justify-content-center py-5 mb-3 mx-2 mt-2 border">
-                        <i class="fa-solid @eff.IconClass text-dark-green" style="font-size: 3rem;"></i>
-                    </div>
-                    <div class="px-3 pb-3">
-                        <h6 class="fw-bold text-dark-green">@eff.Name</h6>
-                        <p class="text-muted fs-7 mb-4">@eff.Description</p>
-                        
-                        <div class="d-flex align-items-center justify-content-between border-top pt-3">
-                            <span class="fs-7 text-muted">@eff.Status</span>
-                            <button class="btn btn-sm fw-bold text-dark-green">KÍCH HOẠT</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        }
+        <div class="alert alert-success">@success</div>
+    }
+    @if (TempData["ErrorMessage"] is string error)
+    {
+        <div class="alert alert-warning">@error</div>
+    }
+
+    @if (!Model.CanManage)
+    {
+        <div class="alert alert-info">Bạn có thể xem các sự kiện tại đây. Tài khoản streamer đã được Admin duyệt mới có thể bật hiệu ứng.</div>
     }
     else
     {
-        <div class="col-12">
-            <div class="card card-custom bg-white p-5 text-center shadow-sm">
-                @await Html.PartialAsync("_EmptyState")
-                <p class="text-muted small mt-2">Dữ liệu hiệu ứng sẽ tự động hiển thị khi được cập nhật từ database hệ thống.</p>
-            </div>
+        <div class="alert alert-success border-0">
+            Đang quản lý hiệu ứng cho kênh <strong>@Model.StreamerName</strong>. Donate thành công trong thời gian sự kiện sẽ chạy hiệu ứng trên AlertBox OBS.
+        </div>
+    }
+
+    @if (Model.Campaigns.Count == 0)
+    {
+        <div class="card border-0 shadow-sm rounded-4 p-5 text-center">
+            <i class="fa-regular fa-calendar-xmark text-muted fs-1 mb-3"></i>
+            <h5 class="fw-bold">Chưa có sự kiện hiệu ứng</h5>
+            <p class="text-muted mb-0">Admin sẽ tạo lịch sự kiện và thời gian áp dụng tại trang quản trị.</p>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            @foreach (var effect in Model.Campaigns)
+            {
+                var canToggle = Model.CanManage && (effect.CanActivate || effect.IsStreamerEnabled);
+                <div class="col-12 col-lg-6">
+                    <div class="card border-0 shadow-sm rounded-4 h-100 overflow-hidden">
+                        <div class="p-4 text-center" style="background: radial-gradient(circle at 50% 0%, #fff6d5, #fff 70%);">
+                            <div class="event-flag mx-auto mb-3" aria-label="Cờ Việt Nam">
+                                <svg viewBox="0 0 30 20" role="img" aria-hidden="true"><rect width="30" height="20" fill="#da251d"/><path d="m15 3 1.5 4.6H21l-3.7 2.8 1.4 4.6-3.7-2.9-3.7 2.9 1.4-4.6L9 7.6h4.5z" fill="#ff0"/></svg>
+                            </div>
+                            <div class="fw-bold text-warning-emphasis">SỰ KIỆN ĐẶC BIỆT</div>
+                        </div>
+                        <div class="card-body p-4 d-flex flex-column">
+                            <div class="d-flex justify-content-between align-items-start gap-2">
+                                <h5 class="fw-bold text-dark-green mb-2">@effect.Title</h5>
+                                <span class="badge @(effect.IsAvailable ? "bg-success" : effect.IsStreamerEnabled ? "bg-primary" : "bg-secondary")">@effect.Status</span>
+                            </div>
+                            <p class="text-muted">@(string.IsNullOrWhiteSpace(effect.Description) ? "Cờ Việt Nam phất lên và pháo hoa bừng sáng mỗi khi có donate." : effect.Description)</p>
+                            <div class="small text-muted mb-3">
+                                <div><i class="fa-regular fa-clock me-1"></i>Bắt đầu: @effect.StartsAtLocal.ToString("dd/MM/yyyy HH:mm")</div>
+                                <div><i class="fa-regular fa-clock me-1"></i>Kết thúc: @effect.EndsAtLocal.ToString("dd/MM/yyyy HH:mm") (giờ Việt Nam)</div>
+                            </div>
+                            <div class="mt-auto">
+                                @if (canToggle)
+                                {
+                                    <form asp-controller="Effects" asp-action="Toggle" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@effect.Id" />
+                                        <button type="submit" class="btn @(effect.IsStreamerEnabled ? "btn-outline-danger" : "btn-success") w-100 fw-bold">
+                                            @(effect.IsStreamerEnabled ? "TẮT HIỆU ỨNG TRÊN KÊNH" : "BẬT HIỆU ỨNG TRÊN KÊNH")
+                                        </button>
+                                    </form>
+                                }
+                                else if (Model.CanManage)
+                                {
+                                    <button class="btn btn-light w-100" disabled>Không thể bật: sự kiện đã hết hạn hoặc Admin tạm dừng</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-light w-100" disabled>Dành cho streamer đã được duyệt</button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
     }
 </div>
+
+<style>
+    .event-flag { width: 168px; height: 112px; filter: drop-shadow(0 8px 10px rgba(30, 41, 59, .2)); animation: flag-wave 1.2s ease-in-out infinite alternate; transform-origin: left center; }
+    .event-flag svg { width: 100%; height: 100%; border-radius: 4px; }
+    @@keyframes flag-wave { from { transform: perspective(260px) rotateY(-12deg) skewY(-1deg); } to { transform: perspective(260px) rotateY(14deg) skewY(2deg); } }
+    @@media (prefers-reduced-motion: reduce) { .event-flag { animation: none; } }
+</style>

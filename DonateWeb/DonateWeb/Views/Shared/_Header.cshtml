@@ -10,7 +10,7 @@
         </a>
 
         <!-- Center Nav -->
-        <ul class="navbar-nav mx-auto flex-row gap-4 d-none d-lg-flex">
+        <ul class="navbar-nav header-nav mx-auto flex-row gap-4 d-none d-lg-flex">
             <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value == "/" ? "active-nav" : "text-muted")" href="/"><i class="fa-solid fa-home me-1"></i> Home</a></li>
             <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value?.StartsWith("/Streamer/Register", StringComparison.OrdinalIgnoreCase) == true ? "active-nav" : "text-muted")" href="/Streamer/Register"><i class="fa-solid fa-video me-1"></i> New Streamer</a></li>
             <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value?.StartsWith("/Guides") == true ? "active-nav" : "text-muted")" href="/Guides"><i class="fa-solid fa-book me-1"></i> Guides</a></li>
@@ -43,7 +43,7 @@
         </form>
 
         <!-- Right Side -->
-        <div class="d-flex align-items-center gap-3">
+        <div class="header-actions d-flex align-items-center gap-3">
             @if (User.Identity?.IsAuthenticated == true)
             {
                 var fullName = User.FindFirst("FullName")?.Value ?? User.Identity.Name ?? "Người dùng";
@@ -53,29 +53,20 @@
                 var isStreamer = User.IsInRole(UserRoles.Streamer);
                 var isViewer = User.IsInRole(UserRoles.Viewer);
                 decimal? liveBalance = null;
+                decimal? liveEarningsBalance = null;
                 if (int.TryParse(userIdClaim, out var uid))
                 {
+                    liveBalance ??= DbContext.Users.Where(u => u.Id == uid).Select(u => (decimal?)u.WalletBalance).FirstOrDefault();
                     if (isStreamer)
                     {
-                        var spId = DbContext.StreamerProfiles.Where(sp => sp.UserId == uid).Select(sp => (int?)sp.Id).FirstOrDefault();
-                        if (spId.HasValue)
-                        {
-                            var hasDonations = DbContext.Donations.Any(d => d.StreamerProfileId == spId.Value && d.Status == DonateWeb.Models.Enums.DonationStatus.Success);
-                            if (!hasDonations)
-                            {
-                                var uEntity = DbContext.Users.FirstOrDefault(u => u.Id == uid);
-                                if (uEntity != null && uEntity.WalletBalance != 0m)
-                                {
-                                    uEntity.WalletBalance = 0m;
-                                    DbContext.SaveChanges();
-                                }
-                                liveBalance = 0m;
-                            }
-                        }
+                        liveEarningsBalance = DbContext.Users
+                            .Where(u => u.Id == uid)
+                            .Select(u => (decimal?)u.StreamerEarningsBalance)
+                            .FirstOrDefault();
                     }
-                    liveBalance ??= DbContext.Users.Where(u => u.Id == uid).Select(u => (decimal?)u.WalletBalance).FirstOrDefault();
                 }
                 var walletBalance = (liveBalance ?? 0m).ToString("N0");
+                var streamerEarningsBalance = (liveEarningsBalance ?? 0m).ToString("N0");
                 var streamerSlug = User.FindFirst("StreamerSlug")?.Value;
                 var accountId = User.FindFirst("AccountId")?.Value;
                 if (string.IsNullOrEmpty(accountId) && int.TryParse(userIdClaim, out var uident))
@@ -89,11 +80,11 @@
 
                 <div class="wallet-badge d-flex align-items-center gap-2 px-3 py-1 rounded-pill">
                     <i class="fa-solid fa-wallet text-success"></i>
-                    <span class="fw-bold" id="headerWalletBalance">Ví: @walletBalance VNĐ</span>
+                    <span class="fw-bold" id="headerWalletBalance">Ví donate: @walletBalance VNĐ</span>
                     @if (isStreamer)
                     {
-                        <a href="/Wallet/Withdraw" class="badge bg-success text-white text-decoration-none ms-1 px-2 py-1 rounded-pill" title="Rút tiền dành cho Streamer">
-                            <i class="fa-solid fa-money-bill-transfer me-1"></i>Rút tiền
+                        <a href="/Wallet/Withdraw" class="badge bg-success text-white text-decoration-none ms-1 px-2 py-1 rounded-pill" title="Doanh thu và chuyển tiền streamer">
+                            <i class="fa-solid fa-money-bill-transfer me-1"></i>Doanh thu: @streamerEarningsBalance đ
                         </a>
                     }
                     else if (isViewer)

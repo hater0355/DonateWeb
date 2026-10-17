@@ -274,7 +274,7 @@
                     </div>
                     <h5 class="fw-bold mb-1 text-white">Mua sắm vật phẩm &amp; phụ kiện từ Idol</h5>
                     <p class="mb-0 text-white-50 small">
-                        Áo thun, pad chuột, bình giữ nhiệt, móc khóa... Mua hàng và thanh toán bằng số dư Ví hoặc quét mã VietQR!
+                        Áo thun, pad chuột, bình giữ nhiệt, móc khóa... Mua hàng và thanh toán bằng số dư ví hoặc PayOS!
                     </p>
                 </div>
             </div>
@@ -519,10 +519,10 @@
                                         <input type="radio" asp-for="PaymentMethod" id="paymentBankRadio" value="2" class="form-check-input mt-0" onchange="handlePaymentMethodChange()" />
                                         <div>
                                             <div class="small fw-semibold text-dark-green">
-                                                <i class="fa-solid fa-building-columns text-primary me-1"></i> Chuyển khoản ngân hàng
+                                                <i class="fa-solid fa-building-columns text-primary me-1"></i> Thanh toán PayOS
                                             </div>
                                             <div class="text-muted" style="font-size: 0.72rem;">
-                                                Quét mã QR (Tự động điền số tiền & nội dung)
+                                                Tạo QR PayOS riêng sau khi nhập số tiền và lời nhắn
                                             </div>
                                         </div>
                                     </label>
@@ -543,40 +543,9 @@
                                 </div>
                             </div>
 
-                            <!-- [MỚI THÊM]: Khối hiển thị Mã QR thanh toán động ngay trong Form khi chọn Chuyển khoản ngân hàng -->
+                            <!-- PayOS tạo QR theo từng đơn sau khi người xem bấm nút ủng hộ. -->
                             <div id="bankQrPaymentBox" class="mt-3 p-3 rounded-3 bg-light border border-primary border-opacity-25 d-none">
-                                <div class="row align-items-center g-3">
-                                    <div class="col-12 col-sm-5 text-center">
-                                        <div class="bg-white p-2 rounded-3 border shadow-sm d-inline-block">
-                                            <img id="inlineGeneratedQrImg"
-                                                 src="@(!string.IsNullOrEmpty(Model.GeneratedQrBase64) ? Model.GeneratedQrBase64 : Model.PaymentQrUrl)"
-                                                 alt="Mã QR Thanh toán chứa số tiền và nội dung chuyển khoản"
-                                                 class="img-fluid rounded-2"
-                                                 style="max-width: 170px;" />
-                                        </div>
-                                        <div class="small text-primary fw-semibold mt-1" style="font-size: 0.75rem;">
-                                            <i class="fa-solid fa-qrcode me-1"></i> Quét mã để thanh toán
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-sm-7">
-                                        <div class="small fw-bold text-dark-green mb-2">
-                                            <i class="fa-solid fa-qrcode text-primary me-1"></i> Quét mã QR để ủng hộ:
-                                        </div>
-                                        <div class="small mb-2">
-                                            <span class="text-muted">Số tiền thanh toán:</span>
-                                            <strong id="inlineQrAmountText" class="text-danger fs-6 ms-1">@Model.Amount.ToString("N0") VNĐ</strong>
-                                        </div>
-                                        <div class="small">
-                                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                                <span class="text-muted">Nội dung chuyển khoản (bắt buộc):</span>
-                                                <button type="button" class="btn btn-sm btn-link text-success p-0 text-decoration-none fw-semibold" style="font-size: 0.75rem;" onclick="copyTransferContent('inlineQrContentText')">
-                                                    <i class="fa-regular fa-copy me-1"></i>Sao chép
-                                                </button>
-                                            </div>
-                                            <code id="inlineQrContentText" class="bg-white px-2 py-1 rounded border text-success fw-bold d-block">@Model.TransferContent</code>
-                                        </div>
-                                    </div>
-                                </div>
+                                <div class="small text-primary"><i class="fa-solid fa-circle-info me-1"></i>Nhập tên, số tiền và lời nhắn rồi bấm nút bên dưới. Mã QR PayOS cùng trang thanh toán sẽ hiện ra; hệ thống tự theo dõi trạng thái giao dịch.</div>
                             </div>
                         </div>
 
@@ -614,9 +583,7 @@
                 <div class="text-center p-3 bg-light rounded-3 border mb-3">
                     <div class="bg-white p-2 rounded-3 border shadow-sm d-inline-block position-relative">
                         @{
-                            var qrSource = !string.IsNullOrEmpty(Model.PaymentQrUrl) 
-                                ? Model.PaymentQrUrl 
-                                : (!string.IsNullOrEmpty(Model.GeneratedQrBase64) ? Model.GeneratedQrBase64 : null);
+                            var qrSource = Model.DonatePageQrBase64;
                         }
                         <img id="sideGeneratedQrImg"
                              src="@qrSource"
@@ -629,38 +596,20 @@
                                 <i class="fa-solid fa-qrcode text-success display-4"></i>
                             </div>
                             <span class="fw-bold text-dark-green small">Mã QR Streamer</span>
-                            <span class="text-muted small mt-1" style="font-size: 0.75rem;">(Mã QR sẽ được cập nhật)</span>
+                            <span class="text-muted small mt-1" style="font-size: 0.75rem;">QR mở trang donate</span>
                         </div>
                     </div>
                     <div class="small text-dark-green fw-semibold mt-2">
-                        <i class="fa-solid fa-camera text-success me-1"></i> Quét mã QR bằng App Ngân hàng hoặc Ví điện tử
+                        <i class="fa-solid fa-camera text-success me-1"></i> Quét để mở trang donate
                     </div>
                     <div class="small text-muted" style="font-size: 0.75rem;">
-                        Hỗ trợ tất cả ứng dụng ngân hàng (VietQR) và Ví điện tử
+                        Nhập khoản ủng hộ rồi thanh toán qua PayOS
                     </div>
                 </div>
 
-                <!-- Khung hiển thị Số tiền & Nội dung chuyển khoản cần quét -->
+                <!-- Hướng dẫn quy trình thanh toán PayOS -->
                 <div class="bg-light-green p-3 rounded-3 border flex-grow-1 d-flex flex-column justify-content-between">
-                    <div>
-                        <div class="mb-3">
-                            <small class="text-muted d-block fw-semibold">Số tiền ủng hộ:</small>
-                            <strong id="sideQrAmountText" class="text-danger fs-5">@Model.Amount.ToString("N0") VNĐ</strong>
-                        </div>
-                        <div class="mb-2">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <small class="text-muted fw-semibold">Nội dung chuyển khoản (bắt buộc):</small>
-                                <button type="button" class="btn btn-sm btn-link text-success p-0 text-decoration-none fw-semibold" style="font-size: 0.78rem;" onclick="copyTransferContent('sideQrContentText')">
-                                    <i class="fa-regular fa-copy me-1"></i>Sao chép
-                                </button>
-                            </div>
-                            <code id="sideQrContentText" class="bg-white p-2 rounded text-success fw-bold d-block border">@Model.TransferContent</code>
-                        </div>
-                    </div>
-                    <div class="mt-3 text-muted small" style="font-size: 0.75rem;">
-                        <i class="fa-solid fa-circle-info text-success me-1"></i>
-                        Vui lòng giữ đúng nội dung chuyển khoản để hệ thống tự động ghi nhận donate và phát thông báo trên livestream.
-                    </div>
+                    <div class="small text-dark-green"><strong>Cách ủng hộ:</strong><ol class="mt-2 mb-0 ps-3"><li>Điền tên, số tiền và lời nhắn.</li><li>Bấm <strong>Ủng hộ</strong> để tạo QR PayOS.</li><li>Quét QR hoặc mở liên kết thanh toán. Webhook sẽ tự xác nhận khi tiền về.</li></ol></div>
                 </div>
             </div>
         </div>
@@ -838,7 +787,7 @@
                 <!-- Header -->
                 <div class="modal-header text-white px-4 py-3" style="background: linear-gradient(135deg, #0d3b2e 0%, #1b4332 50%, #2d6a4f 100%);">
                     <h5 class="modal-title fw-bold" id="vietQrPaymentModalLabel">
-                        <i class="fa-solid fa-qrcode text-warning me-2"></i> QUÉT MÃ VIETQR ỦNG HỘ STREAMER
+                        <i class="fa-solid fa-qrcode text-warning me-2"></i> THANH TOÁN ỦNG HỘ QUA PAYOS
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" onclick="stopDonateListening()"></button>
                 </div>
@@ -855,7 +804,7 @@
                                     </div>
                                 </div>
                                 <div class="mt-2 small text-dark-green fw-semibold">
-                                    <i class="fa-solid fa-mobile-screen me-1 text-success"></i> Mở App Ngân hàng quét mã
+                                    <i class="fa-solid fa-mobile-screen me-1 text-success"></i> Mở app ngân hàng quét QR PayOS
                                 </div>
                                 <div class="small text-muted" style="font-size: 0.75rem;">
                                     Tự động điền đúng Số tiền &amp; Nội dung
@@ -880,7 +829,7 @@
                                         <strong id="modalAmountDisplay" class="fs-5 text-danger">0 VNĐ</strong>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
-                                        <span class="text-muted small">Ngân hàng thụ hưởng:</span>
+                                        <span class="text-muted small">Ngân hàng:</span>
                                         <span id="modalBankNameDisplay" class="fw-semibold text-dark-green small">MB Bank</span>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
@@ -898,7 +847,7 @@
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
-                                            <span class="text-muted small d-block">Nội dung chuyển khoản (bắt buộc):</span>
+                                            <span class="text-muted small d-block">Nội dung PayOS tự điền:</span>
                                             <strong id="modalMemoDisplay" class="text-success font-monospace fs-6">DN...</strong>
                                         </div>
                                         <button type="button" class="btn btn-sm btn-success py-1 px-3 rounded-pill fw-semibold" onclick="copyModalField('modalMemoDisplay', this)">
@@ -906,6 +855,10 @@
                                         </button>
                                     </div>
                                 </div>
+
+                                <a id="modalPayOSCheckoutLink" class="btn btn-outline-primary w-100 rounded-pill mb-3" href="#" target="_blank" rel="noopener noreferrer">
+                                    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Mở trang thanh toán PayOS
+                                </a>
 
                                 <!-- Trạng thái đang lắng nghe Webhook PayOS qua SignalR -->
                                 <div class="p-2 rounded-3 bg-light-green border border-success border-opacity-25 d-flex align-items-center gap-2">
@@ -983,9 +936,8 @@
     // =========================================================================
     const currentWalletBalance = @Model.CurrentWalletBalance.ToString(System.Globalization.CultureInfo.InvariantCulture);
     const streamerSlug = '@Model.Slug';
-    let qrUpdateTimer = null;
 
-    // Biến quản lý phiên thanh toán Donate VietQR Real-time
+    // Biến quản lý phiên thanh toán PayOS
     let donateHubConnection = null;
     let donatePollingInterval = null;
     let donateCountdownInterval = null;
@@ -1002,9 +954,8 @@
         if (event && event.target) {
             event.target.classList.add('active');
         }
-        // [MỚI THÊM]: Cập nhật lại mã QR và kiểm tra số dư khi chọn mệnh giá nhanh
+        // Cập nhật cảnh báo số dư khi chọn mệnh giá nhanh.
         checkWalletBalance();
-        scheduleQrUpdate();
     }
 
     // [MỚI THÊM]: Kiểm tra số dư ví có đủ so với số tiền nhập hay không
@@ -1036,9 +987,8 @@
             if (walletBox) walletBox.classList.add('d-none');
             if (bankQrBox) bankQrBox.classList.remove('d-none');
             if (submitBtn) {
-                submitBtn.innerHTML = '<i class="fa-solid fa-check-circle me-2"></i> XÁC NHẬN ĐÃ CHUYỂN KHOẢN (@Model.DisplayName)';
+                submitBtn.innerHTML = '<i class="fa-solid fa-qrcode me-2"></i> TẠO THANH TOÁN PAYOS (@Model.DisplayName)';
             }
-            scheduleQrUpdate();
         } else {
             if (walletBox) walletBox.classList.remove('d-none');
             if (bankQrBox) bankQrBox.classList.add('d-none');
@@ -1046,61 +996,6 @@
                 submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane me-2"></i> ỦNG HỘ NGAY (@Model.DisplayName)';
             }
             checkWalletBalance();
-        }
-    }
-
-    // [MỚI THÊM]: Gọi AJAX lên Server (/Streamer/GenerateQrAjax) để tạo lại mã QR
-    // chứa thông tin Số tiền và Nội dung chuyển khoản mới nhất
-    function scheduleQrUpdate() {
-        if (qrUpdateTimer) clearTimeout(qrUpdateTimer);
-        qrUpdateTimer = setTimeout(fetchUpdatedQrCode, 300);
-    }
-
-    async function fetchUpdatedQrCode() {
-        const amountInput = document.getElementById('donateAmountInput');
-        const donorInput = document.getElementById('DonorName');
-        const messageInput = document.getElementById('Message');
-        if (!amountInput) return;
-
-        const amount = parseFloat(amountInput.value) || 0;
-        const donorName = donorInput ? donorInput.value : '';
-        const message = messageInput ? messageInput.value : '';
-
-        try {
-            const url = `/Streamer/GenerateQrAjax?slug=${encodeURIComponent(streamerSlug)}&amount=${encodeURIComponent(amount)}&donorName=${encodeURIComponent(donorName)}&message=${encodeURIComponent(message)}`;
-            const response = await fetch(url);
-            if (!response.ok) return;
-
-            const data = await response.json();
-            if (data && (data.success || data.qrBase64)) {
-                // Cập nhật ảnh QR trên cả khung trong Form và cột bên phải
-                const inlineImg = document.getElementById('inlineGeneratedQrImg');
-                const sideImg = document.getElementById('sideGeneratedQrImg');
-                const sidePlaceholder = document.getElementById('sideQrPlaceholder');
-
-                if (inlineImg && data.qrBase64) {
-                    inlineImg.src = data.qrBase64;
-                    inlineImg.classList.remove('d-none');
-                }
-                if (sideImg && data.qrBase64) {
-                    sideImg.src = data.qrBase64;
-                    sideImg.classList.remove('d-none');
-                    if (sidePlaceholder) sidePlaceholder.classList.add('d-none');
-                }
-
-                // Cập nhật text số tiền và nội dung chuyển khoản
-                const inlineAmount = document.getElementById('inlineQrAmountText');
-                const sideAmount = document.getElementById('sideQrAmountText');
-                if (inlineAmount) inlineAmount.textContent = data.formattedAmount;
-                if (sideAmount) sideAmount.textContent = data.formattedAmount;
-
-                const inlineContent = document.getElementById('inlineQrContentText');
-                const sideContent = document.getElementById('sideQrContentText');
-                if (inlineContent) inlineContent.textContent = data.transferContent;
-                if (sideContent) sideContent.textContent = data.transferContent;
-            }
-        } catch (err) {
-            console.error('Lỗi khi cập nhật mã QR:', err);
         }
     }
 
@@ -1136,7 +1031,7 @@
         alert(msg);
     }
 
-    // [MỚI THÊM]: Lắng nghe sự kiện thay đổi Số tiền, Tên người gửi, Lời nhắn để cập nhật QR tức thì
+    // Theo dõi số dư ví khi người xem thay đổi số tiền.
     document.addEventListener('DOMContentLoaded', function () {
         const amountInput = document.getElementById('donateAmountInput');
         const donorInput = document.getElementById('DonorName');
@@ -1145,14 +1040,7 @@
         if (amountInput) {
             amountInput.addEventListener('input', function () {
                 checkWalletBalance();
-                scheduleQrUpdate();
             });
-        }
-        if (donorInput) {
-            donorInput.addEventListener('input', scheduleQrUpdate);
-        }
-        if (messageInput) {
-            messageInput.addEventListener('input', scheduleQrUpdate);
         }
 
         handlePaymentMethodChange();
@@ -1162,7 +1050,7 @@
         if (donateForm) {
             donateForm.addEventListener('submit', function (e) {
                 const bankRadio = document.getElementById('paymentBankRadio');
-                // Nếu người dùng chọn phương thức Chuyển khoản ngân hàng (VietQR)
+                // Nếu người dùng chọn thanh toán PayOS
                 if (bankRadio && bankRadio.checked) {
                     e.preventDefault();
                     handleBankDonateSubmit();
@@ -1175,7 +1063,7 @@
     // XỬ LÝ QUÉT MÃ VIETQR REAL-TIME QUA PAYOS & SIGNALR
     // =========================================================================
 
-    // Gửi yêu cầu tạo đơn donate Pending và mở Modal VietQR
+    // Gửi yêu cầu tạo đơn donate Pending và mở modal PayOS
     async function handleBankDonateSubmit() {
         const submitBtn = document.getElementById('submitDonateBtn');
         const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
@@ -1189,12 +1077,6 @@
         const donorName = donorInput ? donorInput.value.trim() : '';
         const message = messageInput ? messageInput.value.trim() : '';
 
-        if (!donorName) {
-            alert('Vui lòng nhập Tên của bạn / Biệt danh để streamer biết ai ủng hộ.');
-            if (donorInput) donorInput.focus();
-            return;
-        }
-
         if (amount < @Model.MinDonateAmount) {
             alert('Số tiền ủng hộ tối thiểu là @Model.MinDonateAmount.ToString("N0") VNĐ.');
             if (amountInput) amountInput.focus();
@@ -1203,7 +1085,7 @@
 
         if (submitBtn) {
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Đang tạo mã VietQR...';
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Đang tạo thanh toán PayOS...';
         }
 
         try {
@@ -1231,11 +1113,11 @@
             }
 
             if (!response.ok || !result.success) {
-                alert(result.message || 'Không thể khởi tạo mã VietQR. Vui lòng thử lại sau.');
+                alert(result.message || 'Không thể khởi tạo thanh toán PayOS. Vui lòng thử lại sau.');
                 return;
             }
 
-            // Mở Modal hiển thị mã VietQR Real-time
+            // Hiển thị QR và liên kết thanh toán PayOS riêng cho đơn này.
             openVietQrModal(result);
 
         } catch (err) {
@@ -1248,7 +1130,7 @@
         }
     }
 
-    // Mở Modal VietQR và kích hoạt cơ chế lắng nghe Real-time kép (SignalR + Polling AJAX Fallback)
+    // Mở modal QR PayOS và kích hoạt lắng nghe SignalR cùng Polling dự phòng.
     function openVietQrModal(data) {
         currentDonationId = data.donationId;
         currentDonationCode = data.transactionCode;
@@ -1257,11 +1139,13 @@
         // Điền dữ liệu vào Modal
         document.getElementById('modalVietQrImage').src = data.qrUrl;
         document.getElementById('modalAmountDisplay').textContent = data.formattedAmount;
-        document.getElementById('modalBankNameDisplay').textContent = data.bankId;
-        document.getElementById('modalAccountNoDisplay').textContent = data.accountNo;
-        document.getElementById('modalAccountNameDisplay').textContent = data.accountName;
+        document.getElementById('modalBankNameDisplay').textContent = data.bankId || 'PayOS';
+        document.getElementById('modalAccountNoDisplay').textContent = data.accountNo || 'Theo mã QR';
+        document.getElementById('modalAccountNameDisplay').textContent = data.accountName || 'Tài khoản PayOS';
         document.getElementById('modalMemoDisplay').textContent = data.memo;
         document.getElementById('modalStreamerNameDisplay').textContent = data.streamerName || '@Model.DisplayName';
+        const checkoutLink = document.getElementById('modalPayOSCheckoutLink');
+        if (checkoutLink) checkoutLink.href = data.checkoutUrl || '#';
 
         // Đảm bảo trạng thái ban đầu là đang chờ quét mã
         document.getElementById('modalWaitingPaymentState').classList.remove('d-none');
@@ -1271,7 +1155,7 @@
         startDonateCountdown();
 
         // 1. Kích hoạt kết nối SignalR Real-time Hub (0 delay)
-        initSignalRDonation(data.transactionCode, data.donationId);
+        initSignalRDonation(data.transactionCode, data.donationId, data.orderCode);
 
         // 2. Kích hoạt Polling AJAX dự phòng mỗi 3 giây
         startDonatePolling(data.donationId, data.transactionCode);
@@ -1283,7 +1167,7 @@
     }
 
     // Khởi tạo kết nối SignalR lắng nghe sự kiện DonationSuccess khi Webhook PayOS xử lý thành công
-    function initSignalRDonation(txCode, donationId) {
+    function initSignalRDonation(txCode, donationId, orderCode) {
         if (typeof signalR === 'undefined') {
             console.warn('[SignalR] Thư viện SignalR chưa nạp, sử dụng Polling AJAX Fallback.');
             return;
@@ -1303,7 +1187,7 @@
             // Lắng nghe sự kiện DonationSuccess từ PaymentWebhookController
             donateHubConnection.on('DonationSuccess', function (res) {
                 console.log('[SignalR Real-time] Nhận sự kiện DonationSuccess từ PayOS Webhook:', res);
-                if (res && (res.transactionCode === txCode || res.donationId == donationId)) {
+                if (res && (res.transactionCode === txCode || res.donationId == donationId || res.orderCode == orderCode)) {
                     showDonationSuccessUI(res);
                 }
             });
@@ -1314,6 +1198,9 @@
                 donateHubConnection.invoke('JoinTransactionGroup', txCode);
                 if (donationId) {
                     donateHubConnection.invoke('JoinTransactionGroup', donationId.toString());
+                }
+                if (orderCode) {
+                    donateHubConnection.invoke('JoinTransactionGroup', orderCode.toString());
                 }
             }).catch(function (err) {
                 console.warn('[SignalR] Lỗi kết nối Hub, tiếp tục với Polling AJAX:', err);
@@ -1388,7 +1275,7 @@
                 clearInterval(donateCountdownInterval);
                 clearInterval(donatePollingInterval);
                 if (timerEl) timerEl.textContent = 'HẾT HẠN';
-                alert('Mã VietQR này đã hết hạn hiệu lực 10 phút. Vui lòng bấm tạo mã mới để tiếp tục.');
+                alert('Mã thanh toán này đã hết hạn sau 10 phút. Vui lòng tạo đơn mới để tiếp tục.');
                 stopDonateListening();
                 const modalEl = document.getElementById('vietQrPaymentModal');
                 const modalInstance = bootstrap.Modal.getInstance(modalEl);

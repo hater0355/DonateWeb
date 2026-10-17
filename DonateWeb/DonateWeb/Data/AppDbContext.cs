@@ -24,11 +24,14 @@ namespace DonateWeb.Data
         // Các bảng thuộc phân hệ Widget & Tùy biến Streamer (OBS)
         public DbSet<AlertBoxConfig> AlertBoxConfigs => Set<AlertBoxConfig>();
         public DbSet<StreamerGoal> StreamerGoals => Set<StreamerGoal>();
+        public DbSet<SpecialEffectCampaign> SpecialEffectCampaigns => Set<SpecialEffectCampaign>();
+        public DbSet<StreamerEffectActivation> StreamerEffectActivations => Set<StreamerEffectActivation>();
 
         // Phân hệ Gian hàng & Giỏ hàng Streamer
         public DbSet<ShopProduct> ShopProducts => Set<ShopProduct>();
         public DbSet<ShopOrder> ShopOrders => Set<ShopOrder>();
         public DbSet<ShopOrderItem> ShopOrderItems => Set<ShopOrderItem>();
+        public DbSet<DiscountCoupon> DiscountCoupons => Set<DiscountCoupon>();
 
         // Bản tin Breaking News
         public DbSet<BreakingNews> BreakingNews => Set<BreakingNews>();
@@ -101,6 +104,10 @@ namespace DonateWeb.Data
             // Donation - Foreign keys
             modelBuilder.Entity<Donation>(entity =>
             {
+                entity.HasIndex(d => d.ExternalTransactionId)
+                      .IsUnique()
+                      .HasFilter("[ExternalTransactionId] IS NOT NULL");
+
                 entity.HasOne(d => d.StreamerProfile)
                       .WithMany(sp => sp.DonationsReceived)
                       .HasForeignKey(d => d.StreamerProfileId)
@@ -187,6 +194,27 @@ namespace DonateWeb.Data
                 entity.HasIndex(sg => new { sg.StreamerProfileId, sg.IsActive });
             });
 
+            modelBuilder.Entity<SpecialEffectCampaign>(entity =>
+            {
+                entity.Property(campaign => campaign.EffectCode).HasMaxLength(50).IsRequired();
+                entity.Property(campaign => campaign.Title).HasMaxLength(120).IsRequired();
+                entity.Property(campaign => campaign.Description).HasMaxLength(500);
+                entity.HasIndex(campaign => new { campaign.IsEnabled, campaign.StartsAtUtc, campaign.EndsAtUtc });
+            });
+
+            modelBuilder.Entity<StreamerEffectActivation>(entity =>
+            {
+                entity.HasIndex(activation => activation.StreamerProfileId).IsUnique();
+                entity.HasOne(activation => activation.StreamerProfile)
+                    .WithMany()
+                    .HasForeignKey(activation => activation.StreamerProfileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(activation => activation.Campaign)
+                    .WithMany(campaign => campaign.Activations)
+                    .HasForeignKey(activation => activation.SpecialEffectCampaignId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
             // ShopProduct
             modelBuilder.Entity<ShopProduct>(entity =>
             {
@@ -210,6 +238,21 @@ namespace DonateWeb.Data
                       .OnDelete(DeleteBehavior.SetNull);
 
                 entity.HasIndex(o => o.OrderCode).IsUnique();
+                entity.HasIndex(o => o.DiscountCouponId);
+                entity.HasIndex(o => new { o.PaymentMethod, o.PaymentStatus, o.StockReserved, o.CreatedAt })
+                      .HasDatabaseName("IX_ShopOrders_StockReservations");
+
+                entity.HasOne(o => o.DiscountCoupon)
+                      .WithMany(coupon => coupon.ShopOrders)
+                      .HasForeignKey(o => o.DiscountCouponId)
+                      .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<DiscountCoupon>(entity =>
+            {
+                entity.HasIndex(coupon => coupon.Code).IsUnique();
+                entity.Property(coupon => coupon.DiscountValue).HasPrecision(18, 2);
+                entity.Property(coupon => coupon.DiscountType).HasMaxLength(20).IsRequired();
             });
 
             // ShopOrderItem

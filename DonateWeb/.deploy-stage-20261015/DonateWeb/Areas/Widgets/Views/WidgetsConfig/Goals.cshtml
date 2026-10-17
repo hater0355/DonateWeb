@@ -1,0 +1,302 @@
+@model DonateWeb.Areas.Widgets.ViewModels.GoalManagementViewModel
+@{
+    ViewData["Title"] = "Quản lý Mục tiêu Donate (Streamer Goal)";
+}
+
+<div class="row g-4">
+    <!-- Tiêu đề & Hộp URL OBS Goal -->
+    <div class="col-12">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <h3 class="fw-bold mb-1 text-white">
+                    <i class="fa-solid fa-bullseye text-emerald me-2"></i> Quản Lý Mục Tiêu Donate (Goal)
+                </h3>
+                <p class="text-secondary mb-0">
+                    Thiết lập chiến dịch gây quỹ, tính toán tiến độ thanh chạy tự động hiển thị trực tiếp trên livestream qua OBS Studio.
+                </p>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show mt-3 border-0 bg-success bg-opacity-25 text-success" role="alert">
+                <i class="fa-solid fa-circle-check me-2"></i> @Model.SuccessMessage
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show mt-3 border-0 bg-danger bg-opacity-25 text-danger" role="alert">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i> @Model.ErrorMessage
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <!-- Hộp URL OBS Goal Overlay -->
+        <div class="widget-card p-3 mt-3 border border-emerald border-opacity-50">
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-emerald text-white fw-bold">URL OBS BROWSER SOURCE - MỤC TIÊU</span>
+                        <small class="text-muted">Kích thước khuyên dùng: <strong>Width: 800 | Height: 120</strong></small>
+                    </div>
+                    <div class="copy-box d-flex align-items-center justify-content-between">
+                        <span class="font-monospace text-emerald small text-truncate me-2">@Model.ObsOverlayUrl</span>
+                        <button type="button" class="btn btn-sm btn-outline-emerald text-nowrap" onclick="copyToClipboard('@Model.ObsOverlayUrl')">
+                            <i class="fa-regular fa-copy me-1"></i> Sao chép URL
+                        </button>
+                    </div>
+                </div>
+                <div class="col-lg-4 mt-3 mt-lg-0 text-secondary small">
+                    <i class="fa-solid fa-circle-info text-info me-1"></i>
+                    Thanh tiến độ sẽ tự động cập nhật ngay lập tức mỗi khi có khán giả donate thành công mà không cần tải lại OBS!
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Xem trước Goal đang kích hoạt -->
+    <div class="col-12">
+        <div class="widget-card p-4">
+            <h5 class="fw-bold text-white mb-3">
+                <i class="fa-solid fa-display text-info me-2"></i> Mục Tiêu Đang Kích Hoạt Trên Stream
+            </h5>
+
+            @if (Model.ActiveGoal != null)
+            {
+                <div class="p-4 rounded-3" style="background: #0f172a; border: 1px solid #334155;">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+                        <h4 class="fw-bold text-white mb-0">@Model.ActiveGoal.Title</h4>
+                        <span class="badge bg-success px-3 py-2 fs-6">
+                            <i class="fa-solid fa-signal me-1"></i> Đang phát trên OBS
+                        </span>
+                    </div>
+
+                    <!-- Chuỗi hiển thị tiến độ theo yêu cầu: "Mua PC mới: 5.000.000đ / 10.000.000đ (50%)" -->
+                    <div class="d-flex justify-content-between align-items-center mb-2 mt-3">
+                        <span class="fs-5 fw-bold text-warning">
+                            @Model.ActiveGoal.FullGoalDisplay
+                        </span>
+                        <span class="text-secondary small">
+                            Đã đạt: <strong class="text-white">@Model.ActiveGoal.ProgressPercentage%</strong>
+                        </span>
+                    </div>
+
+                    <!-- Thanh chạy tiến độ Progress Bar -->
+                    <div class="progress" style="height: 28px; background-color: #1e293b; border-radius: 14px; overflow: hidden; border: 1px solid #475569;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated fw-bold" 
+                             role="progressbar" 
+                             style="width: @(Model.ActiveGoal.ProgressPercentage)%; background-color: @Model.ActiveGoal.ProgressBarColor; font-size: 14px;" 
+                             aria-valuenow="@Model.ActiveGoal.ProgressPercentage" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                            @(Model.ActiveGoal.ProgressPercentage >= 10 ? $"{Model.ActiveGoal.ProgressPercentage}%" : "")
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-dark border-secondary text-secondary mb-0">
+                    <i class="fa-solid fa-info-circle me-2"></i> Hiện chưa có mục tiêu nào được kích hoạt. Hãy tạo mới hoặc kích hoạt một mục tiêu bên dưới để hiển thị lên stream.
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Cột trái: Form tạo mới / chỉnh sửa Goal -->
+    <div class="col-lg-5">
+        <div class="widget-card p-4">
+            <h5 class="fw-bold mb-4 pb-2 border-bottom border-secondary text-white">
+                <i class="fa-solid fa-plus-circle text-emerald me-2"></i> Thiết Lập Mục Tiêu Mới
+            </h5>
+
+            <form asp-action="SaveGoal" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="NewGoal.Id" id="goalIdInput" />
+                <input type="hidden" asp-for="NewGoal.StreamerProfileId" />
+
+                <div class="mb-3">
+                    <label asp-for="NewGoal.Title" class="form-label fw-semibold text-light"></label>
+                    <input asp-for="NewGoal.Title" id="goalTitleInput" class="form-control widget-input" placeholder="Ví dụ: Mua PC mới" />
+                    <span asp-validation-for="NewGoal.Title" class="text-danger small"></span>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label asp-for="NewGoal.TargetAmount" class="form-label fw-semibold text-light"></label>
+                        <input type="number" asp-for="NewGoal.TargetAmount" id="goalTargetInput" class="form-control widget-input" step="50000" min="10000" />
+                        <span asp-validation-for="NewGoal.TargetAmount" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="NewGoal.StartingAmount" class="form-label fw-semibold text-light"></label>
+                        <input type="number" asp-for="NewGoal.StartingAmount" id="goalStartingInput" class="form-control widget-input" step="10000" min="0" />
+                        <span asp-validation-for="NewGoal.StartingAmount" class="text-danger small"></span>
+                        <small class="text-muted" style="font-size: 0.72rem;">Số tiền khởi điểm (sẽ tự động cộng dồn donate)</small>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="NewGoal.ProgressBarColor" class="form-label fw-semibold text-light">Màu Thanh Chạy Tiến Độ</label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="color" id="goalColorPicker" class="form-control form-control-color bg-dark border-secondary" value="@Model.NewGoal.ProgressBarColor" style="width: 50px; height: 38px;" />
+                        <input asp-for="NewGoal.ProgressBarColor" id="goalColorInput" class="form-control widget-input font-monospace" />
+                    </div>
+                    <span asp-validation-for="NewGoal.ProgressBarColor" class="text-danger small"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="NewGoal.EndDate" class="form-label fw-semibold text-light">Hạn Chót Kết Thúc (Tùy chọn)</label>
+                    <input type="datetime-local" asp-for="NewGoal.EndDate" class="form-control widget-input" />
+                    <span asp-validation-for="NewGoal.EndDate" class="text-danger small"></span>
+                    <small class="text-muted">Bỏ trống nếu mục tiêu không giới hạn thời gian.</small>
+                </div>
+
+                <div class="mb-4 form-check form-switch fs-5">
+                    <input class="form-check-input" type="checkbox" asp-for="NewGoal.IsActive" id="goalActiveInput" />
+                    <label class="form-check-label fs-6 text-light ms-2" for="goalActiveInput">
+                        Kích hoạt ngay trên màn hình OBS
+                    </label>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-emerald px-4 py-2 fw-bold text-white" style="background-color: #10b981;">
+                        <i class="fa-solid fa-floppy-disk me-2"></i> Lưu Mục Tiêu
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="resetGoalForm()">
+                        Làm mới form
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Cột phải: Danh sách các mục tiêu đã tạo -->
+    <div class="col-lg-7">
+        <div class="widget-card p-4">
+            <h5 class="fw-bold mb-4 pb-2 border-bottom border-secondary text-white">
+                <i class="fa-solid fa-list-check text-warning me-2"></i> Danh Sách Mục Tiêu Đã Tạo (@Model.Goals.Count)
+            </h5>
+
+            @if (!Model.Goals.Any())
+            {
+                <div class="text-center py-5 text-secondary">
+                    <i class="fa-solid fa-folder-open fs-1 mb-3"></i>
+                    <p>Chưa có mục tiêu Donate nào được tạo. Hãy thêm mục tiêu đầu tiên ở form bên cạnh!</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle">
+                        <thead>
+                            <tr class="text-secondary small">
+                                <th>Tiêu đề mục tiêu</th>
+                                <th>Tiến độ Donate</th>
+                                <th class="text-center">Trạng thái</th>
+                                <th class="text-end">Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var g in Model.Goals)
+                            {
+                                <tr>
+                                    <td>
+                                        <strong class="text-light">@g.Title</strong>
+                                        <div class="small text-muted">
+                                            Bắt đầu: @g.StartDate.ToString("dd/MM/yyyy")
+                                            @if (g.EndDate.HasValue)
+                                            {
+                                                <span> - Kết thúc: @g.EndDate.Value.ToString("dd/MM/yyyy")</span>
+                                            }
+                                        </div>
+                                    </td>
+                                    <td style="min-width: 180px;">
+                                        <div class="small fw-semibold text-warning mb-1">
+                                            @g.FormattedProgress
+                                        </div>
+                                        <div class="progress" style="height: 8px; background: #334155;">
+                                            <div class="progress-bar" style="width: @(g.ProgressPercentage)%; background-color: @g.ProgressBarColor;"></div>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        @if (g.IsActive)
+                                        {
+                                            <span class="badge bg-success">
+                                                <i class="fa-solid fa-check me-1"></i> Đang chạy
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Tạm dừng</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <!-- Nút Bật/Tắt -->
+                                            <form asp-action="ToggleGoal" asp-route-id="@g.Id" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-outline-info" title="@(g.IsActive ? "Tạm dừng" : "Kích hoạt phát lên stream")">
+                                                    <i class="fa-solid @(g.IsActive ? "fa-pause" : "fa-play")"></i>
+                                                </button>
+                                            </form>
+
+                                            <!-- Nút Sửa nhanh -->
+                                            <button type="button" class="btn btn-outline-warning" 
+                                                    onclick="editGoal(@g.Id, '@Html.Raw(g.Title.Replace("'", "\\'"))', @g.TargetAmount, @g.StartingAmount, '@g.ProgressBarColor', @g.IsActive.ToString().ToLower())"
+                                                    title="Chỉnh sửa mục tiêu">
+                                                <i class="fa-solid fa-pen"></i>
+                                            </button>
+
+                                            <!-- Nút Xóa -->
+                                            <form asp-action="DeleteGoal" asp-route-id="@g.Id" method="post" class="d-inline" onsubmit="return confirm('Bạn có chắc muốn xóa mục tiêu này?');">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-outline-danger" title="Xóa mục tiêu">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const colorPicker = document.getElementById('goalColorPicker');
+        const colorInput = document.getElementById('goalColorInput');
+
+        if (colorPicker && colorInput) {
+            colorPicker.addEventListener('input', () => colorInput.value = colorPicker.value);
+            colorInput.addEventListener('input', () => colorPicker.value = colorInput.value);
+        }
+
+        function editGoal(id, title, target, starting, color, isActive) {
+            document.getElementById('goalIdInput').value = id;
+            document.getElementById('goalTitleInput').value = title;
+            document.getElementById('goalTargetInput').value = target;
+            document.getElementById('goalStartingInput').value = starting;
+            document.getElementById('goalColorInput').value = color;
+            document.getElementById('goalColorPicker').value = color;
+            document.getElementById('goalActiveInput').checked = isActive;
+
+            window.scrollTo({ top: 300, behavior: 'smooth' });
+        }
+
+        function resetGoalForm() {
+            document.getElementById('goalIdInput').value = 0;
+            document.getElementById('goalTitleInput').value = '';
+            document.getElementById('goalTargetInput').value = 10000000;
+            document.getElementById('goalStartingInput').value = 0;
+            document.getElementById('goalColorInput').value = '#10b981';
+            document.getElementById('goalColorPicker').value = '#10b981';
+            document.getElementById('goalActiveInput').checked = true;
+        }
+    </script>
+}

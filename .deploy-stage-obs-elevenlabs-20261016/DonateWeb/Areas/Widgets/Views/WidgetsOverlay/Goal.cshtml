@@ -1,0 +1,175 @@
+@model DonateWeb.Areas.Widgets.ViewModels.StreamerGoalViewModel?
+@{
+    Layout = "_OverlayLayout";
+    var slug = ViewBag.StreamerSlug as string ?? "";
+    var widgetKey = ViewBag.WidgetKey as string ?? "";
+}
+
+<style>
+    .goal-overlay-wrapper {
+        padding: 15px 25px;
+        width: 100%;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .goal-card {
+        background: rgba(15, 23, 42, 0.88);
+        border: 2px solid rgba(255, 255, 255, 0.15);
+        border-radius: 16px;
+        padding: 16px 24px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 0 12px rgba(255, 255, 255, 0.05);
+    }
+
+    .goal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .goal-title {
+        font-family: 'Inter', sans-serif;
+        font-size: 22px;
+        font-weight: 800;
+        color: #ffffff;
+        text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.9);
+        letter-spacing: 0.5px;
+    }
+
+    .goal-stats {
+        font-family: 'Inter', sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+        color: #f59e0b;
+        text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.9);
+    }
+
+    .goal-progress-track {
+        height: 32px;
+        background: rgba(30, 41, 59, 0.9);
+        border-radius: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        overflow: hidden;
+        position: relative;
+        box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+    }
+
+    .goal-progress-bar {
+        height: 100%;
+        border-radius: 14px;
+        transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        background-image: linear-gradient(
+            45deg, 
+            rgba(255, 255, 255, 0.15) 25%, 
+            transparent 25%, 
+            transparent 50%, 
+            rgba(255, 255, 255, 0.15) 50%, 
+            rgba(255, 255, 255, 0.15) 75%, 
+            transparent 75%, 
+            transparent
+        );
+        background-size: 30px 30px;
+        animation: progress-stripes 2s linear infinite;
+        box-shadow: 0 0 15px currentColor;
+    }
+
+    .goal-percent-text {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        top: 0;
+        left: 0;
+        font-family: 'Inter', sans-serif;
+        font-size: 15px;
+        font-weight: 800;
+        color: #ffffff;
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9);
+    }
+
+    @@keyframes progress-stripes {
+        from { background-position: 30px 0; }
+        to { background-position: 0 0; }
+    }
+</style>
+
+<div class="goal-overlay-wrapper">
+    @if (Model != null)
+    {
+        <div class="goal-card" id="goalCard">
+            <div class="goal-header">
+                <span class="goal-title" id="goalTitle">@Model.Title</span>
+                <span class="goal-stats" id="goalStats">@Model.FormattedProgress</span>
+            </div>
+
+            <div class="goal-progress-track">
+                <div class="goal-progress-bar" 
+                     id="goalProgressBar" 
+                     style="width: @(Model.ProgressPercentage)%; background-color: @Model.ProgressBarColor;">
+                </div>
+                <div class="goal-percent-text" id="goalPercentText">
+                    @(Model.ProgressPercentage)%
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="goal-card" id="goalCard" style="display: none;">
+            <div class="goal-header">
+                <span class="goal-title" id="goalTitle">Mục tiêu Donate</span>
+                <span class="goal-stats" id="goalStats">0đ / 0đ (0%)</span>
+            </div>
+            <div class="goal-progress-track">
+                <div class="goal-progress-bar" id="goalProgressBar" style="width: 0%;"></div>
+                <div class="goal-percent-text" id="goalPercentText">0%</div>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        const streamerSlug = '@Html.Raw(slug)';
+        const goalCard = document.getElementById('goalCard');
+        const goalTitle = document.getElementById('goalTitle');
+        const goalStats = document.getElementById('goalStats');
+        const goalProgressBar = document.getElementById('goalProgressBar');
+        const goalPercentText = document.getElementById('goalPercentText');
+
+        // Hàm cập nhật tiến độ Goal thời gian thực qua REST API
+        async function fetchGoalUpdate() {
+            if (!streamerSlug) return;
+
+            try {
+                const response = await fetch('/api/widgets/goal/' + encodeURIComponent(streamerSlug));
+                const res = await response.json();
+
+                if (res.success && res.hasActiveGoal && res.data) {
+                    const g = res.data;
+                    goalCard.style.display = 'block';
+                    goalTitle.innerText = g.title;
+                    goalStats.innerText = g.formattedProgress;
+                    goalProgressBar.style.width = g.progressPercentage + '%';
+                    goalProgressBar.style.backgroundColor = g.progressBarColor || '#10b981';
+                    goalPercentText.innerText = g.progressPercentage + '%';
+                } else {
+                    // Nếu không có goal nào đang active thì có thể ẩn card đi
+                    if (!goalCard.hasAttribute('data-has-initial')) {
+                        goalCard.style.display = 'none';
+                    }
+                }
+            } catch (err) {
+                console.log("Lỗi polling goal:", err);
+            }
+        }
+
+        // Tự động kiểm tra và cập nhật tiến độ mỗi 4 giây
+        setInterval(fetchGoalUpdate, 4000);
+    </script>
+}

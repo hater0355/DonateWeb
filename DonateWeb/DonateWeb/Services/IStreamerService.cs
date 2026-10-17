@@ -10,7 +10,10 @@ namespace DonateWeb.Services
         Task<List<StreamerProfile>> GetFeaturedStreamersAsync(int count = 8);
         Task<(bool Success, string Error)> UpdateProfileConfigAsync(int userId, StreamerProfileConfigViewModel model);
         Task<(bool Success, string Error, Donation? Donation)> ProcessDonationAsync(int? donorUserId, StreamerDonateViewModel model);
-        Task<(bool Success, string Error, StreamerProfile? Profile)> RegisterStreamerAsync(int? currentUserId, StreamerRegisterViewModel model);
+        Task<(bool Success, string Error, StreamerProfile? Profile)> RegisterStreamerAsync(
+            int? currentUserId,
+            StreamerRegisterViewModel model,
+            StreamerIdentitySubmission identitySubmission);
         Task<(bool Success, string Message, User? User)> CancelStreamerAsync(int userId);
 
         // Chức năng Theo dõi Streamer (Streamer Yêu Thích)

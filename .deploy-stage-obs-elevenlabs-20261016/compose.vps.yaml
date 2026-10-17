@@ -1,0 +1,39 @@
+services:
+  web:
+    build:
+      context: ./DonateWeb
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__DefaultConnection: "Server=donateweb-db,1433;Database=${DB_NAME:-DonateWebDB};User Id=${DB_USER:?Set DB_USER in .env};Password=${DB_PASSWORD:?Set DB_PASSWORD in .env};Encrypt=True;TrustServerCertificate=True;MultipleActiveResultSets=true"
+      DataProtection__KeysPath: /var/lib/donateweb/keys
+      PayOS__ClientId: ${PAYOS_CLIENT_ID:?Set PAYOS_CLIENT_ID in .env}
+      PayOS__ApiKey: ${PAYOS_API_KEY:?Set PAYOS_API_KEY in .env}
+      PayOS__ChecksumKey: ${PAYOS_CHECKSUM_KEY:?Set PAYOS_CHECKSUM_KEY in .env}
+      App__PublicBaseUrl: ${PUBLIC_BASE_URL:-}
+      # ElevenLabs: chỉ truyền khóa bí mật vào container máy chủ, không đưa vào OBS/browser.
+      ElevenLabs__ApiKey: ${ELEVENLABS_API_KEY:-}
+      ElevenLabs__VoiceId: ${ELEVENLABS_VOICE_ID:-}
+      ElevenLabs__ModelId: ${ELEVENLABS_MODEL_ID:-eleven_flash_v2_5}
+    volumes:
+      - dataprotection-keys:/var/lib/donateweb/keys
+      # Ảnh người dùng tải lên cần nằm ngoài vòng đời container để không mất khi build lại.
+      - uploaded-images:/app/wwwroot/images
+    networks:
+      - donateweb-net
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  dataprotection-keys:
+  uploaded-images:
+
+networks:
+  donateweb-net:
+    external: true

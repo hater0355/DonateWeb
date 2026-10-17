@@ -34,6 +34,18 @@ namespace DonateWeb.Models.Entities
         [MaxLength(100)]
         public string? TransactionCode { get; set; }
 
+        /// <summary>Mã giao dịch bên thứ ba để chống ghi nhận webhook lặp.</summary>
+        [MaxLength(100)]
+        public string? ExternalTransactionId { get; set; }
+
+        /// <summary>Mã hiệu ứng sự kiện được chụp lại lúc donate thành công.</summary>
+        [MaxLength(50)]
+        public string? SpecialEffectCode { get; set; }
+
+        /// <summary>Tên sự kiện tại thời điểm nhận donate, để AlertBox hiển thị đúng nội dung.</summary>
+        [MaxLength(120)]
+        public string? SpecialEffectTitle { get; set; }
+
         /// <summary>
         /// Cờ đánh dấu giao dịch đang có khiếu nại (Dispute / Nghi ngờ gian lận / Lỗi trừ tiền nhưng không nhận được quà)
         /// </summary>

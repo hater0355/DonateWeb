@@ -1,0 +1,299 @@
+@model DonateWeb.Areas.Admin.ViewModels.AdminTransactionDetailViewModel
+@{
+    ViewData["Title"] = $"Kiểm Tra Log Giao Dịch #{Model.TransactionCode}";
+}
+
+<!-- FILE: Areas/Admin/Views/Admin/TransactionDetail.cshtml -->
+<!-- CHỨC NĂNG: TRA CỨU VÀ KIỂM TRA LOG GIAO DỊCH KHI CÓ KHIẾU NẠI (DISPUTE/LỖI GIAO DỊCH) -->
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <a href="/Admin/Transactions" class="btn btn-outline-secondary btn-sm rounded-circle p-1" style="width: 32px; height: 32px;" title="Quay lại danh sách">
+                <i class="fa-solid fa-arrow-left"></i>
+            </a>
+            <h4 class="fw-bold mb-0 text-dark">
+                Kiểm Tra Log Giao Dịch <span class="font-monospace text-primary">#@Model.TransactionCode</span>
+            </h4>
+        </div>
+        <p class="text-muted small mb-0 ms-4 ps-2">Nhật ký kiểm toán, đối soát thanh toán và biên bản giải quyết khiếu nại (Dispute Resolution)</p>
+    </div>
+
+    <div>
+        @switch (Model.Status)
+        {
+            case DonationStatus.Success:
+                <span class="badge bg-success fs-6 px-3 py-2 rounded-pill"><i class="fa-solid fa-circle-check me-1"></i>Thành công</span>
+                break;
+            case DonationStatus.Pending:
+                <span class="badge bg-warning text-dark fs-6 px-3 py-2 rounded-pill"><i class="fa-solid fa-hourglass-half me-1"></i>Chờ xử lý</span>
+                break;
+            case DonationStatus.Failed:
+                <span class="badge bg-danger fs-6 px-3 py-2 rounded-pill"><i class="fa-solid fa-circle-xmark me-1"></i>Thất bại</span>
+                break;
+            case DonationStatus.Cancelled:
+                <span class="badge bg-secondary fs-6 px-3 py-2 rounded-pill">Đã hủy</span>
+                break;
+            case DonationStatus.Disputed:
+                <span class="badge bg-purple text-white fs-6 px-3 py-2 rounded-pill" style="background-color: #9333ea;">
+                    <i class="fa-solid fa-triangle-exclamation me-1"></i>Đang Khiếu Nại
+                </span>
+                break;
+            case DonationStatus.Refunded:
+                <span class="badge bg-dark fs-6 px-3 py-2 rounded-pill"><i class="fa-solid fa-rotate-left me-1"></i>Đã Hoàn Tiền</span>
+                break;
+        }
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- CỘT TRÁI: THÔNG TIN CHI TIẾT GIAO DỊCH & KHIẾU NẠI -->
+    <div class="col-12 col-lg-7">
+        <!-- CẢNH BÁO KHIẾU NẠI (NẾU CÓ) -->
+        @if (Model.IsDisputed)
+        {
+            <div class="alert alert-warning border-2 border-warning shadow-sm rounded-4 mb-4 p-4">
+                <div class="d-flex align-items-center gap-2 mb-2 text-warning-emphasis">
+                    <i class="fa-solid fa-triangle-exclamation fs-4 text-warning"></i>
+                    <h5 class="mb-0 fw-bold">Giao Dịch Đang Có Khiếu Nại / Tranh Chấp (Dispute)</h5>
+                </div>
+                <p class="mb-2"><strong>Lý do khiếu nại từ người dùng:</strong></p>
+                <div class="p-3 bg-white rounded-3 border text-danger fw-semibold">
+                    "@(Model.DisputeReason ?? "Người dùng báo lỗi thanh toán nhưng không nêu chi tiết.")"
+                </div>
+                @if (!string.IsNullOrEmpty(Model.AdminNote))
+                {
+                    <div class="mt-2 small text-muted">
+                        <strong>Ghi chú trước đó của Admin:</strong> @Model.AdminNote
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- THẺ THÔNG TIN GIAO DỊCH CHÍNH -->
+        <div class="card border-0 shadow-sm rounded-4 mb-4">
+            <div class="card-header bg-white py-3 border-bottom">
+                <h6 class="mb-0 fw-bold text-dark">
+                    <i class="fa-solid fa-receipt text-success me-2"></i>Thông Tin Khoản Donate (Donation)
+                </h6>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-3">
+                    <div class="col-6">
+                        <span class="text-muted small">Mã Giao Dịch:</span>
+                        <div class="fw-bold font-monospace fs-6 text-dark">@Model.TransactionCode</div>
+                    </div>
+                    <div class="col-6">
+                        <span class="text-muted small">Số Tiền Donate:</span>
+                        <div class="fw-bold fs-5 text-success">@Model.Amount.ToString("N0") VNĐ</div>
+                    </div>
+                    <div class="col-6">
+                        <span class="text-muted small">Phương Thức Thanh Toán:</span>
+                        <div class="fw-semibold text-dark">
+                            @switch (Model.PaymentMethod)
+                            {
+                                case PaymentMethod.Wallet: <span>Ví DonateWeb</span> break;
+                                case PaymentMethod.BankTransfer: <span>Chuyển khoản QR (VietQR)</span> break;
+                                case PaymentMethod.Momo: <span>Ví MoMo</span> break;
+                                case PaymentMethod.VnPay: <span>Cổng thanh toán VNPay</span> break;
+                            }
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <span class="text-muted small">Thời Gian Khởi Tạo:</span>
+                        <div class="fw-semibold text-dark">@Model.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss")</div>
+                    </div>
+
+                    <div class="col-12">
+                        <span class="text-muted small">Lời Nhắn Người Gửi Kèm Theo:</span>
+                        <div class="p-3 bg-light rounded-3 text-secondary fst-italic mt-1 border">
+                            "@(string.IsNullOrEmpty(Model.Message) ? "Không có lời nhắn" : Model.Message)"
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- THẺ THÔNG TIN HAI BÊN (DONOR & STREAMER) -->
+        <div class="row g-3">
+            <!-- Bên gửi (Donor) -->
+            <div class="col-12 col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h6 class="mb-0 fw-bold text-dark">
+                            <i class="fa-solid fa-user text-primary me-2"></i>Người Ủng Hộ (Donor)
+                        </h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="fw-bold text-dark fs-6">@Model.DonorName</div>
+                        @if (!string.IsNullOrEmpty(Model.DonorEmail))
+                        {
+                            <div class="small text-muted mb-2">@Model.DonorEmail</div>
+                            <div class="p-2 bg-light rounded-2 small">
+                                Số dư ví hiện tại: <strong class="text-success">@Model.DonorWalletBalance?.ToString("N0") VNĐ</strong>
+                            </div>
+                        }
+                        else
+                        {
+                            <span class="badge bg-light text-muted border mt-2">Ủng hộ ẩn danh (Khách vãng lai)</span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bên nhận (Streamer) -->
+            <div class="col-12 col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h6 class="mb-0 fw-bold text-dark">
+                            <i class="fa-solid fa-satellite-dish text-info me-2"></i>Streamer Nhận Tiền
+                        </h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="fw-bold text-dark fs-6">@Model.StreamerName</div>
+                        <a href="/@Model.StreamerSlug" target="_blank" class="badge bg-light text-primary border text-decoration-none my-1">
+                            /@Model.StreamerSlug <i class="fa-solid fa-external-link small ms-1"></i>
+                        </a>
+
+                        @if (!string.IsNullOrEmpty(Model.StreamerBankName))
+                        {
+                            <div class="mt-2 small text-muted">
+                                <div><strong>Ngân hàng:</strong> @Model.StreamerBankName</div>
+                                <div><strong>Số TK:</strong> <span class="font-monospace">@Model.StreamerAccountNumber</span></div>
+                                <div><strong>Chủ TK:</strong> @Model.StreamerAccountName</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CỘT PHẢI: FORM PHÂN XỬ KHIẾU NẠI & AUDIT TRAIL LOGS -->
+    <div class="col-12 col-lg-5">
+        <!-- FORM XỬ LÝ KHIẾU NẠI (DISPUTE RESOLUTION) -->
+        <div class="card border-0 shadow-sm rounded-4 mb-4">
+            <div class="card-header bg-white py-3 border-bottom">
+                <h6 class="mb-0 fw-bold text-dark">
+                    <i class="fa-solid fa-gavel text-danger me-2"></i>Quyết Định Xử Lý Khiếu Nại & Điều Chỉnh
+                </h6>
+            </div>
+            <div class="card-body p-4">
+                <form asp-area="Admin" asp-controller="Admin" asp-action="ResolveDispute" method="post" onsubmit="return confirm('Bạn có chắc chắn muốn thực thi hành động này?');">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@Model.Id" />
+
+                    <!-- Chọn hành động -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-muted">Hành động của Quản trị viên:</label>
+                        <select name="actionType" id="selectActionType" class="form-select" onchange="updateNewStatus()" required>
+                            <option value="REFUNDED">1. Hoàn tiền cho người gửi (Refund)</option>
+                            <option value="VERIFIED_SUCCESS">2. Xác nhận thành công thủ công (Success)</option>
+                            <option value="REJECT_DISPUTE">3. Bác bỏ khiếu nại (Đóng dispute)</option>
+                            <option value="DISPUTE_OPENED">4. Mở khiếu nại điều tra (Dispute)</option>
+                            <option value="ADMIN_NOTE">5. Chỉ thêm ghi chú kiểm tra log</option>
+                        </select>
+                    </div>
+
+                    <!-- Trạng thái mới (Hidden hoặc được gán tự động) -->
+                    <input type="hidden" name="newStatus" id="inputNewStatus" value="5" />
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-muted">Biên bản giải quyết / Ghi chú đối soát:</label>
+                        <textarea name="note" class="form-control" rows="3" 
+                                  placeholder="Ghi rõ kết quả đối soát mã giao dịch với ngân hàng/cổng thanh toán hoặc lý do hoàn tiền..." required></textarea>
+                    </div>
+
+                    <div class="alert alert-info small border-0 p-2 d-flex gap-2">
+                        <i class="fa-solid fa-circle-info fs-5"></i>
+                        <div>
+                            Mọi quyết định phân xử sẽ được <strong>ghi vào nhật ký kiểm tra (Audit Trail)</strong> vĩnh viễn kèm tài khoản Admin thực hiện.
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 fw-semibold">
+                        <i class="fa-solid fa-check-double me-1"></i> Thực thi quyết định & Ghi Log
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- DÒNG THỜI GIAN NHẬT KÝ KIỂM TRA (AUDIT TRAIL TIMELINE) -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold text-dark">
+                    <i class="fa-solid fa-clock-rotate-left text-primary me-2"></i>Nhật Ký Kiểm Tra (Audit Trail)
+                </h6>
+                <span class="badge bg-light text-dark border">@Model.AuditLogs.Count bản ghi</span>
+            </div>
+            <div class="card-body p-4">
+                @if (Model.AuditLogs.Any())
+                {
+                    <div class="timeline position-relative ps-4" style="border-left: 2px dashed #cbd5e1;">
+                        @foreach (var log in Model.AuditLogs)
+                        {
+                            <div class="timeline-item mb-4 position-relative">
+                                <!-- Điểm mốc trên dòng thời gian -->
+                                <div class="position-absolute bg-primary rounded-circle" style="width: 12px; height: 12px; left: -23px; top: 4px; border: 2px solid white;"></div>
+
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="badge bg-dark font-monospace">@log.ActionType</span>
+                                    <span class="small text-muted" style="font-size: 0.75rem;">
+                                        @log.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss")
+                                    </span>
+                                </div>
+
+                                <div class="small fw-semibold text-secondary">
+                                    Từ: <span class="badge bg-light text-dark border">@log.OldStatus</span>
+                                    &rarr; Sang: <span class="badge bg-light text-dark border">@log.NewStatus</span>
+                                    | Thực hiện: <strong class="text-primary">@log.PerformedBy</strong>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(log.Note))
+                                {
+                                    <div class="p-2 bg-light rounded mt-2 small text-dark border">
+                                        "@log.Note"
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-4 text-muted small">
+                        <i class="fa-solid fa-clipboard-check fs-2 text-muted mb-2 d-block"></i>
+                        Chưa có lịch sử thay đổi trạng thái hoặc biên bản xử lý nào.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function updateNewStatus() {
+            const action = document.getElementById('selectActionType').value;
+            const input = document.getElementById('inputNewStatus');
+
+            switch (action) {
+                case 'REFUNDED':
+                    input.value = 5; // DonationStatus.Refunded
+                    break;
+                case 'VERIFIED_SUCCESS':
+                    input.value = 1; // DonationStatus.Success
+                    break;
+                case 'REJECT_DISPUTE':
+                    input.value = @((int)Model.Status); // Giữ nguyên trạng thái
+                    break;
+                case 'DISPUTE_OPENED':
+                    input.value = 4; // DonationStatus.Disputed
+                    break;
+                case 'ADMIN_NOTE':
+                    input.value = @((int)Model.Status); // Giữ nguyên trạng thái
+                    break;
+            }
+        }
+    </script>
+}

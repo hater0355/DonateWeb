@@ -208,6 +208,11 @@
                 <span>Duyệt sản phẩm Shop</span>
             </a>
 
+            <a href="/Admin/SpecialEffects" class="admin-nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "SpecialEffects" ? "active" : "")">
+                <i class="fa-solid fa-wand-magic-sparkles text-warning"></i>
+                <span>Hiệu ứng sự kiện</span>
+            </a>
+
             <!-- 5. Đăng & Quản lý Breaking News -->
             <a href="/Admin/BreakingNews" class="admin-nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "BreakingNews" ? "active" : "")">
                 <i class="fa-solid fa-bullhorn text-danger"></i>

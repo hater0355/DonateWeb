@@ -1,0 +1,110 @@
+@model DonateWeb.ViewModels.AdminSpecialEffectsViewModel
+@{
+    ViewData["Title"] = "Quản lý hiệu ứng sự kiện";
+}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <div>
+        <h4 class="fw-bold mb-1"><i class="fa-solid fa-wand-magic-sparkles text-warning me-2"></i>Hiệu ứng sự kiện</h4>
+        <p class="text-muted small mb-0">Lên lịch thời gian áp dụng; streamer tự bật hoặc tắt hiệu ứng trên kênh của mình.</p>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] is string success)
+{
+    <div class="alert alert-success">@success</div>
+}
+@if (TempData["ErrorMessage"] is string error)
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+<div class="card border-0 shadow-sm rounded-4 mb-4">
+    <div class="card-body p-4">
+        <h5 class="fw-bold mb-1">Tạo lịch “Việt Nam vô địch”</h5>
+        <p class="small text-muted mb-4">Hiệu ứng hiện gồm cờ Việt Nam phất lên và pháo hoa trên AlertBox OBS. Thời gian nhập theo giờ Việt Nam.</p>
+        <form asp-area="Admin" asp-controller="Admin" asp-action="CreateSpecialEffect" method="post">
+            @Html.AntiForgeryToken()
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Tên sự kiện</label>
+                    <input class="form-control" name="Title" value="@Model.Title" maxlength="120" required />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Mô tả</label>
+                    <input class="form-control" name="Description" value="@Model.Description" maxlength="500" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Bắt đầu</label>
+                    <input class="form-control" type="datetime-local" name="StartsAtLocal" value="@Model.StartsAtLocal" required />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Kết thúc</label>
+                    <input class="form-control" type="datetime-local" name="EndsAtLocal" value="@Model.EndsAtLocal" required />
+                </div>
+            </div>
+            <button class="btn btn-primary mt-3" type="submit"><i class="fa-solid fa-calendar-plus me-1"></i> Tạo lịch sự kiện</button>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm rounded-4">
+    <div class="card-body p-4">
+        <h5 class="fw-bold mb-3">Các lịch hiệu ứng</h5>
+        @if (Model.Campaigns.Count == 0)
+        {
+            <div class="text-center text-muted py-5">Chưa có lịch sự kiện nào.</div>
+        }
+        else
+        {
+            <div class="d-flex flex-column gap-3">
+                @foreach (var item in Model.Campaigns)
+                {
+                    <div class="border rounded-3 p-3">
+                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                            <div>
+                                <strong>@item.Title</strong>
+                                <span class="badge @(item.IsAvailableNow ? "bg-success" : item.IsEnabled ? "bg-secondary" : "bg-danger") ms-2">
+                                    @(item.IsAvailableNow ? "Đang diễn ra" : item.IsEnabled ? "Đã lên lịch / hết hạn" : "Đã tạm dừng")
+                                </span>
+                                <div class="small text-muted mt-1">@item.EnabledStreamerCount streamer đang bật</div>
+                            </div>
+                            <form asp-area="Admin" asp-controller="Admin" asp-action="ToggleSpecialEffect" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <button class="btn btn-sm @(item.IsEnabled ? "btn-outline-danger" : "btn-outline-success")" type="submit">
+                                    @(item.IsEnabled ? "Tạm dừng" : "Mở hiệu ứng")
+                                </button>
+                            </form>
+                        </div>
+                        <form asp-area="Admin" asp-controller="Admin" asp-action="UpdateSpecialEffect" method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="Id" value="@item.Id" />
+                            <div class="row g-2 align-items-end">
+                                <div class="col-lg-3">
+                                    <label class="form-label small">Tên sự kiện</label>
+                                    <input class="form-control form-control-sm" name="Title" value="@item.Title" maxlength="120" required />
+                                </div>
+                                <div class="col-lg-3">
+                                    <label class="form-label small">Mô tả</label>
+                                    <input class="form-control form-control-sm" name="Description" value="@item.Description" maxlength="500" />
+                                </div>
+                                <div class="col-lg-2">
+                                    <label class="form-label small">Bắt đầu (giờ VN)</label>
+                                    <input class="form-control form-control-sm" type="datetime-local" name="StartsAtLocal" value="@item.StartsAtLocal.ToString("yyyy-MM-ddTHH:mm")" required />
+                                </div>
+                                <div class="col-lg-2">
+                                    <label class="form-label small">Kết thúc (giờ VN)</label>
+                                    <input class="form-control form-control-sm" type="datetime-local" name="EndsAtLocal" value="@item.EndsAtLocal.ToString("yyyy-MM-ddTHH:mm")" required />
+                                </div>
+                                <div class="col-lg-2">
+                                    <button class="btn btn-sm btn-outline-primary w-100" type="submit">Lưu thay đổi</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>

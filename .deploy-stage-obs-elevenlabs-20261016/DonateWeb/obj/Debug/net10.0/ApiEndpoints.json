@@ -1,0 +1,270 @@
+[
+  {
+    "ContainingType": "DonateWeb.Security.Webhook.PaymentWebhookController",
+    "Method": "HandlePayOSWebhook",
+    "RelativePath": "api/payment/webhook",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "body",
+        "Type": "DonateWeb.Services.WebhookType",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "DonateWeb.Security.Controllers.SecurityTestApiController",
+    "Method": "GenerateHmac",
+    "RelativePath": "api/security/test/hmac-generate",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "DonateWeb.Security.Controllers.TestHmacRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "DonateWeb.Security.Controllers.SecurityTestApiController",
+    "Method": "TestModeration",
+    "RelativePath": "api/security/test/moderation",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "DonateWeb.Security.Controllers.TestModerationRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "DonateWeb.Security.Controllers.SecurityTestApiController",
+    "Method": "TestRateLimit",
+    "RelativePath": "api/security/test/rate-limit",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "DonateWeb.Security.Webhook.PaymentWebhookController",
+    "Method": "ProcessPaymentWebhook",
+    "RelativePath": "api/webhook/payment",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "gateway",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "payload",
+        "Type": "DonateWeb.Security.Webhook.PaymentWebhookPayload",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "DonateWeb.Security.Webhook.PaymentWebhookController",
+    "Method": "ProcessPaymentWebhook",
+    "RelativePath": "api/webhook/payment/{gateway}",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "gateway",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "payload",
+        "Type": "DonateWeb.Security.Webhook.PaymentWebhookPayload",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "DonateWeb.Security.Webhook.PaymentWebhookController",
+    "Method": "CheckStatus",
+    "RelativePath": "api/webhook/payment/check-status",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "code",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "DonateWeb.Security.Webhook.PaymentWebhookController",
+    "Method": "HealthCheck",
+    "RelativePath": "api/webhook/payment/health",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "DonateWeb.Areas.Widgets.Controllers.WidgetsApiController",
+    "Method": "PollAlert",
+    "RelativePath": "api/widgets/alertbox/poll/{slug}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "slug",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "lastId",
+        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "DonateWeb.Areas.Widgets.Controllers.WidgetsApiController",
+    "Method": "TriggerTestAlert",
+    "RelativePath": "api/widgets/alertbox/test/{slug}",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "slug",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "DonateWeb.Areas.Widgets.Controllers.WidgetsApiController",
+    "Method": "GetActiveGoal",
+    "RelativePath": "api/widgets/goal/{slug}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "slug",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "DonateWeb.Areas.Widgets.Controllers.WidgetsApiController",
+    "Method": "GetLeaderboard",
+    "RelativePath": "api/widgets/leaderboard/{slug}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "slug",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "period",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "limit",
+        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "DonateWeb.Areas.Widgets.Controllers.WidgetsApiController",
+    "Method": "GetRecentDonations",
+    "RelativePath": "api/widgets/recent-donations/{slug}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "slug",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "limit",
+        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "DonateWeb.Areas.Widgets.Controllers.WidgetsApiController",
+    "Method": "GetTtsAlerts",
+    "RelativePath": "api/widgets/tts/alerts/{slug}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "slug",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "X-Widget-Token",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "afterId",
+        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Program\u002B\u003C\u003Ec",
+    "Method": "\u003C\u003CMain\u003E$\u003Eb__0_10",
+    "RelativePath": "health",
+    "HttpMethod": "GET",
+    "IsController": false,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Void",
+        "MediaTypes": [],
+        "StatusCode": 200
+      }
+    ]
+  }
+]

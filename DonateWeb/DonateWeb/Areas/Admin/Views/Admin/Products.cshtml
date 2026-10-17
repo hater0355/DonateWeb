@@ -250,7 +250,7 @@
                                         }
 
                                         <!-- Nút Xóa -->
-                                        <form asp-area="Admin" asp-controller="Admin" asp-action="DeleteProduct" method="post" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn xóa vĩnh viễn sản phẩm này?');">
+                                        <form asp-area="Admin" asp-controller="Admin" asp-action="DeleteProduct" method="post" class="d-inline" onsubmit="return confirm('Ẩn sản phẩm này khỏi gian hàng? Lịch sử đơn hàng cũ vẫn được giữ.');">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="id" value="@prod.Id" />
                                             <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" title="Xóa sản phẩm">

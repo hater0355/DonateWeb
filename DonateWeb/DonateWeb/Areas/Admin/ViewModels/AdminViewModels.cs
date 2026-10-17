@@ -22,7 +22,7 @@ namespace DonateWeb.Areas.Admin.ViewModels
         /// <summary>Tổng số dư ví của toàn bộ người dùng đang lưu ký trong hệ thống</summary>
         public decimal PlatformBalance { get; set; }
 
-        /// <summary>Doanh thu phí sàn nền tảng (Ví dụ: 5% hoa hồng trên các giao dịch quyên góp)</summary>
+        /// <summary>Phí nền tảng trên donate thành công và đơn Shop đã thanh toán</summary>
         public decimal PlatformRevenue { get; set; }
 
         /// <summary>Số lượng giao dịch thành công</summary>
@@ -134,6 +134,20 @@ namespace DonateWeb.Areas.Admin.ViewModels
         public DateTime? LockedAt { get; set; }
         public bool IsVerified { get; set; }
         public DateTime CreatedAt { get; set; }
+        public bool HasIdentityDocuments { get; set; }
+    }
+
+    /// <summary>Thông tin định danh chỉ hiển thị trong khu vực Admin.</summary>
+    public class AdminStreamerIdentityReviewViewModel
+    {
+        public int StreamerId { get; set; }
+        public string DisplayName { get; set; } = string.Empty;
+        public string OwnerFullName { get; set; } = string.Empty;
+        public string OwnerEmail { get; set; } = string.Empty;
+        public DateTime? ConsentAtUtc { get; set; }
+        public bool HasFrontImage { get; set; }
+        public bool HasBackImage { get; set; }
+        public DonateWeb.ViewModels.Streamer.StreamerIdentityData? Identity { get; set; }
     }
 
 

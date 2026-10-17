@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DonateWeb")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+287694107dfc5e2c7391bc0900203bd2dcecbdd2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ca7f97105c8e423fdfea823d956e7cc5cac90497")]
 [assembly: System.Reflection.AssemblyProductAttribute("DonateWeb")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DonateWeb")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

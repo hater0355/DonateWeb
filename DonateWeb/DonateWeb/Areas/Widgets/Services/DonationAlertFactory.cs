@@ -30,6 +30,8 @@ public static class DonationAlertFactory
             Amount = donation.Amount,
             FormattedAmount = $"{donation.Amount:N0}đ",
             Message = message,
+            SpecialEffectCode = donation.SpecialEffectCode,
+            SpecialEffectTitle = donation.SpecialEffectTitle,
             DisplayText = template
                 .Replace("{donor}", donorName)
                 .Replace("{amount}", donation.Amount.ToString("N0"))

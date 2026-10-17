@@ -1194,11 +1194,17 @@ C:\Users\PC\Downloads\DonateWeb-main (1)\DonateWeb-main\DonateWeb\DonateWeb\obj\
 C:\Users\PC\Downloads\DonateWeb-main (1)\DonateWeb-main\DonateWeb\DonateWeb\obj\Debug\net10.0\ref\DonateWeb.dll
 C:\Users\PC\Downloads\DonateWeb-main (1)\DonateWeb-main\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\u36njjr3f4-{0}-5dfeky9pem-5dfeky9pem.gz
 C:\Users\PC\Downloads\DonateWeb-main (1)\DonateWeb-main\DonateWeb\DonateWeb\obj\Debug\net10.0\staticwebassets.upToDateCheck.txt
-C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\u36njjr3f4-{0}-5dfeky9pem-5dfeky9pem.gz
 C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\wj8xf93h38-{0}-n56gf0ycb1-n56gf0ycb1.gz
 C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\z9mk1dyo8e-{0}-l3n5xuwxn8-l3n5xuwxn8.gz
 C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\xqpf1bf85w-{0}-ilo7uva0vt-ilo7uva0vt.gz
 C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\2tf5pfjaei-{0}-qlccset4i1-qlccset4i1.gz
 C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\tab6pw95o0-{0}-xzw0cte36n-xzw0cte36n.gz
 C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\jpesk7doea-{0}-jfsiqqwiad-jfsiqqwiad.gz
-C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\staticwebassets.upToDateCheck.txt
+C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\bin\Debug\net10.0\AngleSharp.dll
+C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\bin\Debug\net10.0\AngleSharp.Css.dll
+C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\bin\Debug\net10.0\HtmlSanitizer.dll
+C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\bin\Debug\net10.0\System.Security.Cryptography.Pkcs.dll
+C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\bin\Debug\net10.0\runtimes\win\lib\net10.0\System.Security.Cryptography.Pkcs.dll
+C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\u36njjr3f4-{0}-0hb9kjqjpl-0hb9kjqjpl.gz
+C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\p7wbltlq55-{0}-ywkkukpd6z-ywkkukpd6z.gz
+C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\3hxh1vd0ht-{0}-hlipzb8djn-hlipzb8djn.gz

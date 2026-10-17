@@ -29,7 +29,7 @@ namespace DonateWeb.Controllers
                 var streamerQuery = _context.StreamerProfiles
                     .AsNoTracking()
                     .Include(sp => sp.User)
-                    .Where(sp => sp.IsActive);
+                    .Where(sp => sp.IsActive && sp.ApprovalStatus == StreamerApprovalStatus.Approved);
 
                 if (!string.IsNullOrWhiteSpace(trimmedKeyword))
                 {
@@ -91,7 +91,7 @@ namespace DonateWeb.Controllers
                     });
                 }
 
-                // 2.1 Bảng xếp hạng TOP NẠP (kết hợp giao dịch nạp ví thành công và donate)
+                // 2.1 Bảng xếp hạng TOP NẠP: chỉ tính giao dịch nạp tiền vào ví thành công.
                 var walletDeposits = await _context.WalletTransactions
                     .AsNoTracking()
                     .Include(w => w.User)
@@ -106,27 +106,12 @@ namespace DonateWeb.Controllers
                     })
                     .ToListAsync();
 
-                var donationDeposits = await _context.Donations
-                    .AsNoTracking()
-                    .Include(d => d.DonorUser)
-                    .Where(d => d.Status == DonationStatus.Success && !string.IsNullOrWhiteSpace(d.DonorName))
-                    .GroupBy(d => new { d.DonorName, Avatar = d.DonorUser != null ? d.DonorUser.AvatarUrl : null })
-                    .Select(g => new
-                    {
-                        Name = g.Key.DonorName,
-                        AvatarUrl = g.Key.Avatar,
-                        TotalAmount = g.Sum(x => x.Amount)
-                    })
-                    .ToListAsync();
-
                 var mergedTopDonors = walletDeposits
-                    .Concat(donationDeposits)
-                    .GroupBy(x => x.Name)
                     .Select(g => new HomeTopDonorViewModel
                     {
-                        Name = g.Key,
-                        AvatarUrl = g.FirstOrDefault(x => !string.IsNullOrEmpty(x.AvatarUrl))?.AvatarUrl,
-                        TotalAmount = g.Sum(x => x.TotalAmount)
+                        Name = g.Name,
+                        AvatarUrl = g.AvatarUrl,
+                        TotalAmount = g.TotalAmount
                     })
                     .OrderByDescending(x => x.TotalAmount)
                     .Take(5)
@@ -140,7 +125,7 @@ namespace DonateWeb.Controllers
                 // 2.2 Bảng xếp hạng TOP STREAMER: Tính hoàn toàn theo số tiền được donate thực tế
                 var topStreamerProfiles = await _context.StreamerProfiles
                     .AsNoTracking()
-                    .Where(sp => sp.IsActive)
+                    .Where(sp => sp.IsActive && sp.ApprovalStatus == StreamerApprovalStatus.Approved)
                     .Select(sp => new
                     {
                         sp.Id,
@@ -179,7 +164,7 @@ namespace DonateWeb.Controllers
                 var rawStatuses = await _context.StreamerStatuses
                     .AsNoTracking()
                     .Include(s => s.StreamerProfile)
-                    .Where(s => s.StreamerProfile.IsActive)
+                    .Where(s => s.StreamerProfile.IsActive && s.StreamerProfile.ApprovalStatus == StreamerApprovalStatus.Approved)
                     .OrderByDescending(s => s.CreatedAt)
                     .Take(12)
                     .ToListAsync();
@@ -209,7 +194,8 @@ namespace DonateWeb.Controllers
                     TopStreamers = topStreamers,
                     TotalDonationCount = totalDonations,
                     TotalDonatedAmount = totalAmount,
-                    TotalStreamerCount = await _context.StreamerProfiles.CountAsync(s => s.IsActive)
+                    TotalStreamerCount = await _context.StreamerProfiles.CountAsync(s =>
+                        s.IsActive && s.ApprovalStatus == StreamerApprovalStatus.Approved)
                 };
 
                 return View("Index", model);

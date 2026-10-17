@@ -38,11 +38,30 @@ namespace DonateWeb.Models.Entities
         [Column(TypeName = "decimal(18,2)")]
         public decimal TotalAmount { get; set; }
 
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal SubtotalAmount { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal DiscountAmount { get; set; }
+
+        [MaxLength(50)]
+        public string? CouponCode { get; set; }
+
+        public int? DiscountCouponId { get; set; }
+        [ForeignKey(nameof(DiscountCouponId))]
+        public virtual DiscountCoupon? DiscountCoupon { get; set; }
+
         [MaxLength(50)]
         public string PaymentMethod { get; set; } = "Wallet"; // 'Wallet' | 'VietQR'
 
         [MaxLength(50)]
         public string PaymentStatus { get; set; } = "Pending"; // 'Pending' | 'Paid' | 'Cancelled'
+
+        /// <summary>
+        /// Cho biết số lượng hàng của đơn PayOS đang chờ đã được giữ khỏi kho hay chưa.
+        /// Khi thanh toán thành công, hàng vẫn bị trừ và cờ này được tắt; khi hủy thì hoàn kho.
+        /// </summary>
+        public bool StockReserved { get; set; }
 
         [MaxLength(100)]
         public string? TransactionCode { get; set; }

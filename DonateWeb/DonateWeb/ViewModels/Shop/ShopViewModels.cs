@@ -80,8 +80,23 @@ namespace DonateWeb.ViewModels.Shop
 
         public string? Note { get; set; }
 
+        [MaxLength(50)]
+        public string? CouponCode { get; set; }
+
         [Required]
         public string PaymentMethod { get; set; } = "Wallet"; // "Wallet" | "VietQR"
+    }
+
+    public class CouponPreviewRequestViewModel
+    {
+        [Required]
+        public int StreamerProfileId { get; set; }
+
+        [Required]
+        public List<CartItemInputModel> Items { get; set; } = new();
+
+        [Required, MaxLength(50)]
+        public string CouponCode { get; set; } = string.Empty;
     }
 
     public class ProductInputModel
@@ -96,9 +111,13 @@ namespace DonateWeb.ViewModels.Shop
         [Range(1000, 1000000000, ErrorMessage = "Giá sản phẩm từ 1,000 đến 1,000,000,000 VNĐ")]
         public decimal Price { get; set; }
 
+        [MaxLength(2000, ErrorMessage = "Mô tả tối đa 2.000 ký tự")]
         public string? Description { get; set; }
+
+        [MaxLength(500, ErrorMessage = "Đường dẫn ảnh tối đa 500 ký tự")]
         public string? ImageUrl { get; set; }
         public IFormFile? ImageFile { get; set; }
+        [Range(0, 999999, ErrorMessage = "Tồn kho phải nằm trong khoảng 0 đến 999.999 sản phẩm")]
         public int StockQuantity { get; set; } = 999;
         public bool IsActive { get; set; } = true;
     }
@@ -107,11 +126,14 @@ namespace DonateWeb.ViewModels.Shop
     {
         public int StreamerProfileId { get; set; }
         public string StreamerName { get; set; } = string.Empty;
+        public string StreamerSlug { get; set; } = string.Empty;
         public List<ShopProduct> Products { get; set; } = new();
         public ProductInputModel NewProduct { get; set; } = new();
+        public int TotalCount { get; set; }
         public int PendingCount { get; set; }
         public int ApprovedCount { get; set; }
         public int RejectedCount { get; set; }
+        public int DeletedCount { get; set; }
         public string StatusFilter { get; set; } = "all";
     }
 }

@@ -49,12 +49,15 @@ namespace DonateWeb.ViewModels.Streamer
 
         // Thông tin thanh toán & nhận tiền
         [Display(Name = "Tên Ngân hàng")]
+        [StringLength(100, ErrorMessage = "Tên ngân hàng tối đa 100 ký tự")]
         public string? BankName { get; set; }
 
         [Display(Name = "Số tài khoản")]
+        [StringLength(50, ErrorMessage = "Số tài khoản tối đa 50 ký tự")]
         public string? BankAccountNumber { get; set; }
 
         [Display(Name = "Tên chủ tài khoản")]
+        [StringLength(100, ErrorMessage = "Tên chủ tài khoản tối đa 100 ký tự")]
         public string? BankAccountName { get; set; }
 
         [Display(Name = "Mã QR nhận donate")]
@@ -90,5 +93,16 @@ namespace DonateWeb.ViewModels.Streamer
         /// Chuỗi Data URI Base64 PNG của mã QR trỏ đến trang Donate (để nhúng trực tiếp vào thẻ <img> và tải về)
         /// </summary>
         public string? QrCodeImageBase64 { get; set; }
+
+        /// <summary>Mã nhận diện được điền sẵn trong nội dung chuyển khoản QR tĩnh.</summary>
+        public string? BankDonationTransferCode { get; set; }
+
+        /// <summary>Ảnh VietQR tĩnh, không điền sẵn số tiền, dành cho livestream.</summary>
+        public string? BankDonationQrBase64 { get; set; }
+
+        /// <summary>Thông tin tài khoản trung tâm nhận mọi khoản donate qua SePay.</summary>
+        public string? CentralBankName { get; set; }
+        public string? CentralBankAccountNumber { get; set; }
+        public string? CentralBankAccountName { get; set; }
     }
 }

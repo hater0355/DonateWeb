@@ -32,7 +32,9 @@ public sealed class PaymentHub : Hub
                 (t.TransactionCode == cleanCode || (parsedOrderCode.HasValue && t.OrderCode == parsedOrderCode.Value)));
         var ownsDonation = await _context.Donations
             .AnyAsync(d => d.DonorUserId == userId &&
-                (d.TransactionCode == cleanCode || (parsedDonationId.HasValue && d.Id == parsedDonationId.Value)));
+                (d.TransactionCode == cleanCode ||
+                 (parsedDonationId.HasValue && d.Id == parsedDonationId.Value) ||
+                 (parsedOrderCode.HasValue && d.TransactionCode == $"DON_{parsedOrderCode.Value}")));
 
         if (!ownsWalletTransaction && !ownsDonation)
             throw new HubException("The transaction does not belong to the current user.");
@@ -50,7 +52,22 @@ public sealed class PaymentHub : Hub
     public async Task JoinStreamerGroup(string streamerSlug)
     {
         if (string.IsNullOrWhiteSpace(streamerSlug)) return;
-        await Groups.AddToGroupAsync(Context.ConnectionId, "Streamer_" + NormalizeSlug(streamerSlug));
+
+        var cleanSlug = NormalizeSlug(streamerSlug);
+        await Groups.AddToGroupAsync(Context.ConnectionId, "Streamer_" + cleanSlug);
+
+        // Nhóm theo ProfileId dùng cho sự kiện OnNewDonation trong AlertBox mới.
+        // Giữ thêm nhóm theo slug để tương thích với các Browser Source cũ.
+        var streamerId = await _context.StreamerProfiles
+            .Where(profile => profile.Slug.ToLower() == cleanSlug ||
+                (profile.User.AccountId != null && profile.User.AccountId.ToLower() == cleanSlug))
+            .Select(profile => (int?)profile.Id)
+            .FirstOrDefaultAsync();
+
+        if (streamerId.HasValue)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"streamer_{streamerId.Value}");
+        }
     }
 
     public async Task JoinTtsGroup(string streamerSlug, string widgetToken)

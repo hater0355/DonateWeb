@@ -22,6 +22,23 @@ namespace DonateWeb.Data
 
                 // Đảm bảo cột Bio và các cột bổ sung trong StreamerProfiles tồn tại trước khi EF Core truy vấn
                 await context.Database.ExecuteSqlRawAsync(@"
+                    -- Hỗ trợ đăng nhập ngoài trên các CSDL cũ đã tồn tại trước khi bảng này được tạo.
+                    IF OBJECT_ID('dbo.ExternalLogins', 'U') IS NULL AND OBJECT_ID('dbo.Users', 'U') IS NOT NULL
+                    BEGIN
+                        CREATE TABLE dbo.ExternalLogins (
+                            Id INT IDENTITY(1,1) NOT NULL,
+                            UserId INT NOT NULL,
+                            Provider NVARCHAR(50) NOT NULL,
+                            ProviderKey NVARCHAR(200) NOT NULL,
+                            ProviderDisplayName NVARCHAR(200) NULL,
+                            CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                            CONSTRAINT PK_ExternalLogins PRIMARY KEY CLUSTERED (Id),
+                            CONSTRAINT FK_ExternalLogins_Users FOREIGN KEY (UserId) REFERENCES dbo.Users (Id) ON DELETE CASCADE
+                        );
+                        CREATE UNIQUE NONCLUSTERED INDEX IX_ExternalLogins_Provider_ProviderKey
+                            ON dbo.ExternalLogins (Provider, ProviderKey);
+                    END
+
                     IF OBJECT_ID('dbo.StreamerProfiles', 'U') IS NOT NULL
                     BEGIN
                         IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.StreamerProfiles') AND name = 'Bio')
@@ -40,6 +57,16 @@ namespace DonateWeb.Data
                             ALTER TABLE dbo.StreamerProfiles ADD RejectionReason NVARCHAR(500) NULL;
                             ALTER TABLE dbo.StreamerProfiles ADD ApprovedAt DATETIME2 NULL;
                         END
+
+                        -- CCCD chỉ lưu dưới dạng mã hóa; khóa ảnh trỏ tới volume riêng ngoài wwwroot.
+                        IF COL_LENGTH('dbo.StreamerProfiles', 'IdentityDataProtected') IS NULL
+                            ALTER TABLE dbo.StreamerProfiles ADD IdentityDataProtected NVARCHAR(MAX) NULL;
+                        IF COL_LENGTH('dbo.StreamerProfiles', 'CitizenIdFrontDocumentKey') IS NULL
+                            ALTER TABLE dbo.StreamerProfiles ADD CitizenIdFrontDocumentKey NVARCHAR(80) NULL;
+                        IF COL_LENGTH('dbo.StreamerProfiles', 'CitizenIdBackDocumentKey') IS NULL
+                            ALTER TABLE dbo.StreamerProfiles ADD CitizenIdBackDocumentKey NVARCHAR(80) NULL;
+                        IF COL_LENGTH('dbo.StreamerProfiles', 'IdentityDataConsentAt') IS NULL
+                            ALTER TABLE dbo.StreamerProfiles ADD IdentityDataConsentAt DATETIME2 NULL;
                     END
 
                     IF OBJECT_ID('dbo.Users', 'U') IS NOT NULL
@@ -48,6 +75,17 @@ namespace DonateWeb.Data
                         BEGIN
                             ALTER TABLE dbo.Users ADD AccountId NVARCHAR(10) NULL;
                         END
+                    END
+
+                    -- Mã giao dịch từ webhook ngân hàng dùng để chống ghi nhận donate trùng.
+                    IF OBJECT_ID('dbo.Donations', 'U') IS NOT NULL
+                    BEGIN
+                        IF COL_LENGTH('dbo.Donations', 'ExternalTransactionId') IS NULL
+                            ALTER TABLE dbo.Donations ADD ExternalTransactionId NVARCHAR(100) NULL;
+
+                        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Donations_ExternalTransactionId' AND object_id = OBJECT_ID('dbo.Donations'))
+                            -- Chạy động để SQL Server biên dịch index sau khi cột vừa được thêm ở trên.
+                            EXEC sys.sp_executesql N'CREATE UNIQUE INDEX IX_Donations_ExternalTransactionId ON dbo.Donations(ExternalTransactionId) WHERE ExternalTransactionId IS NOT NULL;';
                     END
 
                     -- Bảng Sản phẩm Gian hàng Streamer
@@ -82,6 +120,31 @@ namespace DonateWeb.Data
                         END
                     END
 
+                    -- Bảng mã giảm giá do Admin quản lý
+                    IF OBJECT_ID('dbo.DiscountCoupons', 'U') IS NULL
+                    BEGIN
+                        CREATE TABLE dbo.DiscountCoupons (
+                            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                            Code NVARCHAR(50) NOT NULL,
+                            Content NVARCHAR(250) NOT NULL,
+                            Provider NVARCHAR(100) NOT NULL,
+                            DiscountType NVARCHAR(20) NOT NULL,
+                            DiscountValue DECIMAL(18,2) NOT NULL,
+                            ExpiresAtUtc DATETIME2 NULL,
+                            IsActive BIT NOT NULL DEFAULT 1,
+                            UsedCount INT NOT NULL DEFAULT 0,
+                            CreatedAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                            UpdatedAtUtc DATETIME2 NULL,
+                            CONSTRAINT CK_DiscountCoupons_Type CHECK (DiscountType IN ('Percent', 'Fixed')),
+                            CONSTRAINT CK_DiscountCoupons_Value CHECK (DiscountValue > 0)
+                        );
+                    END
+
+                    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_DiscountCoupons_Code' AND object_id = OBJECT_ID('dbo.DiscountCoupons'))
+                    BEGIN
+                        CREATE UNIQUE INDEX IX_DiscountCoupons_Code ON dbo.DiscountCoupons(Code);
+                    END
+
                     -- Bảng Đơn hàng Mua hàng Streamer
                     IF OBJECT_ID('dbo.ShopOrders', 'U') IS NULL
                     BEGIN
@@ -94,16 +157,45 @@ namespace DonateWeb.Data
                             BuyerPhone NVARCHAR(30) NULL,
                             BuyerAddress NVARCHAR(300) NULL,
                             Note NVARCHAR(500) NULL,
+                            SubtotalAmount DECIMAL(18,2) NOT NULL DEFAULT 0,
+                            DiscountAmount DECIMAL(18,2) NOT NULL DEFAULT 0,
                             TotalAmount DECIMAL(18,2) NOT NULL,
+                            CouponCode NVARCHAR(50) NULL,
+                            DiscountCouponId INT NULL,
                             PaymentMethod NVARCHAR(50) NOT NULL DEFAULT 'Wallet',
                             PaymentStatus NVARCHAR(50) NOT NULL DEFAULT 'Pending',
+                            StockReserved BIT NOT NULL DEFAULT 0,
                             TransactionCode NVARCHAR(100) NULL,
                             CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
                             PaidAt DATETIME2 NULL,
                             CONSTRAINT FK_ShopOrders_StreamerProfiles FOREIGN KEY (StreamerProfileId) REFERENCES dbo.StreamerProfiles(Id) ON DELETE NO ACTION,
-                            CONSTRAINT FK_ShopOrders_Users FOREIGN KEY (BuyerUserId) REFERENCES dbo.Users(Id) ON DELETE SET NULL
+                            CONSTRAINT FK_ShopOrders_Users FOREIGN KEY (BuyerUserId) REFERENCES dbo.Users(Id) ON DELETE SET NULL,
+                            CONSTRAINT FK_ShopOrders_DiscountCoupons FOREIGN KEY (DiscountCouponId) REFERENCES dbo.DiscountCoupons(Id) ON DELETE SET NULL
                         );
                     END
+                    ELSE
+                    BEGIN
+                        IF COL_LENGTH('dbo.ShopOrders', 'SubtotalAmount') IS NULL
+                        BEGIN
+                            ALTER TABLE dbo.ShopOrders ADD SubtotalAmount DECIMAL(18,2) NOT NULL CONSTRAINT DF_ShopOrders_SubtotalAmount DEFAULT 0;
+                        END
+                        -- Chạy động sau khi cột đã tồn tại; cũng sửa dữ liệu mặc định 0 nếu lần chạy
+                        -- trước đã thêm cột nhưng dừng giữa chừng do SQL Server biên dịch cùng batch.
+                        EXEC sys.sp_executesql N'UPDATE dbo.ShopOrders SET SubtotalAmount = TotalAmount WHERE SubtotalAmount = 0 AND TotalAmount > 0;';
+                        IF COL_LENGTH('dbo.ShopOrders', 'DiscountAmount') IS NULL
+                            ALTER TABLE dbo.ShopOrders ADD DiscountAmount DECIMAL(18,2) NOT NULL CONSTRAINT DF_ShopOrders_DiscountAmount DEFAULT 0;
+                        IF COL_LENGTH('dbo.ShopOrders', 'CouponCode') IS NULL
+                            ALTER TABLE dbo.ShopOrders ADD CouponCode NVARCHAR(50) NULL;
+                        IF COL_LENGTH('dbo.ShopOrders', 'DiscountCouponId') IS NULL
+                            ALTER TABLE dbo.ShopOrders ADD DiscountCouponId INT NULL;
+                        IF COL_LENGTH('dbo.ShopOrders', 'StockReserved') IS NULL
+                            ALTER TABLE dbo.ShopOrders ADD StockReserved BIT NOT NULL CONSTRAINT DF_ShopOrders_StockReserved DEFAULT 0;
+                        IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID('dbo.ShopOrders') AND referenced_object_id = OBJECT_ID('dbo.DiscountCoupons'))
+                            ALTER TABLE dbo.ShopOrders ADD CONSTRAINT FK_ShopOrders_DiscountCoupons FOREIGN KEY (DiscountCouponId) REFERENCES dbo.DiscountCoupons(Id) ON DELETE SET NULL;
+                    END
+
+                    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ShopOrders_StockReservations' AND object_id = OBJECT_ID('dbo.ShopOrders'))
+                        EXEC sys.sp_executesql N'CREATE INDEX IX_ShopOrders_StockReservations ON dbo.ShopOrders(PaymentMethod, PaymentStatus, StockReserved, CreatedAt);';
 
                     -- Bảng Chi tiết mặt hàng trong đơn hàng
                     IF OBJECT_ID('dbo.ShopOrderItems', 'U') IS NULL
@@ -569,6 +661,53 @@ namespace DonateWeb.Data
                         CREATE NONCLUSTERED INDEX IX_StreamerGoals_StreamerProfileId_IsActive ON dbo.StreamerGoals (StreamerProfileId, IsActive);
                     END
 
+                    -- Hiệu ứng đặc biệt theo chiến dịch và lựa chọn bật/tắt của từng streamer.
+                    IF OBJECT_ID('dbo.SpecialEffectCampaigns', 'U') IS NULL
+                    BEGIN
+                        CREATE TABLE dbo.SpecialEffectCampaigns (
+                            Id INT IDENTITY(1,1) NOT NULL,
+                            EffectCode NVARCHAR(50) NOT NULL,
+                            Title NVARCHAR(120) NOT NULL,
+                            Description NVARCHAR(500) NULL,
+                            StartsAtUtc DATETIME2 NOT NULL,
+                            EndsAtUtc DATETIME2 NOT NULL,
+                            IsEnabled BIT NOT NULL DEFAULT 1,
+                            CreatedAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                            UpdatedAtUtc DATETIME2 NULL,
+                            CONSTRAINT PK_SpecialEffectCampaigns PRIMARY KEY CLUSTERED (Id)
+                        );
+                        CREATE NONCLUSTERED INDEX IX_SpecialEffectCampaigns_IsEnabled_Window
+                            ON dbo.SpecialEffectCampaigns (IsEnabled, StartsAtUtc, EndsAtUtc);
+                    END
+
+                    IF OBJECT_ID('dbo.StreamerEffectActivations', 'U') IS NULL
+                    BEGIN
+                        CREATE TABLE dbo.StreamerEffectActivations (
+                            Id INT IDENTITY(1,1) NOT NULL,
+                            StreamerProfileId INT NOT NULL,
+                            SpecialEffectCampaignId INT NOT NULL,
+                            IsEnabled BIT NOT NULL DEFAULT 0,
+                            ActivatedAtUtc DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                            UpdatedAtUtc DATETIME2 NULL,
+                            CONSTRAINT PK_StreamerEffectActivations PRIMARY KEY CLUSTERED (Id),
+                            CONSTRAINT FK_StreamerEffectActivations_StreamerProfiles FOREIGN KEY (StreamerProfileId) REFERENCES dbo.StreamerProfiles (Id) ON DELETE CASCADE,
+                            CONSTRAINT FK_StreamerEffectActivations_SpecialEffectCampaigns FOREIGN KEY (SpecialEffectCampaignId) REFERENCES dbo.SpecialEffectCampaigns (Id) ON DELETE CASCADE
+                        );
+                        CREATE UNIQUE NONCLUSTERED INDEX IX_StreamerEffectActivations_StreamerProfileId
+                            ON dbo.StreamerEffectActivations (StreamerProfileId);
+                    END
+
+                    IF OBJECT_ID('dbo.Donations', 'U') IS NOT NULL
+                       AND NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Donations') AND name = 'SpecialEffectCode')
+                    BEGIN
+                        ALTER TABLE dbo.Donations ADD SpecialEffectCode NVARCHAR(50) NULL;
+                    END
+                    IF OBJECT_ID('dbo.Donations', 'U') IS NOT NULL
+                       AND NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Donations') AND name = 'SpecialEffectTitle')
+                    BEGIN
+                        ALTER TABLE dbo.Donations ADD SpecialEffectTitle NVARCHAR(120) NULL;
+                    END
+
                     -- Migration check cho các cột bổ sung nếu bảng đã tồn tại từ trước
                     IF OBJECT_ID('dbo.AlertBoxConfigs', 'U') IS NOT NULL
                     BEGIN
@@ -602,6 +741,11 @@ namespace DonateWeb.Data
                         END
                     END
                 ");
+
+                // Tạo cột trước trong một lệnh riêng, rồi backfill bằng lệnh kế tiếp.
+                // SQL Server biên dịch cả batch cùng lúc; để ALTER và UPDATE chung một batch
+                // khiến UPDATE không nhận ra cột vừa được thêm.
+                await MigrateStreamerEarningsBalanceAsync(context);
 
                 // Refresh the reporting total without deriving or overwriting spendable wallet balances.
                 var allStreamerProfiles = await context.StreamerProfiles
@@ -763,6 +907,73 @@ namespace DonateWeb.Data
                 {
                     throw;
                 }
+            }
+        }
+
+        private static async Task MigrateStreamerEarningsBalanceAsync(AppDbContext context)
+        {
+            await using var transaction = await context.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable);
+
+            try
+            {
+                var columnExists = await context.Database
+                    .SqlQueryRaw<int>("SELECT CASE WHEN COL_LENGTH('dbo.Users', 'StreamerEarningsBalance') IS NULL THEN 0 ELSE 1 END AS [Value]")
+                    .SingleAsync();
+
+                if (columnExists == 0)
+                {
+                    // DDL ở batch độc lập để câu UPDATE sau đó biên dịch lại với schema mới.
+                    await context.Database.ExecuteSqlRawAsync(@"
+                        ALTER TABLE dbo.Users ADD StreamerEarningsBalance DECIMAL(18,2) NOT NULL
+                            CONSTRAINT DF_Users_StreamerEarningsBalance DEFAULT (0) WITH VALUES;");
+
+                    // Với streamer đã duyệt, dựng lại hai số dư từ giao dịch lịch sử:
+                    // ví tiêu dùng dựa trên nạp - chi bằng ví; doanh thu dựa trên 90% tiền donate,
+                    // cộng 70% đơn Shop đã thanh toán - lệnh rút.
+                    // Giữ cả phần số dư cũ dương chưa có giao dịch đối ứng để tránh làm mất khoản chỉnh tay.
+                    await context.Database.ExecuteSqlRawAsync(@"
+                        UPDATE u
+                        SET u.WalletBalance = CASE WHEN spendable.Amount < 0 THEN 0 ELSE spendable.Amount END,
+                            u.StreamerEarningsBalance = CASE WHEN earnings.Amount < 0 THEN 0 ELSE earnings.Amount END
+                        FROM dbo.Users AS u
+                        INNER JOIN dbo.StreamerProfiles AS sp ON sp.UserId = u.Id
+                        OUTER APPLY (
+                            SELECT
+                                COALESCE((SELECT SUM(ROUND(d.Amount * 0.90, 0)) FROM dbo.Donations AS d
+                                    WHERE d.StreamerProfileId = sp.Id AND d.[Status] = 1), 0)
+                                + COALESCE((SELECT SUM(ROUND(o.TotalAmount * 0.70, 0)) FROM dbo.ShopOrders AS o
+                                    WHERE o.StreamerProfileId = sp.Id AND o.PaymentStatus = N'Paid'), 0)
+                                - COALESCE((SELECT SUM(wr.Amount) FROM dbo.WithdrawalRequests AS wr
+                                    WHERE wr.UserId = u.Id AND wr.[Status] IN (0, 1)), 0)
+                                AS Amount
+                        ) AS earnings
+                        OUTER APPLY (
+                            SELECT CASE
+                                WHEN (u.WalletBalance - CASE WHEN earnings.Amount < 0 THEN 0 ELSE earnings.Amount END) > ledger.LedgerAmount
+                                    THEN u.WalletBalance - CASE WHEN earnings.Amount < 0 THEN 0 ELSE earnings.Amount END
+                                ELSE ledger.LedgerAmount
+                            END AS Amount
+                            FROM (
+                                SELECT
+                                    COALESCE((SELECT SUM(wt.Amount) FROM dbo.WalletTransactions AS wt
+                                        WHERE wt.UserId = u.Id AND wt.TransactionType = N'DEPOSIT' AND wt.[Status] = 1), 0)
+                                    - COALESCE((SELECT SUM(d.Amount) FROM dbo.Donations AS d
+                                        WHERE d.DonorUserId = u.Id AND d.PaymentMethod = 1 AND d.[Status] IN (1, 4)), 0)
+                                    - COALESCE((SELECT SUM(o.TotalAmount) FROM dbo.ShopOrders AS o
+                                        WHERE o.BuyerUserId = u.Id AND o.PaymentMethod = N'Wallet' AND o.PaymentStatus = N'Paid'), 0)
+                                    AS LedgerAmount
+                            ) AS ledger
+                        ) AS spendable
+                        WHERE sp.ApprovalStatus = 1;");
+                }
+
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
             }
         }
     }

@@ -54,7 +54,7 @@
                 </div>
                 <div class="col-lg-4 mt-3 mt-lg-0 text-secondary small">
                     <i class="fa-solid fa-circle-info text-info me-1"></i>
-                    <strong>Cách dùng:</strong> Trong OBS Studio, bấm <em>Add Source (+) &rarr; Browser</em>, dán URL ở trên, đặt kích thước 800x600 px và tích vào <em>"Shutdown source when not visible"</em>.
+                    <strong>Cách dùng:</strong> Trong OBS Studio, bấm <em>Add Source (+) &rarr; Browser</em>, dán URL ở trên và đặt kích thước 800x600 px. Để nhận donate liên tục, không tích <em>"Shutdown source when not visible"</em>; tích <em>"Control audio via OBS"</em> để OBS thu được tiếng.
                 </div>
             </div>
         </div>
@@ -290,7 +290,7 @@
                                 Đọc tin nhắn tự động (Text-To-Speech)
                             </label>
                         </div>
-                    <small class="text-muted d-block">Khi bật, trợ lý DonateWeb TTS trên máy Windows đọc tên, số tiền và tối đa 220 ký tự lời nhắn. VPS chỉ gửi alert, không tạo âm thanh.</small>
+                    <small class="text-muted d-block">Khi bật, Alert Box trong OBS ưu tiên giọng ElevenLabs đã cấu hình trên VPS; nếu chưa cấu hình hoặc dịch vụ lỗi, nó dùng giọng tiếng Việt của trình duyệt. Audio được tạo cho từng donate thành công; ứng dụng DonateWeb TTS trên Windows vẫn dùng giọng Windows.</small>
                     </div>
                 </div>
 
@@ -352,7 +352,7 @@
         </div>
         <div class="col-12">
             <div class="alert alert-info py-2 mb-0 small">
-                <strong>Âm thanh trong OBS:</strong> Trong Browser Source, bật <em>Control audio via OBS</em> nếu muốn điều chỉnh âm lượng/track riêng. Kiểm tra Browser Source đang được đưa vào audio track phát trực tiếp; nút “Bắn Alert Thử Nghiệm Lên OBS” kiểm tra cả hình lẫn tiếng.
+                <strong>Âm thanh trong OBS:</strong> Khi thêm Browser Source, nhớ tích <em>Control audio via OBS</em> để OBS nhận được tiếng ting ting và giọng đọc TTS. Kiểm tra Browser Source nằm trong audio track phát trực tiếp; nút “Bắn Alert Thử Nghiệm Lên OBS” giúp kiểm tra cả hình lẫn tiếng.
             </div>
         </div>
     </div>

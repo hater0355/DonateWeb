@@ -1,0 +1,196 @@
+@model List<DonateWeb.Areas.Widgets.ViewModels.LeaderboardDonorDto>
+@{
+    Layout = "_OverlayLayout";
+    var slug = ViewBag.StreamerSlug as string ?? "";
+    var period = ViewBag.Period as string ?? "all";
+}
+
+<style>
+    .lb-overlay-wrapper {
+        padding: 20px;
+        width: 100%;
+        max-width: 420px;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .lb-card {
+        background: rgba(15, 23, 42, 0.9);
+        border: 2px solid rgba(255, 255, 255, 0.15);
+        border-radius: 16px;
+        padding: 16px 20px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+    }
+
+    .lb-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .lb-title {
+        font-size: 18px;
+        font-weight: 800;
+        color: #f59e0b;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .lb-period-badge {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        background: rgba(245, 158, 11, 0.2);
+        color: #f59e0b;
+        padding: 4px 8px;
+        border-radius: 8px;
+        border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+
+    .lb-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .lb-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background: rgba(30, 41, 59, 0.8);
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        transition: all 0.3s ease;
+    }
+
+    .lb-item.top-1 {
+        background: linear-gradient(90deg, rgba(234, 179, 8, 0.25) 0%, rgba(30, 41, 59, 0.8) 100%);
+        border: 1px solid rgba(234, 179, 8, 0.5);
+    }
+
+    .lb-item.top-2 {
+        background: linear-gradient(90deg, rgba(148, 163, 184, 0.25) 0%, rgba(30, 41, 59, 0.8) 100%);
+        border: 1px solid rgba(148, 163, 184, 0.5);
+    }
+
+    .lb-item.top-3 {
+        background: linear-gradient(90deg, rgba(249, 115, 22, 0.25) 0%, rgba(30, 41, 59, 0.8) 100%);
+        border: 1px solid rgba(249, 115, 22, 0.5);
+    }
+
+    .lb-donor-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        overflow: hidden;
+    }
+
+    .lb-rank {
+        font-weight: 800;
+        font-size: 16px;
+        width: 26px;
+        text-align: center;
+    }
+
+    .lb-donor-name {
+        font-weight: 700;
+        font-size: 15px;
+        color: #ffffff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 170px;
+    }
+
+    .lb-amount {
+        font-weight: 800;
+        font-size: 15px;
+        color: #10b981;
+        white-space: nowrap;
+    }
+</style>
+
+<div class="lb-overlay-wrapper">
+    <div class="lb-card">
+        <div class="lb-header">
+            <span class="lb-title">
+                🏆 TOP DONATE
+            </span>
+            <span class="lb-period-badge">
+                @(period == "day" ? "Hôm nay" : period == "week" ? "Tuần này" : period == "month" ? "Tháng này" : "Tất cả")
+            </span>
+        </div>
+
+        <div class="lb-list" id="lbListContainer">
+            @if (Model != null && Model.Any())
+            {
+                @foreach (var item in Model)
+                {
+                    var rankClass = item.Rank == 1 ? "top-1" : item.Rank == 2 ? "top-2" : item.Rank == 3 ? "top-3" : "";
+                    var rankIcon = item.Rank == 1 ? "🥇" : item.Rank == 2 ? "🥈" : item.Rank == 3 ? "🥉" : $"#{item.Rank}";
+
+                    <div class="lb-item @rankClass">
+                        <div class="lb-donor-info">
+                            <span class="lb-rank">@rankIcon</span>
+                            <span class="lb-donor-name" title="@item.DonorName">@item.DonorName</span>
+                        </div>
+                        <span class="lb-amount">@item.FormattedAmount</span>
+                    </div>
+                }
+            }
+            else
+            {
+                <div style="text-align: center; color: #94a3b8; padding: 20px 0; font-size: 14px;">
+                    Chưa có dữ liệu ủng hộ
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const streamerSlug = '@Html.Raw(slug)';
+        const period = '@Html.Raw(period)';
+        const lbContainer = document.getElementById('lbListContainer');
+
+        // Hàm làm mới danh sách Top Donate tự động qua API
+        async function fetchLeaderboardUpdate() {
+            if (!streamerSlug) return;
+
+            try {
+                const url = '/api/widgets/leaderboard/' + encodeURIComponent(streamerSlug) + '?period=' + encodeURIComponent(period) + '&limit=5';
+                const response = await fetch(url);
+                const res = await response.json();
+
+                if (res.success && res.data && res.data.length > 0) {
+                    let html = '';
+                    res.data.forEach(item => {
+                        const rankClass = item.rank === 1 ? 'top-1' : item.rank === 2 ? 'top-2' : item.rank === 3 ? 'top-3' : '';
+                        const rankIcon = item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : ('#' + item.rank);
+
+                        html += '<div class="lb-item ' + rankClass + '">' +
+                                    '<div class="lb-donor-info">' +
+                                        '<span class="lb-rank">' + rankIcon + '</span>' +
+                                        '<span class="lb-donor-name" title="' + item.donorName + '">' + item.donorName + '</span>' +
+                                    '</div>' +
+                                    '<span class="lb-amount">' + item.formattedAmount + '</span>' +
+                                '</div>';
+                    });
+                    lbContainer.innerHTML = html;
+                }
+            } catch (err) {
+                console.log("Lỗi polling leaderboard:", err);
+            }
+        }
+
+        // Tự động kiểm tra và làm mới bảng xếp hạng mỗi 15 giây
+        setInterval(fetchLeaderboardUpdate, 15000);
+    </script>
+}

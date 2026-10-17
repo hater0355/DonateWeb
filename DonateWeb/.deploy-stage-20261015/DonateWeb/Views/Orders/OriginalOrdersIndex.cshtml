@@ -1,0 +1,179 @@
+@{
+    ViewData["Title"] = "Danh sách đơn hàng";
+}
+
+<div class="mb-3 d-flex align-items-center gap-2">
+    <h5 class="fw-bold text-dark-green mb-0">DANH SÁCH ĐƠN HÀNG</h5>
+    <i class="fa-regular fa-file-lines text-dark-green"></i>
+</div>
+
+<!-- Bộ lọc tìm kiếm -->
+<div class="card card-custom p-3 mb-3 bg-light-green">
+    <div class="fw-semibold text-dark-green mb-3 small">TÌM KIẾM</div>
+    <div class="row g-2 mb-2">
+        <!-- Mã đơn hàng -->
+        <div class="col-12 col-md-4">
+            <div class="position-relative">
+                <input type="text" id="searchCode" class="form-control form-control-custom"
+                       placeholder="Mã đơn hàng" />
+                <span class="position-absolute top-50 end-0 translate-middle-y pe-3 text-muted">
+                    <i class="fa-solid fa-magnifying-glass fa-sm"></i>
+                </span>
+            </div>
+        </div>
+        <!-- Từ ngày -->
+        <div class="col-12 col-md-4">
+            <input type="date" id="dateFrom" class="form-control form-control-custom" placeholder="Từ ngày" />
+        </div>
+        <!-- Đến ngày -->
+        <div class="col-12 col-md-4">
+            <input type="date" id="dateTo" class="form-control form-control-custom" placeholder="Đến ngày" />
+        </div>
+    </div>
+    <div class="row g-2 mb-3">
+        <!-- Loại đơn hàng -->
+        <div class="col-12 col-md-4">
+            <select id="orderType" class="form-select form-control-custom">
+                <option value="">Loại đơn hàng</option>
+                <option value="donate">Donate</option>
+                <option value="gift">Quà tặng</option>
+                <option value="effect">Hiệu ứng</option>
+            </select>
+        </div>
+        <!-- Trạng thái -->
+        <div class="col-12 col-md-4">
+            <select id="orderStatus" class="form-select form-control-custom">
+                <option value="">Trạng thái</option>
+                <option value="success">Thành công</option>
+                <option value="pending">Đang xử lý</option>
+                <option value="failed">Thất bại</option>
+            </select>
+        </div>
+        <!-- Ủng hộ cho idol -->
+        <div class="col-12 col-md-4">
+            <select id="idolFilter" class="form-select form-control-custom">
+                <option value="">Ủng hộ cho idol</option>
+            </select>
+        </div>
+    </div>
+    <div>
+        <button class="btn btn-dark-green px-4 py-2 fw-semibold" onclick="applyFilter()">
+            ÁP DỤNG
+        </button>
+    </div>
+</div>
+
+<!-- Bảng dữ liệu -->
+<div class="card card-custom bg-white">
+    <div class="table-responsive">
+        <table class="table mb-0" id="ordersTable">
+            <thead>
+                <tr class="border-bottom" style="background-color: var(--light-green);">
+                    <th class="py-3 px-3 text-dark-green fw-semibold small text-uppercase">Mã đơn hàng</th>
+                    <th class="py-3 px-3 text-dark-green fw-semibold small text-uppercase">Ngày tạo đơn</th>
+                    <th class="py-3 px-3 text-dark-green fw-semibold small text-uppercase">Loại đơn hàng</th>
+                    <th class="py-3 px-3 text-dark-green fw-semibold small text-uppercase">Tổng tiền</th>
+                    <th class="py-3 px-3 text-dark-green fw-semibold small text-uppercase">Trạng thái</th>
+                    <th class="py-3 px-3 text-dark-green fw-semibold small text-uppercase">Ủng hộ cho Idol</th>
+                </tr>
+            </thead>
+            <tbody id="ordersBody">
+                <!-- Trạng thái rỗng -->
+                <tr id="emptyRow">
+                    <td colspan="6" class="text-center py-5">
+                        <i class="fa-regular fa-file-lines fa-2x text-muted d-block mb-2"></i>
+                        <span class="text-muted small">Không có dữ liệu phù hợp</span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Phân trang -->
+    <div class="d-flex justify-content-end align-items-center gap-2 px-3 py-2 border-top">
+        <span class="small text-muted me-1">Hiển thị mỗi trang</span>
+        <select class="form-select form-select-sm" style="width: 60px;" id="pageSize" onchange="renderTable()">
+            <option value="10" selected>10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+        </select>
+        <button class="btn btn-sm btn-outline-secondary" onclick="changePage(-1)" id="btnPrev">
+            <i class="fa-solid fa-chevron-left fa-xs"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="changePage(1)" id="btnNext">
+            <i class="fa-solid fa-chevron-right fa-xs"></i>
+        </button>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // Dữ liệu mẫu (sau nối DB thay bằng API call)
+    const allOrders = [];
+    let currentPage = 1;
+    let filtered = [];
+
+    function applyFilter() {
+        const code = document.getElementById('searchCode').value.toLowerCase();
+        const from = document.getElementById('dateFrom').value;
+        const to = document.getElementById('dateTo').value;
+        const type = document.getElementById('orderType').value;
+        const status = document.getElementById('orderStatus').value;
+        const idol = document.getElementById('idolFilter').value;
+
+        filtered = allOrders.filter(o => {
+            return (!code || o.id.toLowerCase().includes(code))
+                && (!from || o.date >= from)
+                && (!to || o.date <= to)
+                && (!type || o.type === type)
+                && (!status || o.status === status)
+                && (!idol || o.idol === idol);
+        });
+        currentPage = 1;
+        renderTable();
+    }
+
+    function renderTable() {
+        const size = parseInt(document.getElementById('pageSize').value);
+        const start = (currentPage - 1) * size;
+        const page = filtered.slice(start, start + size);
+        const body = document.getElementById('ordersBody');
+
+        if (page.length === 0) {
+            body.innerHTML = `
+                <tr id="emptyRow">
+                    <td colspan="6" class="text-center py-5">
+                        <i class="fa-regular fa-file-lines fa-2x text-muted d-block mb-2"></i>
+                        <span class="text-muted small">Không có dữ liệu phù hợp</span>
+                    </td>
+                </tr>`;
+        } else {
+            body.innerHTML = page.map(o => `
+                <tr class="border-bottom">
+                    <td class="py-3 px-3 small fw-semibold text-dark-green">${o.id}</td>
+                    <td class="py-3 px-3 small text-muted">${o.date}</td>
+                    <td class="py-3 px-3 small">${o.type}</td>
+                    <td class="py-3 px-3 small fw-semibold">${Number(o.total).toLocaleString('vi-VN')} VNĐ</td>
+                    <td class="py-3 px-3 small">
+                        <span class="badge rounded-pill ${o.status === 'success' ? 'bg-success' : o.status === 'pending' ? 'bg-warning text-dark' : 'bg-danger'}">
+                            ${o.status === 'success' ? 'Thành công' : o.status === 'pending' ? 'Đang xử lý' : 'Thất bại'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-3 small">${o.idol}</td>
+                </tr>`).join('');
+        }
+
+        document.getElementById('btnPrev').disabled = currentPage === 1;
+        document.getElementById('btnNext').disabled = start + size >= filtered.length;
+    }
+
+    function changePage(dir) {
+        currentPage += dir;
+        renderTable();
+    }
+
+    // Khởi tạo
+    filtered = [...allOrders];
+    renderTable();
+</script>
+}

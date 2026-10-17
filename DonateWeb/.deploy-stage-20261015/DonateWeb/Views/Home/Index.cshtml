@@ -1,0 +1,701 @@
+@model DonateWeb.ViewModels.HomeViewModel
+@using System.Security.Claims
+@using DonateWeb.Models.Enums
+@inject DonateWeb.Data.AppDbContext DbContext
+@{
+    ViewData["Title"] = "Trang chủ";
+}
+
+@functions {
+    public string FormatTimeAgo(DateTime dt)
+    {
+        var span = DateTime.UtcNow - dt;
+        if (span.TotalMinutes < 1) return "Vừa xong";
+        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes} phút trước";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours} giờ trước";
+        if (span.TotalDays < 30) return $"{(int)span.TotalDays} ngày trước";
+        return dt.ToString("dd/MM/yyyy");
+    }
+}
+
+<style>
+    .donate-campaign-banner {
+        background: linear-gradient(135deg, rgba(45,106,79,0.85) 0%, rgba(64,145,108,0.7) 60%, rgba(116,198,157,0.5) 100%), #1f452f;
+        border-radius: 12px;
+        padding: 50px 40px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 160px;
+        position: relative;
+        overflow: hidden;
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+    .donate-campaign-banner::before {
+        content: "";
+        position: absolute; inset: 0;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='200'%3E%3Ccircle cx='480' cy='60' r='120' fill='rgba(255,255,255,0.05)'/%3E%3Ccircle cx='520' cy='150' r='80' fill='rgba(255,255,255,0.04)'/%3E%3C/svg%3E") no-repeat right center;
+        background-size: cover;
+    }
+    .btn-donate-now {
+        background-color: #1b4533;
+        color: white;
+        border: 1px solid rgba(255,255,255,0.25);
+        border-radius: 50px;
+        padding: 8px 30px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        letter-spacing: 0.05em;
+        margin-top: 14px;
+        cursor: pointer;
+        transition: 0.2s;
+        text-decoration: none;
+        display: inline-block;
+    }
+    .btn-donate-now:hover { background-color: #143627; color: white; }
+
+    .kol-list-card {
+        background-color: var(--card-dark-green, #2e7453);
+        color: white;
+        border-radius: 8px;
+        padding: 10px 14px;
+        display: flex;
+        align-items: center;
+        position: relative;
+        cursor: pointer;
+        transition: 0.2s;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+    }
+    .kol-list-card:hover { background-color: var(--card-dark-hover, #235d42); transform: translateY(-2px); }
+    .kol-rank {
+        position: absolute; top: 8px; right: 12px;
+        font-weight: bold; font-size: 0.78rem;
+        color: rgba(255,255,255,0.7);
+    }
+    .kol-avatar {
+        width: 40px; height: 40px;
+        background-color: rgba(255,255,255,0.2);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.75rem; font-weight: bold;
+        margin-right: 10px; flex-shrink: 0;
+    }
+    .kol-info h6 { margin: 0; font-size: 0.88rem; font-weight: 700; }
+    .kol-info small { font-size: 0.72rem; color: rgba(255,255,255,0.75); }
+
+    .status-card-ov {
+        background-color: rgba(255,255,255,0.92);
+        border: 1px solid rgba(45, 106, 79, 0.16);
+        border-radius: 14px; padding: 14px;
+        width: 300px; min-width: 300px; flex-shrink: 0;
+        display: flex; flex-direction: column;
+        transition: all 0.22s ease;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 3px 10px rgba(0,0,0,0.04);
+    }
+    .status-card-ov:hover {
+        background-color: #ffffff;
+        box-shadow: 0 8px 22px rgba(45, 106, 79, 0.15);
+        transform: translateY(-3px);
+    }
+    .status-user-av {
+        width: 38px; height: 38px;
+        background-color: var(--light-green); border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--primary-green); font-size: 0.85rem;
+        flex-shrink: 0; border: 2px solid #ffffff;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+    .status-img-thumb {
+        width: 100%;
+        height: 155px;
+        object-fit: cover;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: transform 0.2s ease, filter 0.2s ease;
+    }
+    .status-img-thumb:hover {
+        transform: scale(1.02);
+        filter: brightness(0.96);
+    }
+    .like-btn {
+        background: transparent;
+        border: none;
+        outline: none;
+        padding: 5px 12px;
+        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .like-btn:hover {
+        background-color: rgba(220, 53, 69, 0.08);
+    }
+    .like-btn.liked {
+        color: #e63946;
+        font-weight: 700;
+    }
+    .like-btn:not(.liked) {
+        color: #6c757d;
+    }
+    .like-btn i {
+        font-size: 1.1rem;
+        transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .like-btn:active i {
+        transform: scale(1.35);
+    }
+
+    /* Right column */
+    .right-card-green {
+        background-color: var(--card-dark-green, #2e7453);
+        color: white;
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+    }
+    .stat-row {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.15);
+        font-size: 0.85rem;
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .placeholder-box {
+        background-color: rgba(255,255,255,0.65);
+        color: #555;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.75rem; border-radius: 6px;
+    }
+    .multi-device-box {
+        background-color: var(--card-dark-green, #2e7453);
+        border-radius: 10px; padding: 20px;
+        display: flex; justify-content: space-between; align-items: center;
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+    }
+    .multi-device-bar {
+        background-color: rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 6px;
+        padding: 8px 14px;
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.7);
+        margin-top: 8px;
+    }
+    .qr-card {
+        background-color: var(--light-green);
+        border: 1px solid var(--border-color);
+        border-radius: 10px; padding: 18px;
+        text-align: center;
+    }
+    .section-title {
+        font-size: 0.8rem; font-weight: 700; color: var(--dark-green);
+        letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 12px;
+    }
+    .top-ranking-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 9px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        transition: all 0.2s ease;
+        text-decoration: none;
+    }
+    .top-ranking-row:last-child {
+        border-bottom: none;
+    }
+    a.top-ranking-row:hover {
+        background-color: rgba(255, 255, 255, 0.08);
+        border-radius: 6px;
+        padding-left: 6px;
+        padding-right: 6px;
+    }
+    .top-rank-badge {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.72rem;
+        font-weight: 700;
+        flex-shrink: 0;
+        background: rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.85);
+    }
+    .top-rank-badge.rank-1 {
+        background: linear-gradient(135deg, #ffd700 0%, #ffae00 100%);
+        color: #143627;
+        box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+    }
+    .top-rank-badge.rank-2 {
+        background: linear-gradient(135deg, #e0e0e0 0%, #bdbdbd 100%);
+        color: #143627;
+    }
+    .top-rank-badge.rank-3 {
+        background: linear-gradient(135deg, #e0a96d 0%, #a46628 100%);
+        color: #ffffff;
+    }
+    .top-rank-avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background-color: rgba(255, 255, 255, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        overflow: hidden;
+        border: 1.5px solid rgba(255, 255, 255, 0.25);
+        flex-shrink: 0;
+    }
+</style>
+
+<div class="row g-4">
+    <!-- Left Column -->
+    <div class="col-12 col-xl-9">
+
+        <!-- Campaign Banner -->
+        <div class="donate-campaign-banner">
+            <h2 class="fw-bold text-white mb-0" style="text-shadow: 1px 1px 4px rgba(0,0,0,0.3); letter-spacing: 0.06em;">ESPORT GLORY CAMPAIGN</h2>
+            <a href="/Streamer/Donate" class="btn-donate-now">DONATE NGAY</a>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.SearchKeyword))
+        {
+            <div class="alert d-flex flex-wrap justify-content-between align-items-center mb-4 rounded-3 shadow-sm" style="background-color: var(--light-green); border: 1px solid var(--border-color); color: var(--dark-green);">
+                <div>
+                    <i class="fa-solid fa-magnifying-glass me-2 text-success"></i>
+                    Kết quả tìm kiếm cho từ khóa: <strong class="text-success">"@Model.SearchKeyword"</strong>
+                    <span class="ms-2 badge bg-success rounded-pill">@(Model.FeaturedStreamers?.Count ?? 0) Streamer</span>
+                </div>
+                <a href="/" class="btn btn-sm btn-outline-success rounded-pill px-3 mt-2 mt-sm-0">
+                    <i class="fa-solid fa-rotate-left me-1"></i> Xóa tìm kiếm
+                </a>
+            </div>
+        }
+
+        <!-- Danh sach KOL -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <p class="section-title mb-0">
+                @(string.IsNullOrWhiteSpace(Model.SearchKeyword) ? "DANH SÁCH KOL" : $"STREAMER PHÙ HỢP ({Model.FeaturedStreamers?.Count ?? 0})")
+            </p>
+            @if (Model.FeaturedStreamers != null && Model.FeaturedStreamers.Any())
+            {
+                <span class="text-muted small">(@Model.FeaturedStreamers.Count Streamer)</span>
+            }
+        </div>
+        <div class="row g-3 mb-4">
+            @if (Model.FeaturedStreamers != null && Model.FeaturedStreamers.Any())
+            {
+                @for (int i = 0; i < Model.FeaturedStreamers.Count; i++)
+                {
+                    var kol = Model.FeaturedStreamers[i];
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <a href="/@kol.Slug" class="text-decoration-none">
+                            <div class="kol-list-card">
+                                @if (kol.Rank > 0)
+                                {
+                                    <div class="kol-rank">#@kol.Rank</div>
+                                }
+                                <div class="kol-avatar overflow-hidden">
+                                    @if (!string.IsNullOrEmpty(kol.AvatarUrl) && kol.AvatarUrl != "/images/default-avatar.png")
+                                    {
+                                        <img src="@kol.AvatarUrl" alt="@kol.DisplayName" class="w-100 h-100 object-fit-cover rounded-circle" onerror="this.src='/images/default-avatar.png'" />
+                                    }
+                                    else
+                                    {
+                                        <i class="fa-solid fa-user"></i>
+                                    }
+                                </div>
+                                <div class="kol-info text-truncate">
+                                    <h6 class="text-truncate text-white">@kol.DisplayName</h6>
+                                    <small class="text-white-50">@(kol.FollowerCount > 0 ? $"{kol.FollowerCount:N0} Followers" : "Mới tham gia")</small>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="col-12">
+                    <div class="card card-custom p-4 text-center bg-white">
+                        <i class="fa-regular fa-folder-open fs-2 text-muted mb-2"></i>
+                        @if (!string.IsNullOrWhiteSpace(Model.SearchKeyword))
+                        {
+                            <p class="text-muted mb-1 fw-medium">Không tìm thấy Streamer nào khớp với từ khóa "@Model.SearchKeyword"</p>
+                            <small class="text-muted">Hãy thử tìm kiếm bằng tên hiển thị hoặc mã ID streamer khác.</small>
+                        }
+                        else
+                        {
+                            <p class="text-muted mb-1 fw-medium">Chưa có KOL / Streamer nào trên hệ thống</p>
+                            <small class="text-muted mb-3">Các tài khoản streamer được tạo trong database sẽ tự động xuất hiện tại đây.</small>
+                            <div>
+                                <a href="/Streamer/Register" class="btn btn-sm btn-outline-success rounded-pill px-3">Đăng ký làm Streamer</a>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Status -->
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <p class="section-title mb-0">STATUS</p>
+            <span class="text-muted small" style="font-size: 0.78rem;">
+                <i class="fa-solid fa-fire text-danger me-1"></i>Bản tin Streamer mới nhất
+            </span>
+        </div>
+        <div class="d-flex gap-3 overflow-auto pb-3 mb-4 custom-scrollbar">
+            @if (Model.Statuses != null && Model.Statuses.Any())
+            {
+                @foreach (var st in Model.Statuses)
+                {
+                    <div class="status-card-ov">
+                        <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
+                            <a href="/@st.StreamerSlug" class="text-decoration-none d-flex align-items-center gap-2 overflow-hidden flex-grow-1 me-2">
+                                <div class="status-user-av overflow-hidden">
+                                    <img src="@st.StreamerAvatarUrl" alt="@st.StreamerName" class="w-100 h-100 object-fit-cover rounded-circle" onerror="this.src='/images/default-avatar.png'" />
+                                </div>
+                                <div class="overflow-hidden">
+                                    <div class="fw-bold text-dark-green text-truncate" style="font-size:0.85rem;" title="@st.StreamerName">@st.StreamerName</div>
+                                    <small class="text-muted d-block" style="font-size:0.72rem;">@FormatTimeAgo(st.CreatedAt)</small>
+                                </div>
+                            </a>
+                            <a href="/@st.StreamerSlug" class="btn btn-sm btn-light border rounded-pill px-2 py-0 text-muted" style="font-size: 0.72rem;" title="Ghé thăm kênh">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                            </a>
+                        </div>
+
+                        <div class="status-content text-dark mb-2" style="font-size: 0.85rem; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line;">
+                            @st.Content
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(st.ImageUrl))
+                        {
+                            <div class="status-img-wrapper mb-2" onclick="previewStatusImage('@st.ImageUrl', '@st.StreamerName')" title="Bấm để xem ảnh lớn">
+                                <img src="@st.ImageUrl" alt="Ảnh status @st.StreamerName" class="status-img-thumb" loading="lazy" />
+                            </div>
+                        }
+
+                        <div class="status-footer-ov mt-auto pt-2 border-top d-flex align-items-center justify-content-between">
+                            <button type="button" 
+                                    class="like-btn @(st.IsLikedByCurrentUser ? "liked" : "")" 
+                                    data-status-id="@st.Id" 
+                                    onclick="toggleStatusLike(this, @st.Id)"
+                                    title="Thả tim">
+                                <i class="@(st.IsLikedByCurrentUser ? "fa-solid fa-heart text-danger" : "fa-regular fa-heart")"></i>
+                                <span class="like-count" style="font-size: 0.84rem;">@st.LikeCount.ToString("N0")</span>
+                            </button>
+                            <a href="/@st.StreamerSlug" class="text-success text-decoration-none small fw-semibold" style="font-size: 0.75rem;">
+                                Xem kênh <i class="fa-solid fa-chevron-right ms-1"></i>
+                            </a>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="w-100 p-4 card card-custom bg-white text-center text-muted">
+                    <i class="fa-regular fa-newspaper fs-3 text-muted opacity-50 mb-2"></i>
+                    <div>Chưa có status nào được đăng tải từ các Streamer.</div>
+                </div>
+            }
+        </div>
+
+
+    </div>
+
+    <!-- Right Column -->
+    <div class="col-12 col-xl-3">
+
+        <!-- Profile Mini -->
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            var fullName = User.FindFirst("FullName")?.Value ?? User.Identity.Name ?? "Người dùng";
+            var avatarUrl = User.FindFirst("AvatarUrl")?.Value ?? "/images/default-avatar.png";
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0";
+            var liveBalance = int.TryParse(userId, out var uid)
+                ? DbContext.Users.Where(u => u.Id == uid).Select(u => (decimal?)u.WalletBalance).FirstOrDefault()
+                : null;
+            var walletBalance = (liveBalance ?? 0m).ToString("N0");
+            var roleBadge = User.IsInRole(UserRoles.Admin) ? "Admin" : User.IsInRole(UserRoles.Streamer) ? "Streamer" : "Viewer";
+
+            <div class="right-card-green d-flex align-items-center gap-3">
+                <img src="@avatarUrl" class="rounded-3 border border-light object-fit-cover flex-shrink-0" width="60" height="60" alt="Avatar" onerror="this.src='/images/default-avatar.png'" />
+                <div class="flex-grow-1 text-truncate">
+                    <h6 class="fw-bold mb-0 text-truncate" style="font-size:0.9rem;">@fullName</h6>
+                    <small class="text-white-50 d-block" style="font-size:0.75rem;">ID: @userId</small>
+                    <span class="badge bg-white text-dark-green mt-1" style="font-size:0.7rem;">@roleBadge | Ví: @walletBalance đ</span>
+                </div>
+                <a href="/Profile" class="align-self-start text-white text-opacity-50 text-decoration-none" title="Xem hồ sơ">
+                    <i class="fa-solid fa-gear"></i>
+                </a>
+            </div>
+        }
+        else
+        {
+            <div class="right-card-green d-flex align-items-center gap-3">
+                <div class="placeholder-box flex-shrink-0" style="width:60px; height:60px; border-radius:8px;">
+                    <i class="fa-regular fa-user fs-4 text-dark-green"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h6 class="fw-bold mb-1" style="font-size:0.88rem;">Khách Vãng Lai</h6>
+                    <div class="d-flex gap-2">
+                        <a href="/Auth/Login" class="btn btn-sm btn-light py-0 px-2 fw-semibold" style="font-size: 0.72rem;">Đăng nhập</a>
+                        <a href="/Auth/Register" class="btn btn-sm btn-outline-light py-0 px-2 fw-semibold" style="font-size: 0.72rem;">Đăng ký</a>
+                    </div>
+                </div>
+            </div>
+        }
+
+
+        <!-- TOP NẠP -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <p class="section-title mb-0">
+                <i class="fa-solid fa-crown text-warning me-1"></i> TOP NẠP
+            </p>
+            <a href="/Wallet/Deposit" class="text-white-50 small text-decoration-none" style="font-size:0.75rem;">
+                <i class="fa-solid fa-plus-circle me-1"></i>Nạp ví
+            </a>
+        </div>
+        <div class="right-card-green p-0 px-3 mb-3">
+            @if (Model.TopDonors != null && Model.TopDonors.Any())
+            {
+                @foreach (var donor in Model.TopDonors)
+                {
+                    <div class="top-ranking-row">
+                        <div class="d-flex align-items-center gap-2 overflow-hidden me-2">
+                            <span class="top-rank-badge rank-@donor.Rank">
+                                @if (donor.Rank == 1)
+                                {
+                                    <i class="fa-solid fa-crown text-dark"></i>
+                                }
+                                else if (donor.Rank == 2)
+                                {
+                                    <i class="fa-solid fa-medal text-dark"></i>
+                                }
+                                else if (donor.Rank == 3)
+                                {
+                                    <i class="fa-solid fa-award text-white"></i>
+                                }
+                                else
+                                {
+                                    <span>#@donor.Rank</span>
+                                }
+                            </span>
+                            <div class="top-rank-avatar">
+                                @if (!string.IsNullOrEmpty(donor.AvatarUrl) && donor.AvatarUrl != "/images/default-avatar.png")
+                                {
+                                    <img src="@donor.AvatarUrl" alt="@donor.Name" class="w-100 h-100 object-fit-cover" onerror="this.src='/images/default-avatar.png'" />
+                                }
+                                else
+                                {
+                                    <i class="fa-solid fa-user-ninja text-white-50"></i>
+                                }
+                            </div>
+                            <div class="text-truncate">
+                                <span class="fw-bold text-white d-block text-truncate" style="font-size:0.84rem;" title="@donor.Name">@donor.Name</span>
+                                <small class="text-white-50" style="font-size:0.7rem;">Thành viên</small>
+                            </div>
+                        </div>
+                        <div class="text-end flex-shrink-0">
+                            <span class="fw-bold" style="font-size:0.85rem; color:#ffe082;">@donor.TotalAmount.ToString("N0") đ</span>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="py-4 text-center text-white-50 small">
+                    <i class="fa-solid fa-crown d-block mb-2 fs-5 text-warning opacity-75"></i>
+                    <span>Chưa có giao dịch nạp tiền nào</span>
+                    <div class="mt-2">
+                        <a href="/Wallet/Deposit" class="btn btn-sm btn-outline-light rounded-pill px-3 py-1" style="font-size: 0.72rem;">
+                            <i class="fa-solid fa-wallet me-1"></i> Nạp tiền ngay
+                        </a>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- TOP STREAMER -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <p class="section-title mb-0">
+                <i class="fa-solid fa-trophy text-warning me-1"></i> TOP STREAMER
+            </p>
+            <span class="text-white-50 small" style="font-size:0.75rem;">Tiền donate</span>
+        </div>
+        <div class="right-card-green p-0 px-3 mb-3">
+            @if (Model.TopStreamers != null && Model.TopStreamers.Any())
+            {
+                @foreach (var streamer in Model.TopStreamers)
+                {
+                    <a href="/@streamer.Slug" class="top-ranking-row text-white text-decoration-none">
+                        <div class="d-flex align-items-center gap-2 overflow-hidden me-2">
+                            <span class="top-rank-badge rank-@streamer.Rank">
+                                @if (streamer.Rank == 1)
+                                {
+                                    <i class="fa-solid fa-trophy text-dark"></i>
+                                }
+                                else if (streamer.Rank == 2)
+                                {
+                                    <i class="fa-solid fa-medal text-dark"></i>
+                                }
+                                else if (streamer.Rank == 3)
+                                {
+                                    <i class="fa-solid fa-award text-white"></i>
+                                }
+                                else
+                                {
+                                    <span>#@streamer.Rank</span>
+                                }
+                            </span>
+                            <div class="top-rank-avatar">
+                                @if (!string.IsNullOrEmpty(streamer.AvatarUrl) && streamer.AvatarUrl != "/images/default-avatar.png")
+                                {
+                                    <img src="@streamer.AvatarUrl" alt="@streamer.DisplayName" class="w-100 h-100 object-fit-cover" onerror="this.src='/images/default-avatar.png'" />
+                                }
+                                else
+                                {
+                                    <i class="fa-solid fa-user text-white-50"></i>
+                                }
+                            </div>
+                            <div class="text-truncate">
+                                <span class="fw-bold text-white d-block text-truncate" style="font-size:0.84rem;" title="@streamer.DisplayName">
+                                    @streamer.DisplayName
+                                    @if (streamer.IsVerified)
+                                    {
+                                        <i class="fa-solid fa-circle-check text-info ms-1" style="font-size:0.7rem;" title="Đã xác minh"></i>
+                                    }
+                                </span>
+                                <small class="text-white-50" style="font-size:0.7rem;">
+                                    @(streamer.FollowerCount > 0 ? $"{streamer.FollowerCount:N0} theo dõi" : "Mới tham gia")
+                                </small>
+                            </div>
+                        </div>
+                        <div class="text-end flex-shrink-0">
+                            <span class="fw-bold text-warning d-block" style="font-size:0.85rem;">@streamer.TotalReceived.ToString("N0") đ</span>
+                        </div>
+                    </a>
+                }
+            }
+            else
+            {
+                <div class="py-4 text-center text-white-50 small">
+                    <i class="fa-solid fa-trophy d-block mb-1 fs-5 text-warning opacity-75"></i>
+                    <span>Chưa có streamer nào</span>
+                </div>
+            }
+        </div>
+
+        <!-- QR Code -->
+        <div class="qr-card mt-3">
+            <h6 class="fw-bold text-dark-green mb-1" style="font-size:0.82rem; letter-spacing:0.04em;">QUÉT MÃ ĐỂ TƯƠNG TÁC</h6>
+            <p class="text-muted mb-2" style="font-size:0.75rem;">Quét mã để tương tác trên hệ thống và cập nhật các tính năng mới nhất.</p>
+            <div class="bg-white p-2 d-inline-block rounded">
+                <i class="fa-solid fa-qrcode" style="font-size: 4.5rem; color: #1F452F;"></i>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Modal xem ảnh lớn Status -->
+<div class="modal fade" id="statusImagePreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-body p-0 text-center position-relative">
+                <button type="button" class="btn btn-dark btn-sm rounded-circle position-absolute top-0 end-0 m-3 shadow" data-bs-dismiss="modal" style="width: 36px; height: 36px; z-index: 10;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <img id="statusPreviewImgSrc" src="" alt="Ảnh status" class="img-fluid rounded-3 shadow-lg" style="max-height: 85vh; object-fit: contain; background: #000;" />
+                <div id="statusPreviewImgCaption" class="mt-2 text-white bg-dark bg-opacity-75 p-2 rounded small d-inline-block"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function toggleStatusLike(btn, statusId) {
+        if (!statusId) return;
+        
+        var icon = btn.querySelector('i');
+        var countSpan = btn.querySelector('.like-count');
+        
+        var isCurrentlyLiked = btn.classList.contains('liked');
+        var currentCount = parseInt((countSpan.textContent || '0').replace(/,/g, '')) || 0;
+        
+        if (isCurrentlyLiked) {
+            btn.classList.remove('liked');
+            icon.className = 'fa-regular fa-heart';
+            countSpan.textContent = Math.max(0, currentCount - 1).toLocaleString('vi-VN');
+        } else {
+            btn.classList.add('liked');
+            icon.className = 'fa-solid fa-heart text-danger';
+            countSpan.textContent = (currentCount + 1).toLocaleString('vi-VN');
+        }
+
+        var formData = new FormData();
+        formData.append('statusId', statusId);
+
+        fetch('/Streamer/ToggleLikeStatus', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.success) {
+                if (data.isLiked) {
+                    btn.classList.add('liked');
+                    icon.className = 'fa-solid fa-heart text-danger';
+                } else {
+                    btn.classList.remove('liked');
+                    icon.className = 'fa-regular fa-heart';
+                }
+                countSpan.textContent = data.likeCount.toLocaleString('vi-VN');
+            } else {
+                if (isCurrentlyLiked) {
+                    btn.classList.add('liked');
+                    icon.className = 'fa-solid fa-heart text-danger';
+                    countSpan.textContent = currentCount.toLocaleString('vi-VN');
+                } else {
+                    btn.classList.remove('liked');
+                    icon.className = 'fa-regular fa-heart';
+                    countSpan.textContent = currentCount.toLocaleString('vi-VN');
+                }
+            }
+        })
+        .catch(err => {
+            console.error('Lỗi khi thả tim:', err);
+        });
+    }
+
+    function previewStatusImage(url, streamerName) {
+        if (!url) return;
+        var modalEl = document.getElementById('statusImagePreviewModal');
+        var img = document.getElementById('statusPreviewImgSrc');
+        var cap = document.getElementById('statusPreviewImgCaption');
+        if (img) img.src = url;
+        if (cap) cap.textContent = 'Ảnh đăng bởi ' + (streamerName || 'Streamer');
+        if (window.bootstrap && bootstrap.Modal) {
+            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        }
+    }
+</script>
+}

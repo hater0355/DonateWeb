@@ -106,30 +106,8 @@ namespace DonateWeb.Security.RateLimiting
         public string ResolveClientIp(HttpContext context)
         {
             if (context == null) return "unknown";
-
-            // 1. Kiểm tra Header do Cloudflare gắn
-            if (context.Request.Headers.TryGetValue("CF-Connecting-IP", out var cfIp) && !string.IsNullOrWhiteSpace(cfIp))
-            {
-                return cfIp.ToString().Trim();
-            }
-
-            // 2. Kiểm tra Header X-Forwarded-For (Lấy IP đầu tiên trong chuỗi forwarded)
-            if (context.Request.Headers.TryGetValue("X-Forwarded-For", out var forwardedFor) && !string.IsNullOrWhiteSpace(forwardedFor))
-            {
-                var ips = forwardedFor.ToString().Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                if (ips.Length > 0 && IPAddress.TryParse(ips[0].Trim(), out var parsedIp))
-                {
-                    return parsedIp.ToString();
-                }
-            }
-
-            // 3. Kiểm tra Header X-Real-IP
-            if (context.Request.Headers.TryGetValue("X-Real-IP", out var realIp) && !string.IsNullOrWhiteSpace(realIp))
-            {
-                return realIp.ToString().Trim();
-            }
-
-            // 4. Lấy RemoteIpAddress trực tiếp từ kết nối Socket TCP
+            // Lấy RemoteIpAddress sau middleware ForwardedHeaders. Không tự đọc các header
+            // do client gửi vì có thể giả mạo X-Forwarded-For / X-Real-IP để né giới hạn.
             var remoteIp = context.Connection.RemoteIpAddress;
             if (remoteIp != null)
             {

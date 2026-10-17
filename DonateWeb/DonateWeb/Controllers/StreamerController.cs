@@ -1,13 +1,14 @@
 using System.Security.Claims;
+using System.Globalization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using QRCoder; // [MỚI THÊM] Thư viện QRCoder để sinh mã QR thanh toán chứa số tiền và nội dung chuyển khoản
 using DonateWeb.Data;
 using DonateWeb.Models.Entities;
 using DonateWeb.Models.Enums;
+using DonateWeb.Security.ContentModeration;
 using DonateWeb.Security.RateLimiting;
 using DonateWeb.Security.Uploads;
 using DonateWeb.Services;
@@ -24,6 +25,10 @@ namespace DonateWeb.Controllers
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
         private readonly ILogger<StreamerController> _logger;
+        private readonly IPayOSService _payOS;
+        private readonly IContentModerationService _contentModeration;
+        private readonly IStreamerIdentityDocumentService _identityDocumentService;
+        private readonly IStreamerBankQrService _streamerBankQrService;
 
         public StreamerController(
             IStreamerService streamerService,
@@ -32,7 +37,11 @@ namespace DonateWeb.Controllers
             IQrCodeService qrCodeService,
             AppDbContext context,
             IConfiguration configuration,
-            ILogger<StreamerController> logger)
+            ILogger<StreamerController> logger,
+            IPayOSService payOS,
+            IContentModerationService contentModeration,
+            IStreamerIdentityDocumentService identityDocumentService,
+            IStreamerBankQrService streamerBankQrService)
         {
             _streamerService = streamerService;
             _authService = authService;
@@ -41,6 +50,10 @@ namespace DonateWeb.Controllers
             _context = context;
             _configuration = configuration;
             _logger = logger;
+            _payOS = payOS;
+            _contentModeration = contentModeration;
+            _identityDocumentService = identityDocumentService;
+            _streamerBankQrService = streamerBankQrService;
         }
 
         /// <summary>
@@ -108,60 +121,37 @@ namespace DonateWeb.Controllers
             return _qrCodeService.GenerateQrCodeBase64(url, 10);
         }
 
-        // =========================================================================
-        // [MỚI THÊM] Hàm hỗ trợ sinh ảnh mã QR (Base64 PNG) chứa thông tin:
-        // Ngân hàng, Số tài khoản, Chủ tài khoản, Số tiền (Amount) và Nội dung chuyển khoản
-        // =========================================================================
-        private string GeneratePaymentQrBase64(string? bankName, string? bankAccountNo, string? bankAccountName, decimal amount, string transferContent)
+        private string GetPublicBaseUrl()
         {
-            var bank = string.IsNullOrWhiteSpace(bankName) ? "MB Bank" : bankName.Trim();
-            var accNo = string.IsNullOrWhiteSpace(bankAccountNo) ? "0987654321" : bankAccountNo.Trim();
-            var accName = string.IsNullOrWhiteSpace(bankAccountName) ? "STREAMER DONATE" : bankAccountName.Trim().ToUpper();
-
-            // Chuỗi payload thanh toán chứa đầy đủ thông tin Ngân hàng, Số tiền và Nội dung chuyển khoản
-            var qrPayload = $"BANK:{bank}|ACC:{accNo}|NAME:{accName}|AMOUNT:{amount:0}|CONTENT:{transferContent}";
-
-            using var qrGenerator = new QRCodeGenerator();
-            using var qrCodeData = qrGenerator.CreateQrCode(qrPayload, QRCodeGenerator.ECCLevel.Q);
-            using var qrCode = new PngByteQRCode(qrCodeData);
-            byte[] qrCodeBytes = qrCode.GetGraphic(10);
-
-            return $"data:image/png;base64,{Convert.ToBase64String(qrCodeBytes)}";
-        }
-
-        // =========================================================================
-        // [MỚI THÊM] API Endpoint trả về mã QR động ngay khi Viewer thay đổi Số tiền,
-        // Tên người gửi hoặc Lời nhắn trên giao diện (AJAX)
-        // =========================================================================
-        [HttpGet]
-        public async Task<IActionResult> GenerateQrAjax(string slug, decimal amount, string? donorName, string? message)
-        {
-            var streamer = await _streamerService.GetBySlugAsync(slug);
-            if (streamer == null)
+            var configuredBaseUrl = _configuration["App:PublicBaseUrl"]?.Trim().TrimEnd('/');
+            if (Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var configuredUri) &&
+                (configuredUri.Scheme == Uri.UriSchemeHttp || configuredUri.Scheme == Uri.UriSchemeHttps))
             {
-                return NotFound();
+                return configuredBaseUrl!;
             }
 
-            var streamerIdentifier = !string.IsNullOrWhiteSpace(streamer.User?.AccountId) ? streamer.User.AccountId : streamer.Slug;
-            var cleanDonor = string.IsNullOrWhiteSpace(donorName) ? "Viewer" : donorName.Trim();
-            var transferContent = string.IsNullOrWhiteSpace(message)
-                ? $"DONATE {streamerIdentifier} {cleanDonor}"
-                : $"DONATE {streamerIdentifier} {cleanDonor} - {message.Trim()}";
+            return $"{Request.Scheme}://{Request.Host}";
+        }
 
-            var qrBase64 = GeneratePaymentQrBase64(
-                streamer.BankName,
-                streamer.BankAccountNumber,
-                streamer.BankAccountName ?? streamer.DisplayName,
-                amount,
-                transferContent);
+        private async Task PopulateConfigQrFieldsAsync(StreamerProfileConfigViewModel model, StreamerProfile streamer)
+        {
+            var identifier = !string.IsNullOrWhiteSpace(model.Slug) ? model.Slug : streamer.Id.ToString();
+            model.DonatePageUrl = $"{GetPublicBaseUrl()}/{Uri.EscapeDataString(identifier)}";
+            model.QrCodeImageBase64 = GenerateQrCodeBase64(model.DonatePageUrl);
+            model.BankDonationTransferCode = $"DW{streamer.Id}";
 
-            return Json(new
-            {
-                success = true,
-                qrBase64,
-                transferContent,
-                formattedAmount = amount.ToString("N0") + " VNĐ"
-            });
+            // QR của mọi streamer dùng chung tài khoản đã liên kết với SePay.
+            model.CentralBankName = _configuration["SePay:BankName"]?.Trim();
+            model.CentralBankAccountNumber = _configuration["SePay:AccountNumber"]?.Trim();
+            model.CentralBankAccountName = _configuration["SePay:AccountName"]?.Trim();
+            model.BankDonationQrBase64 = streamer.IsActive && streamer.ApprovalStatus == StreamerApprovalStatus.Approved
+                ? await _streamerBankQrService.CreateStaticQrPngDataUriAsync(
+                    model.CentralBankName,
+                    model.CentralBankAccountNumber,
+                    model.CentralBankAccountName,
+                    model.BankDonationTransferCode,
+                    HttpContext.RequestAborted)
+                : null;
         }
 
         /// <summary>
@@ -213,31 +203,34 @@ namespace DonateWeb.Controllers
                     currentWalletBalance = currentUser.WalletBalance;
                 }
             }
+
+            // Hồ sơ đang chờ duyệt/từ chối chỉ được xem bởi chính chủ; không công khai trang nhận donate.
+            if (streamer.ApprovalStatus != StreamerApprovalStatus.Approved && !isOwnerStreamer)
+            {
+                ViewBag.NotFoundSlug = targetIdentifier ?? streamer.Slug;
+                return View("StreamerNotFound");
+            }
+
             ViewBag.IsOwnerStreamer = isOwnerStreamer;
             ViewBag.IsFollowing = isFollowing;
 
             var defaultDonorName = User.Identity?.IsAuthenticated == true ? (User.FindFirst("FullName")?.Value ?? User.Identity.Name ?? "") : "";
             var defaultAmount = streamer.MinDonateAmount > 0 ? streamer.MinDonateAmount : 20000;
 
-            // [MỚI THÊM] Tạo nội dung chuyển khoản và sinh mã QR ban đầu khi mở trang
-            var streamerIdentifier = !string.IsNullOrWhiteSpace(streamer.User?.AccountId) ? streamer.User.AccountId : streamer.Slug;
-            var initialTransferContent = $"DONATE {streamerIdentifier} {(string.IsNullOrWhiteSpace(defaultDonorName) ? "Viewer" : defaultDonorName)}";
-            var initialQrBase64 = GeneratePaymentQrBase64(
-                streamer.BankName,
-                streamer.BankAccountNumber,
-                streamer.BankAccountName ?? streamer.DisplayName,
-                defaultAmount,
-                initialTransferContent);
+            // QR cố định trên livestream chỉ mở trang donate; QR thanh toán PayOS
+            // được tạo riêng sau khi người ủng hộ nhập số tiền và lời nhắn.
+            var donatePageUrl = $"{GetPublicBaseUrl()}/{Uri.EscapeDataString(streamer.Slug)}";
+            var donatePageQr = GenerateQrCodeBase64(donatePageUrl);
 
             var model = new StreamerDonateViewModel
             {
                 StreamerProfileId = streamer.Id,
-                Slug = streamerIdentifier,
+                Slug = streamer.Slug,
                 DisplayName = streamer.DisplayName,
                 AvatarUrl = string.IsNullOrWhiteSpace(streamer.AvatarUrl) ? "/images/default-avatar.png" : streamer.AvatarUrl,
                 BannerUrl = string.IsNullOrWhiteSpace(streamer.BannerUrl) ? "/images/default-banner.jpg" : streamer.BannerUrl,
                 GreetingMessage = streamer.GreetingMessage,
-                Bio = streamer.Bio,
+                Bio = ProfileBioSanitizer.Sanitize(streamer.Bio),
                 MinDonateAmount = streamer.MinDonateAmount,
                 FollowerCount = streamer.FollowerCount,
                 Rank = streamer.Rank,
@@ -259,8 +252,8 @@ namespace DonateWeb.Controllers
                 Amount = defaultAmount,
                 // [MỚI THÊM] Gán số dư tài khoản, nội dung chuyển khoản và mã QR vừa sinh vào ViewModel
                 CurrentWalletBalance = currentWalletBalance,
-                TransferContent = initialTransferContent,
-                GeneratedQrBase64 = initialQrBase64,
+                DonatePageUrl = donatePageUrl,
+                DonatePageQrBase64 = donatePageQr,
                 PaymentMethod = (User.Identity?.IsAuthenticated == true && currentWalletBalance >= defaultAmount)
                     ? PaymentMethod.Wallet
                     : PaymentMethod.BankTransfer
@@ -413,27 +406,17 @@ namespace DonateWeb.Controllers
             model.AvatarUrl = streamer.AvatarUrl;
             model.BannerUrl = streamer.BannerUrl;
             model.GreetingMessage = streamer.GreetingMessage;
-            model.Bio = streamer.Bio;
+            model.Bio = ProfileBioSanitizer.Sanitize(streamer.Bio);
             model.MinDonateAmount = streamer.MinDonateAmount;
             model.BankName = streamer.BankName;
             model.BankAccountNumber = streamer.BankAccountNumber;
             model.BankAccountName = streamer.BankAccountName;
             model.PaymentQrUrl = streamer.PaymentQrUrl;
+            model.DonatePageUrl = $"{GetPublicBaseUrl()}/{Uri.EscapeDataString(streamer.Slug)}";
+            model.DonatePageQrBase64 = GenerateQrCodeBase64(model.DonatePageUrl);
             model.IsActive = streamer.IsActive;
             model.LockReason = streamer.LockReason;
             model.CurrentWalletBalance = currentWalletBalance;
-
-            // [MỚI THÊM] Sinh lại nội dung chuyển khoản và mã QR với số tiền & nội dung mà Viewer vừa nhập
-            var cleanDonorName = string.IsNullOrWhiteSpace(model.DonorName) ? "Viewer" : model.DonorName.Trim();
-            model.TransferContent = string.IsNullOrWhiteSpace(model.Message)
-                ? $"DONATE {streamer.Slug} {cleanDonorName}"
-                : $"DONATE {streamer.Slug} {cleanDonorName} - {model.Message.Trim()}";
-            model.GeneratedQrBase64 = GeneratePaymentQrBase64(
-                streamer.BankName,
-                streamer.BankAccountNumber,
-                streamer.BankAccountName ?? streamer.DisplayName,
-                model.Amount,
-                model.TransferContent);
 
             // KIỂM TRA: Nếu kênh streamer đang chờ duyệt hoặc bị từ chối thì chặn gửi donate
             if (streamer.ApprovalStatus == StreamerApprovalStatus.Pending)
@@ -507,11 +490,11 @@ namespace DonateWeb.Controllers
 
         /// <summary>
         /// POST: /Streamer/CreateBankDonation
-        /// Tạo đơn Donate ở trạng thái Pending, sinh mã Memo VietQR dạng "DN{id}" để người dùng quét mã.
-        /// Khi PayOS báo webhook, trạng thái sẽ tự động chuyển thành Success.
+        /// Tạo đơn donate PayOS riêng cho từng khoản ủng hộ.
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [DonateRateLimit(5, 60, "bank_donation_create")]
         public async Task<IActionResult> CreateBankDonation([FromForm] string slug, [FromForm] string? donorName, [FromForm] decimal amount, [FromForm] string? message)
         {
             var streamer = await _streamerService.GetBySlugAsync(slug);
@@ -546,54 +529,77 @@ namespace DonateWeb.Controllers
                 currentUserId = uid;
             }
 
-            var cleanDonorName = string.IsNullOrWhiteSpace(donorName) ? "Người ủng hộ ẩn danh" : donorName.Trim();
+            var rawDonorName = string.IsNullOrWhiteSpace(donorName) ? "Người ủng hộ ẩn danh" : donorName.Trim();
+            var cleanDonorName = _contentModeration.ModerateContent(rawDonorName).SanitizedText.Trim();
+            var cleanMessage = _contentModeration.ModerateContent(message, rawDonorName).SanitizedText.Trim();
+            if (string.IsNullOrWhiteSpace(cleanDonorName)) cleanDonorName = "Người ủng hộ ẩn danh";
+            if (cleanDonorName.Length > 50) cleanDonorName = cleanDonorName[..50];
+            if (cleanMessage.Length > 500) cleanMessage = cleanMessage[..500];
 
-            // 1. Tạo đơn Donate ở trạng thái Pending
+            var baseUrl = GetPublicBaseUrl();
+            var streamerPageUrl = $"{baseUrl}/{Uri.EscapeDataString(streamer.Slug)}";
+            var orderCode = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000 + Random.Shared.Next(0, 1000);
+            var expiresAt = DateTimeOffset.UtcNow.AddMinutes(10);
+
+            // Lưu đơn Pending trước để webhook đối chiếu theo orderCode.
             var donation = new Donation
             {
                 StreamerProfileId = streamer.Id,
                 DonorUserId = currentUserId,
                 DonorName = cleanDonorName,
                 Amount = amount,
-                Message = message?.Trim(),
+                Message = string.IsNullOrWhiteSpace(cleanMessage) ? "Đã gửi ủng hộ" : cleanMessage,
                 PaymentMethod = PaymentMethod.BankTransfer,
                 Status = DonationStatus.Pending,
-                TransactionCode = $"DON_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N")[..4].ToUpper()}",
+                TransactionCode = $"DON_{orderCode}",
                 CreatedAt = DateTime.UtcNow
             };
 
             _context.Donations.Add(donation);
             await _context.SaveChangesAsync();
 
-            // 2. Gán memo chuẩn dạng "DN" + donation.Id (Ví dụ: DN84920)
-            var memo = $"DN{donation.Id}";
-            donation.TransactionCode = memo;
-            await _context.SaveChangesAsync();
-
-            // 3. Lấy thông tin tài khoản ngân hàng (Ưu tiên tài khoản riêng của Streamer, fallback tài khoản hệ thống)
-            var bankId = !string.IsNullOrWhiteSpace(streamer.BankName) ? streamer.BankName : (_configuration["BankConfig:BankId"] ?? "MB");
-            var accountNo = !string.IsNullOrWhiteSpace(streamer.BankAccountNumber) ? streamer.BankAccountNumber : (_configuration["BankConfig:AccountNo"] ?? "0354031024");
-            var accountName = !string.IsNullOrWhiteSpace(streamer.BankAccountName) ? streamer.BankAccountName : (_configuration["BankConfig:AccountName"] ?? "NGUYEN ANH HIEU");
-
-            var encodedMemo = Uri.EscapeDataString(memo);
-            var encodedAccountName = Uri.EscapeDataString(accountName);
-            var vietQrUrl = $"https://img.vietqr.io/image/{bankId}-{accountNo}-compact2.png?amount={(long)amount}&addInfo={encodedMemo}&accountName={encodedAccountName}";
-
-            return Json(new
+            try
             {
-                success = true,
-                donationId = donation.Id,
-                transactionCode = memo,
-                memo = memo,
-                amount = donation.Amount,
-                formattedAmount = $"{donation.Amount:N0} VNĐ",
-                bankId = bankId,
-                accountNo = accountNo,
-                accountName = accountName,
-                qrUrl = vietQrUrl,
-                streamerName = streamer.DisplayName,
-                expireSeconds = 600
-            });
+                var payment = await _payOS.createPaymentLink(new PaymentData
+                {
+                    orderCode = orderCode,
+                    amount = decimal.ToInt32(amount),
+                    // Mô tả PayOS ngắn để tương thích với các ngân hàng giới hạn nội dung.
+                    description = "DONATE",
+                    cancelUrl = $"{streamerPageUrl}?payment=cancel&orderCode={orderCode}",
+                    returnUrl = $"{streamerPageUrl}?payment=return&orderCode={orderCode}",
+                    buyerName = cleanDonorName,
+                    expiredAt = (int)expiresAt.ToUnixTimeSeconds()
+                });
+
+                if (string.IsNullOrWhiteSpace(payment.qrCode))
+                    throw new InvalidOperationException("PayOS không trả về dữ liệu QR cho đơn thanh toán.");
+
+                return Json(new
+                {
+                    success = true,
+                    donationId = donation.Id,
+                    transactionCode = donation.TransactionCode,
+                    orderCode,
+                    memo = payment.description,
+                    amount = donation.Amount,
+                    formattedAmount = $"{donation.Amount:N0} VNĐ",
+                    bankId = payment.bin,
+                    accountNo = payment.accountNumber,
+                    accountName = payment.accountName,
+                    qrUrl = GenerateQrCodeBase64(payment.qrCode),
+                    checkoutUrl = payment.checkoutUrl,
+                    streamerName = streamer.DisplayName,
+                    expireSeconds = Math.Max(1, (int)(expiresAt - DateTimeOffset.UtcNow).TotalSeconds)
+                });
+            }
+            catch (Exception ex)
+            {
+                donation.Status = DonationStatus.Failed;
+                await _context.SaveChangesAsync();
+                _logger.LogError(ex, "Không tạo được payment link PayOS cho donation {DonationId}.", donation.Id);
+                return Json(new { success = false, message = "Không tạo được thanh toán PayOS. Vui lòng kiểm tra cấu hình PayOS rồi thử lại." });
+            }
         }
 
         /// <summary>
@@ -870,21 +876,18 @@ namespace DonateWeb.Controllers
             }
 
             // Xây dựng đường dẫn trang donate của streamer: https://localhost:7111/{ID hoặc Slug}
-            var scheme = Request.Scheme;
-            var host = Request.Host.Value;
             var identifier = !string.IsNullOrWhiteSpace(streamer.Slug) ? streamer.Slug : streamer.Id.ToString();
-            var donatePageUrl = $"{scheme}://{host}/{identifier}";
+            var donatePageUrl = $"{GetPublicBaseUrl()}/{Uri.EscapeDataString(identifier)}";
 
             // Sinh mã QR Base64 PNG chuẩn phân giải cao (Level Q) nhúng web và OBS
             var qrCodeBase64 = GenerateQrCodeBase64(donatePageUrl);
-
             var model = new StreamerProfileConfigViewModel
             {
                 Id = streamer.Id,
                 DisplayName = streamer.DisplayName,
                 Slug = streamer.Slug,
                 GreetingMessage = streamer.GreetingMessage,
-                Bio = streamer.Bio,
+                Bio = ProfileBioSanitizer.Sanitize(streamer.Bio),
                 AvatarUrl = streamer.AvatarUrl,
                 BannerUrl = streamer.BannerUrl,
                 MinDonateAmount = streamer.MinDonateAmount,
@@ -898,9 +901,10 @@ namespace DonateWeb.Controllers
                 FacebookUrl = streamer.FacebookUrl,
                 TiktokUrl = streamer.TiktokUrl,
                 DonatePageUrl = donatePageUrl,
-                QrCodeImageBase64 = qrCodeBase64
+                QrCodeImageBase64 = qrCodeBase64,
             };
 
+            await PopulateConfigQrFieldsAsync(model, streamer);
             return View(model);
         }
 
@@ -928,10 +932,15 @@ namespace DonateWeb.Controllers
                 return NotFound();
             }
 
-            var scheme = Request.Scheme;
-            var host = Request.Host.Value;
+            var isOwner = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var currentUserId)
+                && streamer.UserId == currentUserId;
+            if (streamer.ApprovalStatus != StreamerApprovalStatus.Approved && !isOwner)
+            {
+                return NotFound();
+            }
+
             var identifier = !string.IsNullOrWhiteSpace(streamer.Slug) ? streamer.Slug : streamer.Id.ToString();
-            var donatePageUrl = $"{scheme}://{host}/{identifier}";
+            var donatePageUrl = $"{GetPublicBaseUrl()}/{Uri.EscapeDataString(identifier)}";
             var qrCodeBase64 = GenerateQrCodeBase64(donatePageUrl);
 
             var model = new StreamerProfileConfigViewModel
@@ -940,7 +949,7 @@ namespace DonateWeb.Controllers
                 DisplayName = streamer.DisplayName,
                 Slug = streamer.Slug,
                 GreetingMessage = streamer.GreetingMessage,
-                Bio = streamer.Bio,
+                Bio = ProfileBioSanitizer.Sanitize(streamer.Bio),
                 AvatarUrl = streamer.AvatarUrl,
                 BannerUrl = streamer.BannerUrl,
                 MinDonateAmount = streamer.MinDonateAmount,
@@ -971,10 +980,26 @@ namespace DonateWeb.Controllers
                 return RedirectToAction("Register", "Streamer");
             }
 
+            var bankFields = new[] { model.BankName, model.BankAccountNumber, model.BankAccountName };
+            var hasAnyBankField = bankFields.Any(value => !string.IsNullOrWhiteSpace(value));
+            var hasAllBankFields = bankFields.All(value => !string.IsNullOrWhiteSpace(value));
+            if (hasAnyBankField && !hasAllBankFields)
+            {
+                ModelState.AddModelError(nameof(model.BankName), "Để lưu thông tin nhận tiền khi rút doanh thu, hãy điền đủ ngân hàng, số tài khoản và tên chủ tài khoản.");
+            }
+            if (!string.IsNullOrWhiteSpace(model.BankAccountNumber) &&
+                !System.Text.RegularExpressions.Regex.IsMatch(model.BankAccountNumber.Trim(), "^[A-Za-z0-9]{6,19}$"))
+            {
+                ModelState.AddModelError(nameof(model.BankAccountNumber), "Số tài khoản phải gồm 6–19 chữ cái hoặc chữ số, không có khoảng trắng.");
+            }
+
             if (!ModelState.IsValid)
             {
+                model.Bio = ProfileBioSanitizer.Sanitize(model.Bio);
                 model.AvatarUrl = streamer.AvatarUrl;
                 model.BannerUrl = streamer.BannerUrl;
+                model.PaymentQrUrl = streamer.PaymentQrUrl;
+                await PopulateConfigQrFieldsAsync(model, streamer);
                 return View(model);
             }
 
@@ -986,8 +1011,11 @@ namespace DonateWeb.Controllers
 
             if (!ModelState.IsValid)
             {
+                model.Bio = ProfileBioSanitizer.Sanitize(model.Bio);
                 model.AvatarUrl = streamer.AvatarUrl;
                 model.BannerUrl = streamer.BannerUrl;
+                model.PaymentQrUrl = streamer.PaymentQrUrl;
+                await PopulateConfigQrFieldsAsync(model, streamer);
                 return View(model);
             }
 
@@ -999,10 +1027,16 @@ namespace DonateWeb.Controllers
                 ? uploadedBannerPath
                 : (!string.IsNullOrWhiteSpace(model.BannerUrl) ? model.BannerUrl.Trim() : streamer.BannerUrl);
 
+            // Thông tin ngân hàng cá nhân là nơi nhận tiền khi streamer rút doanh thu;
+            // QR donate luôn dùng tài khoản trung tâm cấu hình ở SePay.
+            model.PaymentQrUrl = streamer.PaymentQrUrl;
+
             var (success, error) = await _streamerService.UpdateProfileConfigAsync(userId, model);
             if (!success)
             {
+                model.Bio = ProfileBioSanitizer.Sanitize(model.Bio);
                 ModelState.AddModelError(string.Empty, error);
+                await PopulateConfigQrFieldsAsync(model, streamer);
                 return View(model);
             }
 
@@ -1064,26 +1098,122 @@ namespace DonateWeb.Controllers
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RequestSizeLimit(12 * 1024 * 1024)]
         public async Task<IActionResult> Register(StreamerRegisterViewModel model)
         {
+            int? currentUserId = null;
+            User? currentUser = null;
+            if (User.Identity?.IsAuthenticated == true && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var uid))
+            {
+                currentUserId = uid;
+                currentUser = await _authService.GetUserByIdAsync(uid);
+                ViewBag.PendingProfile = currentUser?.StreamerProfile;
+            }
+
+            if (!model.IdentityDataConsent)
+            {
+                ModelState.AddModelError(nameof(model.IdentityDataConsent), "Bạn cần đồng ý để nền tảng xử lý thông tin và ảnh CCCD nhằm xét duyệt hồ sơ streamer.");
+            }
+
+            if (!DateOnly.TryParseExact(model.DateOfBirth, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+                ModelState.AddModelError(nameof(model.DateOfBirth), "Ngày sinh không hợp lệ.");
+            if (!DateOnly.TryParseExact(model.IdentityIssuedDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+                ModelState.AddModelError(nameof(model.IdentityIssuedDate), "Ngày cấp CCCD không hợp lệ.");
+            if (model.Gender is not ("Nam" or "Nữ" or "Khác"))
+                ModelState.AddModelError(nameof(model.Gender), "Giới tính không hợp lệ.");
+
             if (!ModelState.IsValid)
             {
                 return View(model);
             }
 
-            int? currentUserId = null;
-            if (User.Identity?.IsAuthenticated == true && int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var uid))
+            const long maxIdentityImageBytes = 5L * 1024 * 1024;
+            if (model.CitizenIdFrontImage!.Length > maxIdentityImageBytes)
+                ModelState.AddModelError(nameof(model.CitizenIdFrontImage), "Ảnh mặt trước không được vượt quá 5 MB.");
+            if (model.CitizenIdBackImage!.Length > maxIdentityImageBytes)
+                ModelState.AddModelError(nameof(model.CitizenIdBackImage), "Ảnh mặt sau không được vượt quá 5 MB.");
+            if (!ModelState.IsValid)
+                return View(model);
+
+            var identityData = new StreamerIdentityData
             {
-                currentUserId = uid;
+                FullName = model.FullName.Trim(),
+                DateOfBirth = model.DateOfBirth!.Trim(),
+                CitizenId = model.CitizenId.Trim(),
+                Gender = model.Gender.Trim(),
+                Nationality = model.Nationality.Trim(),
+                PlaceOfOrigin = model.PlaceOfOrigin.Trim(),
+                PlaceOfBirth = model.PlaceOfBirth.Trim(),
+                PermanentAddress = model.PermanentAddress!.Trim(),
+                IdentityIssuedDate = model.IdentityIssuedDate!.Trim(),
+                IdentityIssuedBy = model.IdentityIssuedBy.Trim(),
+                CurrentAddress = model.CurrentAddress?.Trim()
+            };
+            var protectedIdentityData = _identityDocumentService.ProtectIdentity(identityData);
+
+            string? frontDocumentKey = null;
+            string? backDocumentKey = null;
+            try
+            {
+                frontDocumentKey = await _identityDocumentService.SaveDocumentAsync(model.CitizenIdFrontImage!, HttpContext.RequestAborted);
+                backDocumentKey = await _identityDocumentService.SaveDocumentAsync(model.CitizenIdBackImage!, HttpContext.RequestAborted);
             }
-
-            var (success, error, profile) = await _streamerService.RegisterStreamerAsync(currentUserId, model);
-
-            if (!success || profile == null)
+            catch (OperationCanceledException)
             {
-                ModelState.AddModelError(string.Empty, error);
+                await _identityDocumentService.DeleteDocumentAsync(frontDocumentKey);
+                await _identityDocumentService.DeleteDocumentAsync(backDocumentKey);
+                throw;
+            }
+            catch (InvalidDataException exception)
+            {
+                await _identityDocumentService.DeleteDocumentAsync(frontDocumentKey);
+                await _identityDocumentService.DeleteDocumentAsync(backDocumentKey);
+                ModelState.AddModelError(string.Empty, exception.Message);
                 return View(model);
             }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                await _identityDocumentService.DeleteDocumentAsync(frontDocumentKey);
+                await _identityDocumentService.DeleteDocumentAsync(backDocumentKey);
+                _logger.LogError(exception, "Failed to store private streamer identity documents");
+                ModelState.AddModelError(string.Empty, "Không thể lưu ảnh CCCD lúc này. Vui lòng thử lại sau.");
+                return View(model);
+            }
+
+            var identitySubmission = new StreamerIdentitySubmission(
+                protectedIdentityData,
+                frontDocumentKey,
+                backDocumentKey,
+                DateTime.UtcNow);
+
+            var oldFrontKey = currentUser?.StreamerProfile?.CitizenIdFrontDocumentKey;
+            var oldBackKey = currentUser?.StreamerProfile?.CitizenIdBackDocumentKey;
+            (bool Success, string Error, StreamerProfile? Profile) result;
+            try
+            {
+                result = await _streamerService.RegisterStreamerAsync(currentUserId, model, identitySubmission);
+            }
+            catch (Exception exception)
+            {
+                await _identityDocumentService.DeleteDocumentAsync(frontDocumentKey);
+                await _identityDocumentService.DeleteDocumentAsync(backDocumentKey);
+                _logger.LogError(exception, "Failed to submit streamer application for user {UserId}", currentUserId);
+                ModelState.AddModelError(string.Empty, "Không thể gửi hồ sơ lúc này. Vui lòng thử lại sau.");
+                return View(model);
+            }
+
+            if (!result.Success || result.Profile == null)
+            {
+                await _identityDocumentService.DeleteDocumentAsync(frontDocumentKey);
+                await _identityDocumentService.DeleteDocumentAsync(backDocumentKey);
+                ModelState.AddModelError(string.Empty, result.Error);
+                return View(model);
+            }
+
+            if (!string.Equals(oldFrontKey, frontDocumentKey, StringComparison.Ordinal))
+                await _identityDocumentService.DeleteDocumentAsync(oldFrontKey);
+            if (!string.Equals(oldBackKey, backDocumentKey, StringComparison.Ordinal))
+                await _identityDocumentService.DeleteDocumentAsync(oldBackKey);
 
             TempData["SuccessMessage"] = "Đăng ký làm Streamer thành công! Yêu cầu của bạn đã được gửi đến Quản trị viên để xét duyệt. Bạn sẽ được cấp quyền và kích hoạt kênh ngay khi được phê duyệt.";
             return RedirectToAction(nameof(Register));

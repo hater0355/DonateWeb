@@ -17,12 +17,18 @@ namespace DonateWeb.Areas.Admin.Services
         private readonly AppDbContext _context;
         private readonly ILogger<AdminService> _logger;
         private readonly IAccountIdService _accountIdService;
+        private readonly IStreamerIdentityDocumentService _identityDocumentService;
 
-        public AdminService(AppDbContext context, ILogger<AdminService> logger, IAccountIdService accountIdService)
+        public AdminService(
+            AppDbContext context,
+            ILogger<AdminService> logger,
+            IAccountIdService accountIdService,
+            IStreamerIdentityDocumentService identityDocumentService)
         {
             _context = context;
             _logger = logger;
             _accountIdService = accountIdService;
+            _identityDocumentService = identityDocumentService;
         }
 
         // ====================================================================
@@ -47,16 +53,25 @@ namespace DonateWeb.Areas.Admin.Services
             var totalRefundedAmount = refundedDonations.Sum(d => d.Amount);
 
             // Tổng số dư ví của tất cả người dùng hiện có trong hệ thống (tiền lưu ký)
-            var totalUserWalletBalance = await _context.Users.SumAsync(u => u.WalletBalance);
+            var totalUserWalletBalance = await _context.Users
+                .SumAsync(u => u.WalletBalance + u.StreamerEarningsBalance);
 
             // TỔNG DÒNG TIỀN VÀO (INFLOW): Tổng tiền donate thành công trên hệ thống
             var totalInflow = totalDonationsSuccessAmount;
 
-            // TỔNG DÒNG TIỀN RA (OUTFLOW): 95% chuyển giao cho Streamer nhận + Tiền hoàn trả khiếu nại
-            var totalOutflow = (totalDonationsSuccessAmount * 0.95m) + totalRefundedAmount;
+            // Tính phần streamer thực nhận theo mức phí donate 10% trên từng giao dịch.
+            var totalStreamerDonationEarnings = successfulDonations.Sum(d => DonationCommission.StreamerNet(d.Amount));
 
-            // DOANH THU PHÍ SÀN (PLATFORM COMMISSION): 5% từ các giao dịch donate thành công
-            var platformRevenue = totalDonationsSuccessAmount * 0.05m;
+            // TỔNG DÒNG TIỀN RA (OUTFLOW): 90% chuyển giao cho Streamer nhận + Tiền hoàn trả khiếu nại
+            var totalOutflow = totalStreamerDonationEarnings + totalRefundedAmount;
+
+            // Phí sàn gồm 10% donate thành công và 30% đơn Shop đã thanh toán.
+            var paidShopOrders = await _context.ShopOrders
+                .Where(o => o.PaymentStatus == "Paid")
+                .Select(o => o.TotalAmount)
+                .ToListAsync();
+            var platformRevenue = successfulDonations.Sum(d => DonationCommission.PlatformFee(d.Amount))
+                + paidShopOrders.Sum(ShopCommission.PlatformFee);
 
             // 1.2. Thống kê số lượng theo trạng thái
             var totalSuccessCount = successfulDonations.Count;
@@ -86,12 +101,15 @@ namespace DonateWeb.Areas.Admin.Services
                     .Where(d => d.CreatedAt >= targetDate && d.CreatedAt < nextDate)
                     .Sum(d => d.Amount);
 
-                // Tiền ra của ngày (95% streamer + tiền hoàn trả trong ngày)
+                // Tiền ra của ngày (90% streamer + tiền hoàn trả trong ngày)
                 var dayRefunds = refundedDonations
                     .Where(d => d.ResolvedAt.HasValue && d.ResolvedAt.Value >= targetDate && d.ResolvedAt.Value < nextDate)
                     .Sum(d => d.Amount);
 
-                var dayOutflow = (dayInflow * 0.95m) + dayRefunds;
+                var dayStreamerEarnings = successfulDonations
+                    .Where(d => d.CreatedAt >= targetDate && d.CreatedAt < nextDate)
+                    .Sum(d => DonationCommission.StreamerNet(d.Amount));
+                var dayOutflow = dayStreamerEarnings + dayRefunds;
 
                 chartInflow.Add(dayInflow);
                 chartOutflow.Add(dayOutflow);
@@ -238,6 +256,8 @@ namespace DonateWeb.Areas.Admin.Services
                     LockReason = s.LockReason,
                     LockedAt = s.LockedAt,
                     IsVerified = s.IsVerified,
+                    HasIdentityDocuments = s.IdentityDataProtected != null &&
+                        s.CitizenIdFrontDocumentKey != null && s.CitizenIdBackDocumentKey != null,
                     CreatedAt = s.CreatedAt
                 })
                 .ToListAsync();
@@ -272,6 +292,23 @@ namespace DonateWeb.Areas.Admin.Services
             if (streamer == null)
             {
                 return (false, "Không tìm thấy thông tin Streamer cần duyệt.");
+            }
+
+            if (string.IsNullOrWhiteSpace(streamer.IdentityDataProtected) ||
+                string.IsNullOrWhiteSpace(streamer.CitizenIdFrontDocumentKey) ||
+                string.IsNullOrWhiteSpace(streamer.CitizenIdBackDocumentKey) ||
+                !streamer.IdentityDataConsentAt.HasValue)
+            {
+                return (false, "Chưa thể duyệt: hồ sơ này chưa có thông tin CCCD, ảnh đủ hai mặt và sự đồng ý xử lý dữ liệu. Yêu cầu streamer bổ sung hồ sơ trước.");
+            }
+
+            var identity = _identityDocumentService.UnprotectIdentity(streamer.IdentityDataProtected);
+            if (identity == null || string.IsNullOrWhiteSpace(identity.FullName) ||
+                string.IsNullOrWhiteSpace(identity.CitizenId) ||
+                await _identityDocumentService.ReadDocumentAsync(streamer.CitizenIdFrontDocumentKey) == null ||
+                await _identityDocumentService.ReadDocumentAsync(streamer.CitizenIdBackDocumentKey) == null)
+            {
+                return (false, "Chưa thể duyệt: thông tin hoặc ảnh CCCD không đọc được. Vui lòng yêu cầu streamer gửi lại hồ sơ.");
             }
 
             // Cập nhật trạng thái duyệt và kích hoạt
@@ -694,6 +731,7 @@ namespace DonateWeb.Areas.Admin.Services
             var donation = await _context.Donations
                 .Include(d => d.DonorUser)
                 .Include(d => d.StreamerProfile)
+                    .ThenInclude(sp => sp.User)
                 .FirstOrDefaultAsync(d => d.Id == donationId);
 
             if (donation == null)
@@ -718,6 +756,12 @@ namespace DonateWeb.Areas.Admin.Services
                 if (oldStatus == DonationStatus.Success && donation.StreamerProfile != null)
                 {
                     donation.StreamerProfile.TotalReceived = Math.Max(0, donation.StreamerProfile.TotalReceived - donation.Amount);
+                    if (donation.StreamerProfile.User != null)
+                    {
+                        // Ghi nhận khoản hoàn vào số dư doanh thu, kể cả khi phát sinh số dư âm
+                        // nếu streamer đã chuyển hoặc rút phần tiền này trước đó.
+                        donation.StreamerProfile.User.StreamerEarningsBalance -= DonationCommission.StreamerNet(donation.Amount);
+                    }
                 }
 
                 donation.IsDisputed = false;
@@ -728,7 +772,12 @@ namespace DonateWeb.Areas.Admin.Services
             {
                 if (oldStatus != DonationStatus.Success && donation.StreamerProfile != null)
                 {
+                    await SpecialEffectAssignment.ApplyToDonationAsync(_context, donation);
                     donation.StreamerProfile.TotalReceived += donation.Amount;
+                    if (donation.StreamerProfile.User != null)
+                    {
+                        donation.StreamerProfile.User.StreamerEarningsBalance += DonationCommission.StreamerNet(donation.Amount);
+                    }
                 }
                 donation.IsDisputed = false;
                 donation.ResolvedAt = DateTime.UtcNow;
@@ -742,6 +791,16 @@ namespace DonateWeb.Areas.Admin.Services
             // 4. Trường hợp mở khiếu nại mới (Dispute):
             else if (newStatus == DonationStatus.Disputed)
             {
+                // Tạm khóa phần doanh thu nếu giao dịch thành công bị mở khiếu nại.
+                // Khi quản trị viên xác nhận lại, nhánh Success sẽ cộng lại đúng phần ròng 90%.
+                if (oldStatus == DonationStatus.Success && donation.StreamerProfile != null)
+                {
+                    donation.StreamerProfile.TotalReceived = Math.Max(0, donation.StreamerProfile.TotalReceived - donation.Amount);
+                    if (donation.StreamerProfile.User != null)
+                    {
+                        donation.StreamerProfile.User.StreamerEarningsBalance -= DonationCommission.StreamerNet(donation.Amount);
+                    }
+                }
                 donation.IsDisputed = true;
                 donation.ResolvedAt = null;
             }
@@ -951,12 +1010,14 @@ namespace DonateWeb.Areas.Admin.Services
             }
 
             var prodName = product.Name;
-            _context.ShopProducts.Remove(product);
+            // Ẩn thay vì xóa vật lý để giữ nguyên các dòng ShopOrderItems đang tham chiếu sản phẩm.
+            product.IsActive = false;
+            product.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Admin {Admin} đã xóa sản phẩm '{Name}' (ID: {Id}) khỏi hệ thống", adminUsername, prodName, productId);
+            _logger.LogInformation("Admin {Admin} đã ẩn sản phẩm '{Name}' (ID: {Id}) khỏi gian hàng", adminUsername, prodName, productId);
 
-            return (true, $"Đã xóa sản phẩm \"{prodName}\" thành công.");
+            return (true, $"Đã ẩn sản phẩm \"{prodName}\" khỏi gian hàng. Lịch sử đơn hàng cũ vẫn được giữ.");
         }
 
         public async Task<(bool Success, string Message)> ToggleProductActiveAsync(int productId, string adminUsername)

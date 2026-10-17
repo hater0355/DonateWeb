@@ -1,0 +1,316 @@
+@model DonateWeb.ViewModels.Shop.ProductManageViewModel
+@{
+    ViewData["Title"] = "Quản lý Sản phẩm Gian hàng";
+}
+
+<style>
+    .product-mgmt-header {
+        background: linear-gradient(135deg, #1b4533 0%, #29503e 100%);
+        border-radius: 20px;
+        color: white;
+        padding: 28px 32px;
+        box-shadow: 0 8px 24px rgba(27, 69, 51, 0.15);
+    }
+    .preview-box {
+        width: 100%;
+        height: 180px;
+        border-radius: 12px;
+        border: 2px dashed #cbd5e1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8fafc;
+        overflow: hidden;
+        position: relative;
+    }
+    .preview-box img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+</style>
+
+<div class="container-fluid px-0 pb-5">
+    <!-- Header Banner -->
+    <div class="product-mgmt-header mb-4">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div>
+                <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill mb-2" style="background: rgba(255,255,255,0.15); font-size: 0.82rem;">
+                    <i class="fa-solid fa-boxes-stacked text-warning"></i>
+                    <span>Kênh Streamer: @Model.StreamerName</span>
+                </div>
+                <h2 class="fw-bold mb-1 display-6">Quản Lý Sản Phẩm Gian Hàng</h2>
+                <p class="mb-0 text-white-50 small">
+                    Thêm và quản lý các sản phẩm bạn muốn bán cho người xem. Khi thêm mới, sản phẩm sẽ được gửi tới <strong>Quản trị viên (Admin) xét duyệt</strong> trước khi hiển thị chính thức trên sàn và gian hàng.
+                </p>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="/Shop/StreamerShop?slug=@Model.StreamerProfileId" class="btn btn-outline-light rounded-pill px-3 py-2 fw-semibold" target="_blank">
+                    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Xem gian hàng của bạn
+                </a>
+                <button type="button" class="btn btn-warning rounded-pill px-4 py-2 fw-bold text-dark shadow-sm" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                    <i class="fa-solid fa-circle-plus me-1"></i> Thêm sản phẩm mới
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert thông báo -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success rounded-4 d-flex align-items-center gap-2 p-3 mb-4 shadow-sm">
+            <i class="fa-solid fa-circle-check fs-5 text-success"></i>
+            <div class="fw-semibold">@TempData["SuccessMessage"]</div>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger rounded-4 d-flex align-items-center gap-2 p-3 mb-4 shadow-sm">
+            <i class="fa-solid fa-triangle-exclamation fs-5 text-danger"></i>
+            <div class="fw-semibold">@TempData["ErrorMessage"]</div>
+        </div>
+    }
+
+    <!-- THANH BỘ LỌC TRẠNG THÁI DUYỆT -->
+    <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+        <a href="/Shop/MyProducts?status=all" class="btn btn-sm rounded-pill px-3 fw-semibold @(Model.StatusFilter == "all" ? "btn-dark" : "btn-outline-secondary")">
+            Tất cả (@(Model.PendingCount + Model.ApprovedCount + Model.RejectedCount))
+        </a>
+        <a href="/Shop/MyProducts?status=pending" class="btn btn-sm rounded-pill px-3 fw-semibold @(Model.StatusFilter == "pending" ? "btn-warning text-dark fw-bold shadow-sm" : "btn-outline-warning text-dark")">
+            <i class="fa-solid fa-clock me-1 text-warning"></i> Chờ duyệt (@Model.PendingCount)
+        </a>
+        <a href="/Shop/MyProducts?status=approved" class="btn btn-sm rounded-pill px-3 fw-semibold @(Model.StatusFilter == "approved" ? "btn-success shadow-sm" : "btn-outline-success")">
+            <i class="fa-solid fa-circle-check me-1"></i> Đã duyệt / Đang bán (@Model.ApprovedCount)
+        </a>
+        @if (Model.RejectedCount > 0)
+        {
+            <a href="/Shop/MyProducts?status=rejected" class="btn btn-sm rounded-pill px-3 fw-semibold @(Model.StatusFilter == "rejected" ? "btn-danger shadow-sm" : "btn-outline-danger")">
+                <i class="fa-solid fa-circle-xmark me-1"></i> Bị từ chối (@Model.RejectedCount)
+            </a>
+        }
+    </div>
+
+    <!-- Danh sách sản phẩm của Streamer -->
+    <div class="card border-0 shadow-sm rounded-4 bg-white overflow-hidden">
+        <div class="p-3 px-4 border-bottom d-flex align-items-center justify-content-between">
+            <h5 class="fw-bold text-dark-green mb-0 d-flex align-items-center gap-2">
+                <i class="fa-solid fa-list-check text-success"></i>
+                Danh Sách Sản Phẩm
+                <span class="badge bg-light-green text-dark-green rounded-pill font-monospace">@Model.Products.Count sản phẩm</span>
+            </h5>
+            <button type="button" class="btn btn-sm btn-dark-green rounded-pill px-3 fw-semibold" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                <i class="fa-solid fa-plus me-1"></i> Thêm mới
+            </button>
+        </div>
+
+        @if (!Model.Products.Any())
+        {
+            <div class="text-center py-5">
+                <i class="fa-solid fa-boxes-packing fa-3x text-muted mb-3 opacity-50"></i>
+                <h5 class="fw-bold text-dark">Chưa có sản phẩm nào trong mục này</h5>
+                <p class="text-muted small mb-3">Bấm nút bên dưới để tạo sản phẩm mới và gửi Quản trị viên duyệt!</p>
+                <button type="button" class="btn btn-dark-green rounded-pill px-4 fw-semibold" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                    <i class="fa-solid fa-circle-plus me-1"></i> Thêm sản phẩm mới
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr class="text-muted small text-uppercase">
+                            <th class="ps-4 py-3" style="width: 80px;">Hình ảnh</th>
+                            <th class="py-3">Tên sản phẩm</th>
+                            <th class="py-3">Giá bán</th>
+                            <th class="py-3">Tồn kho</th>
+                            <th class="py-3">Kiểm duyệt Admin</th>
+                            <th class="py-3">Ngày gửi</th>
+                            <th class="pe-4 py-3 text-end">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var prod in Model.Products)
+                        {
+                            <tr>
+                                <td class="ps-4">
+                                    <img src="@(string.IsNullOrWhiteSpace(prod.ImageUrl) ? "/images/default-banner.jpg" : prod.ImageUrl)" 
+                                         alt="@prod.Name" 
+                                         class="rounded-3 border" 
+                                         style="width: 56px; height: 56px; object-fit: cover;" 
+                                         onerror="this.src='/images/default-banner.jpg';" />
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-dark">@prod.Name</div>
+                                    @if (!string.IsNullOrWhiteSpace(prod.Description))
+                                    {
+                                        <div class="text-muted small text-truncate" style="max-width: 320px;">@prod.Description</div>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="fw-bold text-dark-green font-monospace fs-6">@prod.Price.ToString("N0") đ</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border font-monospace">@prod.StockQuantity</span>
+                                </td>
+                                <td>
+                                    @if (prod.ApprovalStatus == DonateWeb.Models.Enums.ProductApprovalStatus.Pending)
+                                    {
+                                        <span class="badge bg-warning-subtle text-dark border border-warning px-2 py-1 rounded-pill small fw-semibold">
+                                            <i class="fa-solid fa-clock me-1 text-warning"></i> Chờ Admin duyệt
+                                        </span>
+                                        <div class="text-muted small mt-1" style="font-size: 0.75rem;">Chưa hiển thị trên gian hàng</div>
+                                    }
+                                    else if (prod.ApprovalStatus == DonateWeb.Models.Enums.ProductApprovalStatus.Approved)
+                                    {
+                                        if (prod.IsActive)
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 rounded-pill small fw-semibold">
+                                                <i class="fa-solid fa-circle-check me-1"></i> Đã duyệt (Đang bán)
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary-subtle text-secondary px-2 py-1 rounded-pill small fw-semibold">
+                                                Đã duyệt (Tạm ngưng)
+                                            </span>
+                                        }
+                                    }
+                                    else if (prod.ApprovalStatus == DonateWeb.Models.Enums.ProductApprovalStatus.Rejected)
+                                    {
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 rounded-pill small fw-semibold">
+                                            <i class="fa-solid fa-circle-xmark me-1"></i> Bị từ chối duyệt
+                                        </span>
+                                        @if (!string.IsNullOrWhiteSpace(prod.RejectionReason))
+                                        {
+                                            <div class="text-danger small mt-1" style="font-size: 0.78rem;">
+                                                <i class="fa-solid fa-circle-info me-1"></i> Lý do: @prod.RejectionReason
+                                            </div>
+                                        }
+                                    }
+                                </td>
+                                <td>
+                                    <span class="small text-muted">@prod.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                                </td>
+                                <td class="pe-4 text-end">
+                                    <form asp-controller="Shop" asp-action="DeleteProduct" method="post" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn xóa sản phẩm này khỏi gian hàng?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@prod.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3" title="Xóa sản phẩm">
+                                            <i class="fa-regular fa-trash-can me-1"></i> Xóa
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- MODAL THÊM SẢN PHẨM MỚI -->
+<div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content rounded-4 border-0 shadow-lg overflow-hidden">
+            <form asp-controller="Shop" asp-action="CreateProduct" method="post" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <div class="modal-header bg-dark-green text-white py-3 border-0">
+                    <h5 class="modal-title fw-bold fs-6 d-flex align-items-center gap-2" id="addProductModalLabel">
+                        <i class="fa-solid fa-circle-plus text-warning"></i>
+                        Thêm Sản Phẩm Mới Vào Gian Hàng
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body p-4">
+                    <div class="alert alert-warning border-0 rounded-3 small p-3 mb-3 d-flex align-items-center gap-2" style="background-color: #fef3c7;">
+                        <i class="fa-solid fa-shield-halved text-warning fs-5"></i>
+                        <div>
+                            <strong>Quy trình kiểm duyệt:</strong> Sản phẩm sau khi thêm sẽ được gửi đến <strong>Quản trị viên (Admin) xét duyệt</strong> để đảm bảo an toàn nội dung trước khi xuất hiện trên gian hàng công khai.
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Tên sản phẩm -->
+                        <div class="col-12 col-md-8">
+                            <label class="form-label fw-semibold text-dark small">Tên sản phẩm <span class="text-danger">*</span></label>
+                            <input type="text" name="Name" class="form-control rounded-3" placeholder="Ví dụ: Áo Thun Mixi Gaming Bản Giới Hạn 2026" required maxlength="200" />
+                        </div>
+
+                        <!-- Giá bán -->
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold text-dark small">Giá bán (VNĐ) <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="number" name="Price" class="form-control rounded-start-3" placeholder="250000" min="1000" max="1000000000" step="1000" required />
+                                <span class="input-group-text bg-light rounded-end-3">VNĐ</span>
+                            </div>
+                        </div>
+
+                        <!-- Số lượng tồn kho -->
+                        <div class="col-12 col-md-4">
+                            <label class="form-label fw-semibold text-dark small">Số lượng tồn kho</label>
+                            <input type="number" name="StockQuantity" class="form-control rounded-3" value="100" min="1" max="99999" />
+                        </div>
+
+                        <!-- Chọn hình ảnh từ máy tính (File Upload) -->
+                        <div class="col-12 col-md-8">
+                            <label class="form-label fw-semibold text-dark small">
+                                <i class="fa-solid fa-upload me-1 text-success"></i> Chọn ảnh sản phẩm từ máy tính <span class="text-danger">*</span>
+                            </label>
+                            <input type="file" id="productImageFileInput" name="ImageFile" class="form-control rounded-3" accept="image/*" onchange="previewSelectedImage(event)" />
+                            <div class="form-text small">Hỗ trợ JPG, PNG, WebP (Tối đa 8 MB).</div>
+                        </div>
+
+                        <!-- Hoặc nhập link ảnh URL dự phòng -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-dark small">Hoặc đường dẫn ảnh Online (URL)</label>
+                            <input type="url" id="productImageUrlInput" name="ImageUrl" class="form-control rounded-3" placeholder="https://example.com/anh-san-pham.jpg" oninput="previewUrlImage(this.value)" />
+                        </div>
+
+                        <!-- Khung xem trước ảnh (Preview) -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-dark small mb-1">Xem trước hình ảnh:</label>
+                            <div class="preview-box">
+                                <img id="productImagePreview" src="/images/default-banner.jpg" alt="Preview" />
+                            </div>
+                        </div>
+
+                        <!-- Mô tả sản phẩm -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-dark small">Mô tả chi tiết sản phẩm</label>
+                            <textarea name="Description" class="form-control rounded-3" rows="3" placeholder="Mô tả chất liệu, màu sắc, kích thước, ưu điểm nổi bật của sản phẩm..." maxlength="2000"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light border-0 py-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Hủy bỏ</button>
+                    <button type="submit" class="btn btn-dark-green rounded-pill px-4 fw-bold">
+                        <i class="fa-solid fa-check me-1"></i> Thêm Sản Phẩm Ngay
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function previewSelectedImage(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('productImagePreview').src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function previewUrlImage(url) {
+        if (url && url.trim().length > 5) {
+            document.getElementById('productImagePreview').src = url.trim();
+        }
+    }
+</script>

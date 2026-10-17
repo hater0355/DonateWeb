@@ -44,9 +44,24 @@ builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IAccountIdService, AccountIdService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IStreamerService, StreamerService>();
+builder.Services.AddSingleton<IStreamerIdentityDocumentService, StreamerIdentityDocumentService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IWidgetService, WidgetService>();
 builder.Services.AddScoped<IQrCodeService, QrCodeService>();
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient<IStreamerBankQrService, StreamerBankQrService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(8);
+});
+builder.Services.Configure<DonateWeb.Areas.Widgets.Services.ElevenLabsOptions>(
+    builder.Configuration.GetSection("ElevenLabs"));
+builder.Services.AddHttpClient<DonateWeb.Areas.Widgets.Services.IElevenLabsTtsService,
+    DonateWeb.Areas.Widgets.Services.ElevenLabsTtsService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddSingleton<DonateWeb.Areas.Widgets.Services.IDonationTtsAudioCache,
+    DonateWeb.Areas.Widgets.Services.DonationTtsAudioCache>();
 
 // Đăng ký Phân hệ Bảo mật & Kiểm duyệt (Content Moderation, Rate Limiting & Webhook Security)
 builder.Services.AddSecurityAndModeration(builder.Configuration);
@@ -65,7 +80,7 @@ if (string.IsNullOrWhiteSpace(payOSClientId) || string.IsNullOrWhiteSpace(payOSA
 var payOS = new DonateWeb.Services.PayOS(payOSClientId, payOSApiKey, payOSChecksumKey);
 builder.Services.AddSingleton<DonateWeb.Services.IPayOSService>(payOS);
 
-// 3. Cấu hình Authentication (Cookie & OAuth2 Bên thứ 3: Google, Facebook, YouTube)
+// 3. Cấu hình Authentication (Cookie và đăng nhập bên thứ ba)
 var authBuilder = builder.Services.AddAuthentication(options =>
 {
     options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -79,6 +94,9 @@ var authBuilder = builder.Services.AddAuthentication(options =>
     options.AccessDeniedPath = "/Auth/AccessDenied";
     options.Cookie.Name = "DonateWeb.AuthCookie";
     options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
     options.ExpireTimeSpan = TimeSpan.FromDays(7);
     options.SlidingExpiration = true;
 })
@@ -86,6 +104,9 @@ var authBuilder = builder.Services.AddAuthentication(options =>
 {
     options.Cookie.Name = "DonateWeb.ExternalAuthCookie";
     options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
     options.ExpireTimeSpan = TimeSpan.FromMinutes(10);
 });
 
@@ -98,8 +119,11 @@ authBuilder.AddGoogle("Google", options =>
     options.ClientId = !string.IsNullOrWhiteSpace(googleClientId) ? googleClientId : "YOUR_GOOGLE_CLIENT_ID";
     options.ClientSecret = !string.IsNullOrWhiteSpace(googleClientSecret) ? googleClientSecret : "YOUR_GOOGLE_CLIENT_SECRET";
     options.CallbackPath = "/signin-google";
-    options.SaveTokens = true;
     options.ClaimActions.MapJsonKey("urn:google:picture", "picture", "url");
+    // Google OAuth v2 dùng verified_email; OpenID Connect chuẩn dùng email_verified.
+    // Hỗ trợ cả hai định dạng để chỉ chấp nhận email được Google xác minh.
+    options.ClaimActions.MapJsonKey("urn:google:email_verified", "verified_email");
+    options.ClaimActions.MapJsonKey("urn:google:email_verified_oidc", "email_verified");
     options.Events.OnRemoteFailure = context =>
     {
         var errorMsg = Uri.EscapeDataString(context.Failure?.Message ?? "Đã hủy hoặc xảy ra lỗi xác thực Google.");
@@ -110,42 +134,20 @@ authBuilder.AddGoogle("Google", options =>
 });
 
 // 3.2. Cấu hình đăng nhập bằng Facebook
-var fbAppId = builder.Configuration["Authentication:Facebook:AppId"];
-var fbAppSecret = builder.Configuration["Authentication:Facebook:AppSecret"];
+var facebookAppId = builder.Configuration["Authentication:Facebook:AppId"];
+var facebookAppSecret = builder.Configuration["Authentication:Facebook:AppSecret"];
 authBuilder.AddFacebook("Facebook", options =>
 {
     options.SignInScheme = "ExternalCookie";
-    options.AppId = !string.IsNullOrWhiteSpace(fbAppId) ? fbAppId : "YOUR_FACEBOOK_APP_ID";
-    options.AppSecret = !string.IsNullOrWhiteSpace(fbAppSecret) ? fbAppSecret : "YOUR_FACEBOOK_APP_SECRET";
+    options.AppId = !string.IsNullOrWhiteSpace(facebookAppId) ? facebookAppId : "YOUR_FACEBOOK_APP_ID";
+    options.AppSecret = !string.IsNullOrWhiteSpace(facebookAppSecret) ? facebookAppSecret : "YOUR_FACEBOOK_APP_SECRET";
     options.CallbackPath = "/signin-facebook";
-    options.SaveTokens = true;
-    options.Fields.Add("name");
-    options.Fields.Add("email");
+    options.Scope.Add("email");
     options.Fields.Add("picture");
+    options.ClaimActions.MapJsonSubKey("urn:facebook:picture", "picture", "data", "url");
     options.Events.OnRemoteFailure = context =>
     {
         var errorMsg = Uri.EscapeDataString(context.Failure?.Message ?? "Đã hủy hoặc xảy ra lỗi xác thực Facebook.");
-        context.Response.Redirect($"/Auth/ExternalLoginCallback?remoteError={errorMsg}");
-        context.HandleResponse();
-        return Task.CompletedTask;
-    };
-});
-
-// 3.3. Cấu hình đăng nhập bằng YouTube (Sử dụng Google OAuth 2.0 + YouTube Data API Scope)
-var ytClientId = builder.Configuration["Authentication:YouTube:ClientId"];
-var ytClientSecret = builder.Configuration["Authentication:YouTube:ClientSecret"];
-authBuilder.AddGoogle("YouTube", "YouTube", options =>
-{
-    options.SignInScheme = "ExternalCookie";
-    options.ClientId = !string.IsNullOrWhiteSpace(ytClientId) ? ytClientId : (!string.IsNullOrWhiteSpace(googleClientId) ? googleClientId : "YOUR_YOUTUBE_CLIENT_ID");
-    options.ClientSecret = !string.IsNullOrWhiteSpace(ytClientSecret) ? ytClientSecret : (!string.IsNullOrWhiteSpace(googleClientSecret) ? googleClientSecret : "YOUR_YOUTUBE_CLIENT_SECRET");
-    options.CallbackPath = "/signin-youtube";
-    options.SaveTokens = true;
-    options.Scope.Add("https://www.googleapis.com/auth/youtube.readonly");
-    options.ClaimActions.MapJsonKey("urn:google:picture", "picture", "url");
-    options.Events.OnRemoteFailure = context =>
-    {
-        var errorMsg = Uri.EscapeDataString(context.Failure?.Message ?? "Đã hủy hoặc xảy ra lỗi xác thực YouTube.");
         context.Response.Redirect($"/Auth/ExternalLoginCallback?remoteError={errorMsg}");
         context.HandleResponse();
         return Task.CompletedTask;
@@ -168,8 +170,8 @@ builder.Services.AddAntiforgery(options =>
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.KnownIPNetworks.Clear();
-    options.KnownProxies.Clear();
+    // Chỉ tin proxy trong dải bridge mặc định của Docker; không tin forwarded header từ mọi IP.
+    options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("172.16.0.0/12"));
 });
 
 var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];

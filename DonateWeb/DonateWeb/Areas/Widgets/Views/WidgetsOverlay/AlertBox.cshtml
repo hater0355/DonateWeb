@@ -17,6 +17,9 @@
             @Model.DisplayName
         </div>
 
+        <!-- Số tiền được tách riêng để người xem dễ đọc trên livestream -->
+        <div id="alertAmount" style="display: none; margin-top: 6px; color: #fbbf24; font-family: '@Model.FontFamily', sans-serif; font-size: 30px; font-weight: 900; text-shadow: 2px 2px 8px #000;"></div>
+
         <!-- Lời nhắn của người Donate -->
         <div id="alertMessageWrapper" style="display: none; margin-top: 12px; padding: 10px 20px; background: rgba(15, 23, 42, 0.85); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 12px; backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgba(0,0,0,0.6);">
             <div id="alertMessageText" style="color: #f8fafc; font-family: 'Inter', sans-serif; font-size: 20px; font-weight: 500; text-shadow: 1px 1px 4px #000; word-break: break-word;">
@@ -25,28 +28,63 @@
     </div>
 </div>
 
+<!-- Lớp hiệu ứng sự kiện chạy riêng trên Browser Source, không chặn thao tác hay che mất tiếng donate. -->
+<div id="specialEventOverlay" class="special-event-overlay" aria-hidden="true">
+    <canvas id="specialEventFireworks" aria-hidden="true"></canvas>
+    <div class="special-event-content">
+        <div class="special-event-flag" aria-label="Cờ Việt Nam">
+            <svg viewBox="0 0 30 20" role="img" aria-hidden="true"><rect width="30" height="20" fill="#da251d"/><path d="m15 3 1.5 4.6H21l-3.7 2.8 1.4 4.6-3.7-2.9-3.7 2.9 1.4-4.6L9 7.6h4.5z" fill="#ff0"/></svg>
+        </div>
+        <div id="specialEventTitle" class="special-event-title">VIỆT NAM VÔ ĐỊCH</div>
+        <div class="special-event-subtitle">TỰ HÀO VIỆT NAM</div>
+    </div>
+</div>
+
 <!-- Audio Player ẩn dùng để phát âm thanh hiệu ứng -->
 <audio id="alertAudioPlayer" preload="auto"></audio>
+<!-- Audio MP3 do máy chủ lấy từ ElevenLabs, phát ra Browser Source để OBS thu tiếng -->
+<audio id="ttsAudioPlayer" preload="none"></audio>
 
 @section Scripts {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+    <style>
+        .special-event-overlay { position: fixed; inset: 0; z-index: 9999; display: none; place-items: center; overflow: hidden; pointer-events: none; }
+        #specialEventFireworks { position: absolute; inset: 0; width: 100%; height: 100%; }
+        .special-event-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 32px 44px; border: 2px solid rgba(255, 220, 90, .85); border-radius: 26px; background: linear-gradient(135deg, rgba(120, 0, 0, .84), rgba(20, 20, 35, .78)); box-shadow: 0 0 55px rgba(255, 190, 30, .55); animation: special-event-enter .7s cubic-bezier(.2,.8,.2,1) both; }
+        .special-event-flag { width: min(42vw, 350px); filter: drop-shadow(0 10px 16px rgba(0,0,0,.5)); transform-origin: left center; animation: special-event-wave .65s ease-in-out infinite alternate; }
+        .special-event-flag svg { display: block; width: 100%; border-radius: 5px; }
+        .special-event-title { color: #ffe46b; font: 900 clamp(30px, 6vw, 74px)/1.08 system-ui, sans-serif; text-align: center; text-transform: uppercase; letter-spacing: .04em; text-shadow: 0 4px 0 #8a1700, 0 0 26px #ff3b20, 2px 3px 8px #000; }
+        .special-event-subtitle { color: #fff; font: 800 clamp(15px, 2.2vw, 24px)/1.2 system-ui, sans-serif; letter-spacing: .3em; text-shadow: 0 2px 8px #000; }
+        @@keyframes special-event-enter { from { opacity: 0; transform: scale(.72) translateY(24px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        @@keyframes special-event-wave { from { transform: perspective(600px) rotateY(-18deg) skewY(-2deg); } to { transform: perspective(600px) rotateY(18deg) skewY(2deg); } }
+        @@media (max-width: 600px) { .special-event-content { padding: 24px 18px; width: 92vw; } }
+        @@media (prefers-reduced-motion: reduce) { .special-event-content, .special-event-flag { animation: none; } }
+    </style>
     <script>
         // Cấu hình ban đầu từ ViewModel
         const streamerSlug = '@Html.Raw(Model.StreamerSlug)';
+        // Token này chỉ dùng để lấy audio cho khoản donate hợp lệ; API key ElevenLabs không gửi xuống trình duyệt.
+        const widgetToken = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.WidgetToken));
         const defaultImageUrl = '@Html.Raw(Model.ImageUrl)';
         const defaultSoundUrl = '@Html.Raw(Model.SoundUrl)';
         const defaultDuration = @Model.DurationSeconds;
         const defaultVolume = @Model.SoundVolume;
         const defaultAnimIn = '@Html.Raw(Model.AnimationIn)';
         const defaultAnimOut = '@Html.Raw(Model.AnimationOut)';
+        const defaultTtsEnabled = @Model.IsTtsEnabled.ToString().ToLowerInvariant();
 
         const alertContainer = document.getElementById('alertBoxContainer');
         const alertImage = document.getElementById('alertImage');
         const alertVideo = document.getElementById('alertVideo');
         const alertTitle = document.getElementById('alertTitle');
+        const alertAmount = document.getElementById('alertAmount');
         const alertMessageWrapper = document.getElementById('alertMessageWrapper');
         const alertMessageText = document.getElementById('alertMessageText');
         const audioPlayer = document.getElementById('alertAudioPlayer');
+        const ttsAudioPlayer = document.getElementById('ttsAudioPlayer');
+        const specialEventOverlay = document.getElementById('specialEventOverlay');
+        const specialEventTitle = document.getElementById('specialEventTitle');
+        const specialEventCanvas = document.getElementById('specialEventFireworks');
 
         // Hàng đợi các Alert đang chờ phát lần lượt
         let alertQueue = [];
@@ -54,6 +92,88 @@
         let lastDonationId = 0;
         const seenDonationIds = new Set();
         const seenDonationOrder = [];
+        let specialEffectAnimationFrame = 0;
+        let specialEffectHideTimer = 0;
+
+        // Pháo hoa canvas được vẽ trực tiếp trên Browser Source của OBS, không cần tải ảnh bên ngoài.
+        function showSpecialEffect(effectCode, eventTitle) {
+            if (effectCode !== 'vietnam-champions') return false;
+
+            window.clearTimeout(specialEffectHideTimer);
+            window.cancelAnimationFrame(specialEffectAnimationFrame);
+            specialEventTitle.textContent = eventTitle || 'VIỆT NAM VÔ ĐỊCH';
+            specialEventOverlay.style.display = 'grid';
+            specialEventOverlay.setAttribute('aria-hidden', 'false');
+
+            const canvas = specialEventCanvas;
+            const context = canvas.getContext('2d');
+            if (!context) return true;
+
+            const ratio = Math.min(window.devicePixelRatio || 1, 2);
+            const width = Math.max(1, window.innerWidth);
+            const height = Math.max(1, window.innerHeight);
+            canvas.width = Math.floor(width * ratio);
+            canvas.height = Math.floor(height * ratio);
+            context.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+            const particles = [];
+            const colors = ['#ff304f', '#ffde59', '#ffffff', '#26d07c', '#55c7ff'];
+            const startedAt = performance.now();
+            let lastBurstAt = 0;
+            const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            const burst = (x, y) => {
+                const count = 38;
+                for (let index = 0; index < count; index++) {
+                    const angle = (Math.PI * 2 * index / count) + Math.random() * .08;
+                    const speed = 1.5 + Math.random() * 4.2;
+                    particles.push({
+                        x, y,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: 1,
+                        decay: .009 + Math.random() * .012,
+                        size: 1.5 + Math.random() * 2.8,
+                        color: colors[Math.floor(Math.random() * colors.length)]
+                    });
+                }
+            };
+
+            const frame = now => {
+                const elapsed = now - startedAt;
+                context.clearRect(0, 0, width, height);
+                if (!reducedMotion && now - lastBurstAt > 430 && elapsed < 6200) {
+                    burst(width * (.12 + Math.random() * .76), height * (.12 + Math.random() * .48));
+                    lastBurstAt = now;
+                }
+                for (let index = particles.length - 1; index >= 0; index--) {
+                    const particle = particles[index];
+                    particle.x += particle.vx;
+                    particle.y += particle.vy;
+                    particle.vy += .035;
+                    particle.life -= particle.decay;
+                    if (particle.life <= 0) { particles.splice(index, 1); continue; }
+                    context.globalAlpha = particle.life;
+                    context.fillStyle = particle.color;
+                    context.beginPath();
+                    context.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                    context.fill();
+                }
+                context.globalAlpha = 1;
+                if (elapsed < 6800) {
+                    specialEffectAnimationFrame = window.requestAnimationFrame(frame);
+                }
+            };
+            specialEffectAnimationFrame = window.requestAnimationFrame(frame);
+            specialEffectHideTimer = window.setTimeout(() => {
+                window.cancelAnimationFrame(specialEffectAnimationFrame);
+                context.clearRect(0, 0, width, height);
+                specialEventOverlay.style.display = 'none';
+                specialEventOverlay.setAttribute('aria-hidden', 'true');
+            }, 7200);
+
+            return true;
+        }
 
         function enqueueAlert(alertData) {
             if (!alertData) return;
@@ -100,11 +220,14 @@
                     .withAutomaticReconnect([0, 2000, 5000, 10000])
                     .build();
 
-                // Lắng nghe sự kiện ReceiveAlert từ PaymentWebhookController khi Webhook PayOS kích hoạt
-                hubConn.on('ReceiveAlert', function (alertData) {
-                    console.log('[OBS SignalR Real-time] Nhận Alert mới từ PayOS Webhook:', alertData);
+                // Nhận cả sự kiện mới theo streamer ID và sự kiện cũ theo slug.
+                // enqueueAlert tự loại bản ghi trùng nếu Polling cũng trả về cùng khoản donate.
+                const handleDonationAlert = function (alertData) {
+                    console.log('[OBS SignalR Real-time] Nhận donate mới:', alertData);
                     enqueueAlert(alertData);
-                });
+                };
+                hubConn.on('OnNewDonation', handleDonationAlert);
+                hubConn.on('ReceiveAlert', handleDonationAlert);
 
                 const joinStreamerGroup = function () {
                     hubConn.invoke('JoinStreamerGroup', streamerSlug);
@@ -162,6 +285,97 @@
             playSingleAlert(currentAlert);
         }
 
+        // Đọc lời nhắn trực tiếp trong Browser Source của OBS bằng Web Speech API.
+        function speakMessage(text) {
+            if (!('speechSynthesis' in window) || !text || !text.trim()) {
+                return Promise.resolve();
+            }
+
+            return new Promise(resolve => {
+                const speech = window.speechSynthesis;
+                speech.cancel(); // Tránh câu trước bị đọc chồng lên donate hiện tại.
+
+                const utterance = new SpeechSynthesisUtterance(text.trim());
+                utterance.lang = 'vi-VN';
+                utterance.rate = 1.0;
+
+                const voices = speech.getVoices();
+                const vietnameseVoices = voices.filter(voice =>
+                    voice.lang && (voice.lang.toLowerCase().includes('vi') || voice.lang.toUpperCase().includes('VIE')));
+                const preferredVoice = vietnameseVoices.find(voice => /google|microsoft/i.test(voice.name))
+                    || vietnameseVoices[0];
+                if (preferredVoice) utterance.voice = preferredVoice;
+
+                let settled = false;
+                const finishSpeech = () => {
+                    if (settled) return;
+                    settled = true;
+                    resolve();
+                };
+
+                // Tránh làm kẹt hàng đợi nếu trình duyệt không phát hoặc không gửi onend.
+                const safetyTimer = setTimeout(() => {
+                    speech.cancel();
+                    finishSpeech();
+                }, 30000);
+                utterance.onend = () => { clearTimeout(safetyTimer); finishSpeech(); };
+                utterance.onerror = () => { clearTimeout(safetyTimer); finishSpeech(); };
+
+                try {
+                    speech.speak(utterance);
+                } catch (error) {
+                    clearTimeout(safetyTimer);
+                    console.warn('[OBS TTS] Không thể phát giọng đọc:', error);
+                    finishSpeech();
+                }
+            });
+        }
+
+        // Ưu tiên lấy giọng ElevenLabs từ máy chủ. Nếu chưa cấu hình hoặc có lỗi mạng,
+        // dùng giọng tiếng Việt của trình duyệt làm dự phòng để alert vẫn đọc được.
+        async function speakDonationWithElevenLabs(alertData, text) {
+            const donationId = Math.max(0, Number(alertData.donationId || 0));
+            try {
+                const response = await fetch(
+                    '/api/widgets/tts/audio/' + encodeURIComponent(streamerSlug) + '/' + donationId,
+                    { headers: { 'X-Widget-Token': widgetToken } });
+                if (!response.ok) throw new Error('ElevenLabs audio HTTP ' + response.status);
+
+                const audioBlob = await response.blob();
+                if (!audioBlob.size) throw new Error('ElevenLabs trả về audio rỗng');
+
+                const audioUrl = URL.createObjectURL(audioBlob);
+                await new Promise((resolve, reject) => {
+                    let finished = false;
+                    let safetyTimer;
+                    const finish = (error) => {
+                        if (finished) return;
+                        finished = true;
+                        clearTimeout(safetyTimer);
+                        ttsAudioPlayer.onended = null;
+                        ttsAudioPlayer.onerror = null;
+                        if (error) {
+                            ttsAudioPlayer.pause();
+                            ttsAudioPlayer.removeAttribute('src');
+                            ttsAudioPlayer.load();
+                        }
+                        URL.revokeObjectURL(audioUrl);
+                        error ? reject(error) : resolve();
+                    };
+
+                    ttsAudioPlayer.volume = 1;
+                    ttsAudioPlayer.onended = () => finish();
+                    ttsAudioPlayer.onerror = () => finish(new Error('OBS không phát được audio ElevenLabs'));
+                    safetyTimer = setTimeout(() => finish(new Error('Audio ElevenLabs phát quá lâu')), 45000);
+                    ttsAudioPlayer.src = audioUrl;
+                    ttsAudioPlayer.play().catch(finish);
+                });
+            } catch (error) {
+                console.warn('[OBS TTS] ElevenLabs chưa phát được, chuyển sang giọng trình duyệt:', error);
+                await speakMessage(text);
+            }
+        }
+
         // Thực thi phát một Alert cụ thể
         function playSingleAlert(alertData) {
             const mediaUrl = alertData.mediaUrl || alertData.imageUrl || defaultImageUrl;
@@ -171,10 +385,18 @@
             const animIn = alertData.animationIn || defaultAnimIn;
             const animOut = alertData.animationOut || defaultAnimOut;
 
+            // Khi donate có hiệu ứng sự kiện, ẩn ảnh/GIF/video cũ để lớp sự kiện thay thế hình alert đó.
+            const hasSpecialEffect = showSpecialEffect(alertData.specialEffectCode, alertData.specialEffectTitle);
+
             const isVideo = (alertData.mediaType === 'video') || mediaUrl.endsWith('.webm') || mediaUrl.endsWith('.mp4');
 
             // 1. Cập nhật Media hiển thị (Video WebM/MP4 hoặc Ảnh GIF)
-            if (isVideo) {
+            if (hasSpecialEffect) {
+                alertImage.style.display = 'none';
+                alertVideo.pause();
+                alertVideo.removeAttribute('src');
+                alertVideo.style.display = 'none';
+            } else if (isVideo) {
                 alertImage.style.display = 'none';
                 alertVideo.style.display = 'inline-block';
                 alertVideo.src = mediaUrl;
@@ -192,6 +414,14 @@
             alertTitle.style.color = alertData.textColor || '#10b981';
             alertTitle.style.fontFamily = (alertData.fontFamily || 'Inter') + ', sans-serif';
             alertTitle.style.fontSize = (alertData.fontSize || 28) + 'px';
+
+            const amount = Number(alertData.amount || 0);
+            if (amount > 0) {
+                alertAmount.innerText = new Intl.NumberFormat('vi-VN').format(amount) + ' đồng';
+                alertAmount.style.display = 'block';
+            } else {
+                alertAmount.style.display = 'none';
+            }
 
             if (alertData.message && alertData.message.trim() !== '') {
                 alertMessageText.innerText = '"' + alertData.message.trim() + '"';
@@ -222,7 +452,24 @@
             alertContainer.className = 'animate__animated animate__' + animIn;
             alertContainer.style.display = 'block';
 
-            // 5. Chờ hết thời gian hiển thị, kích hoạt hiệu ứng biến mất (Animation Out)
+            // Giọng đọc chỉ bật khi streamer đã bật TTS trong cấu hình Alert Box.
+            const shouldSpeak = alertData.isTtsEnabled !== undefined
+                ? Boolean(alertData.isTtsEnabled)
+                : defaultTtsEnabled;
+            if (shouldSpeak) {
+                const donorName = alertData.donorName || 'Người ủng hộ ẩn danh';
+                const spokenAmount = new Intl.NumberFormat('vi-VN').format(amount);
+                const donationMessage = (alertData.message || '').trim() || 'Đã gửi ủng hộ';
+                const spokenText = donorName + ' ủng hộ ' + spokenAmount + ' đồng. Lời nhắn: ' + donationMessage;
+                speechFinished = false;
+                speakDonationWithElevenLabs(alertData, spokenText).then(() => {
+                    speechFinished = true;
+                    finishAlertIfReady();
+                });
+            }
+
+            // Popup hiển thị ít nhất 8 giây; nếu giọng đọc dài hơn thì hàng đợi chờ đọc xong.
+            const visibleDurationMs = Math.max(Number(durationSec) * 1000, 8000);
             setTimeout(() => {
                 alertContainer.className = 'animate__animated animate__' + animOut;
 
@@ -231,7 +478,7 @@
                     visualFinished = true;
                     finishAlertIfReady();
                 }, 1000);
-            }, durationSec * 1000);
+            }, visibleDurationMs);
         }
 
         // Bắt đầu chạy khi tải xong trang trong OBS

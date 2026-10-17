@@ -14,12 +14,68 @@
     }
 
     .goal-card {
+        position: relative;
+        overflow: hidden;
         background: rgba(15, 23, 42, 0.88);
         border: 2px solid rgba(255, 255, 255, 0.15);
         border-radius: 16px;
         padding: 16px 24px;
         backdrop-filter: blur(10px);
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 0 12px rgba(255, 255, 255, 0.05);
+        transition: border-color 500ms ease, box-shadow 500ms ease;
+    }
+
+    .goal-card > *:not(.goal-complete-flash) {
+        position: relative;
+        z-index: 1;
+    }
+
+    .goal-card.goal-complete {
+        border-color: rgba(250, 204, 21, 0.85);
+        box-shadow: 0 0 28px rgba(250, 204, 21, 0.3), inset 0 0 18px rgba(250, 204, 21, 0.08);
+    }
+
+    .goal-card.goal-complete .goal-title::after {
+        content: " ✨";
+        color: #facc15;
+    }
+
+    .goal-complete-flash {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        opacity: 0;
+        background: radial-gradient(ellipse at center, rgba(250, 204, 21, 0.34), transparent 72%);
+    }
+
+    .goal-card.goal-completion-flash .goal-complete-flash {
+        animation: goal-complete-flash 1.3s ease-out both;
+    }
+
+    .goal-card.goal-updated {
+        animation: goal-card-pulse 750ms ease-out;
+    }
+
+    .goal-confetti-container {
+        position: fixed;
+        inset: 0;
+        overflow: visible;
+        pointer-events: none;
+        z-index: 1000;
+    }
+
+    .goal-confetti-piece {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 9px;
+        height: 13px;
+        border-radius: 2px;
+        opacity: 0;
+        background: var(--goal-color);
+        animation: goal-confetti 1.8s cubic-bezier(0.12, 0.65, 0.25, 1) var(--goal-delay) forwards;
+        will-change: transform, opacity;
     }
 
     .goal-header {
@@ -54,6 +110,16 @@
         overflow: hidden;
         position: relative;
         box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+    }
+
+    .goal-progress-track::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(110deg, transparent 25%, rgba(255, 255, 255, 0.32) 48%, transparent 70%);
+        transform: translateX(-110%);
+        animation: goal-track-shine 4s ease-in-out infinite;
     }
 
     .goal-progress-bar {
@@ -96,12 +162,50 @@
         from { background-position: 30px 0; }
         to { background-position: 0 0; }
     }
+
+    @@keyframes goal-track-shine {
+        0%, 35% { transform: translateX(-110%); }
+        75%, 100% { transform: translateX(110%); }
+    }
+
+    @@keyframes goal-card-pulse {
+        0% { transform: scale(1); }
+        35% { transform: scale(1.018); box-shadow: 0 0 30px rgba(16, 185, 129, 0.55); }
+        100% { transform: scale(1); }
+    }
+
+    @@keyframes goal-complete-flash {
+        0% { opacity: 0; }
+        25% { opacity: 1; }
+        100% { opacity: 0; }
+    }
+
+    @@keyframes goal-confetti {
+        0% { transform: translate(-50%, -50%) scale(0.55) rotate(0deg); opacity: 0; }
+        12% { opacity: 1; }
+        100% {
+            transform: translate(calc(-50% + var(--goal-x)), calc(-50% + var(--goal-y))) scale(0.8) rotate(var(--goal-rotation));
+            opacity: 0;
+        }
+    }
+
+    @@media (prefers-reduced-motion: reduce) {
+        .goal-progress-bar,
+        .goal-progress-track::after,
+        .goal-card.goal-updated,
+        .goal-card.goal-completion-flash .goal-complete-flash,
+        .goal-confetti-piece {
+            animation: none !important;
+            transition: none !important;
+        }
+    }
 </style>
 
 <div class="goal-overlay-wrapper">
     @if (Model != null)
     {
         <div class="goal-card" id="goalCard">
+            <div class="goal-complete-flash" aria-hidden="true"></div>
             <div class="goal-header">
                 <span class="goal-title" id="goalTitle">@Model.Title</span>
                 <span class="goal-stats" id="goalStats">@Model.FormattedProgress</span>
@@ -121,6 +225,7 @@
     else
     {
         <div class="goal-card" id="goalCard" style="display: none;">
+            <div class="goal-complete-flash" aria-hidden="true"></div>
             <div class="goal-header">
                 <span class="goal-title" id="goalTitle">Mục tiêu Donate</span>
                 <span class="goal-stats" id="goalStats">0đ / 0đ (0%)</span>
@@ -132,6 +237,7 @@
         </div>
     }
 </div>
+<div class="goal-confetti-container" id="goalConfetti" aria-hidden="true"></div>
 
 @section Scripts {
     <script>
@@ -141,23 +247,70 @@
         const goalStats = document.getElementById('goalStats');
         const goalProgressBar = document.getElementById('goalProgressBar');
         const goalPercentText = document.getElementById('goalPercentText');
+        const goalConfetti = document.getElementById('goalConfetti');
+        let previousGoal = null;
+        let goalFetchInProgress = false;
+
+        function pulseGoalCard() {
+            goalCard.classList.remove('goal-updated');
+            void goalCard.offsetWidth;
+            goalCard.classList.add('goal-updated');
+            window.setTimeout(() => goalCard.classList.remove('goal-updated'), 800);
+        }
+
+        function celebrateGoalCompletion() {
+            goalCard.classList.add('goal-complete', 'goal-completion-flash');
+            window.setTimeout(() => goalCard.classList.remove('goal-completion-flash'), 1400);
+
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+            const colors = ['#facc15', '#34d399', '#60a5fa', '#f472b6', '#ffffff'];
+            for (let i = 0; i < 42; i++) {
+                const piece = document.createElement('span');
+                const angle = (Math.PI * 2 * i / 42) + (Math.random() - 0.5) * 0.4;
+                const distance = 90 + Math.random() * 220;
+                piece.className = 'goal-confetti-piece';
+                piece.style.setProperty('--goal-x', `${Math.cos(angle) * distance}px`);
+                piece.style.setProperty('--goal-y', `${Math.sin(angle) * distance}px`);
+                piece.style.setProperty('--goal-rotation', `${Math.random() * 900 - 450}deg`);
+                piece.style.setProperty('--goal-delay', `${Math.random() * 160}ms`);
+                piece.style.setProperty('--goal-color', colors[i % colors.length]);
+                if (Math.random() > 0.55) piece.style.borderRadius = '50%';
+                piece.addEventListener('animationend', () => piece.remove(), { once: true });
+                goalConfetti.appendChild(piece);
+            }
+        }
 
         // Hàm cập nhật tiến độ Goal thời gian thực qua REST API
         async function fetchGoalUpdate() {
-            if (!streamerSlug) return;
+            if (!streamerSlug || goalFetchInProgress) return;
+            goalFetchInProgress = true;
 
             try {
                 const response = await fetch('/api/widgets/goal/' + encodeURIComponent(streamerSlug));
+                if (!response.ok) return;
                 const res = await response.json();
 
                 if (res.success && res.hasActiveGoal && res.data) {
                     const g = res.data;
+                    const currentAmount = Number(g.currentAmount) || 0;
+                    const targetAmount = Number(g.targetAmount) || 0;
+                    const isNewGoal = previousGoal && (previousGoal.id !== g.id || previousGoal.targetAmount !== targetAmount);
                     goalCard.style.display = 'block';
                     goalTitle.innerText = g.title;
                     goalStats.innerText = g.formattedProgress;
                     goalProgressBar.style.width = g.progressPercentage + '%';
                     goalProgressBar.style.backgroundColor = g.progressBarColor || '#10b981';
                     goalPercentText.innerText = g.progressPercentage + '%';
+                    goalCard.classList.toggle('goal-complete', targetAmount > 0 && currentAmount >= targetAmount);
+
+                    if (previousGoal && !isNewGoal && currentAmount > previousGoal.currentAmount) {
+                        pulseGoalCard();
+                    }
+                    if (previousGoal && !isNewGoal && previousGoal.currentAmount < targetAmount && currentAmount >= targetAmount) {
+                        celebrateGoalCompletion();
+                    }
+                    previousGoal = { id: g.id, currentAmount, targetAmount };
                 } else {
                     // Nếu không có goal nào đang active thì có thể ẩn card đi
                     if (!goalCard.hasAttribute('data-has-initial')) {
@@ -166,9 +319,12 @@
                 }
             } catch (err) {
                 console.log("Lỗi polling goal:", err);
+            } finally {
+                goalFetchInProgress = false;
             }
         }
 
+        fetchGoalUpdate();
         // Tự động kiểm tra và cập nhật tiến độ mỗi 4 giây
         setInterval(fetchGoalUpdate, 4000);
     </script>

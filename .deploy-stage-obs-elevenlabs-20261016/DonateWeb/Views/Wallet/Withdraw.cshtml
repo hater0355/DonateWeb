@@ -1,0 +1,354 @@
+@model DonateWeb.ViewModels.Wallet.WithdrawViewModel
+@{
+    ViewData["Title"] = "Rút tiền doanh thu (Streamer)";
+}
+
+<style>
+    .streamer-wallet-banner {
+        background: linear-gradient(135deg, #0f291e 0%, #1b4332 55%, #2d6a4f 100%);
+        border-radius: 16px;
+        color: #ffffff;
+        box-shadow: 0 8px 24px rgba(15, 41, 30, 0.2);
+    }
+    .quick-withdraw-btn {
+        border: 1.5px solid var(--border-color, #cce3de);
+        background-color: #ffffff;
+        color: var(--dark-green, #1b4332);
+        font-weight: 600;
+        border-radius: 10px;
+        padding: 8px 14px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .quick-withdraw-btn:hover, .quick-withdraw-btn.active {
+        background-color: var(--dark-green, #1b4332);
+        color: #ffffff;
+        border-color: var(--dark-green, #1b4332);
+    }
+    .stat-mini-box {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        padding: 14px 16px;
+    }
+</style>
+
+<div class="pb-5">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <div>
+            <h4 class="fw-bold text-dark-green mb-1 d-flex align-items-center gap-2">
+                <i class="fa-solid fa-money-bill-transfer text-success"></i> RÚT TIỀN DOANH THU STREAMER
+            </h4>
+            <p class="text-muted small mb-0">
+                Dành riêng cho <strong>Streamer (@Model.StreamerDisplayName)</strong> — Trừ số dư khả dụng và tạo yêu cầu rút tiền về tài khoản ngân hàng
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/@Model.StreamerSlug" class="btn btn-outline-success rounded-pill px-3 fw-semibold btn-sm">
+                <i class="fa-solid fa-id-card me-1"></i> Trang cá nhân (/@Model.StreamerSlug)
+            </a>
+        </div>
+    </div>
+
+    <!-- Thông báo kết quả -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success rounded-3 d-flex align-items-center gap-3 p-3 mb-4 shadow-sm border-success">
+            <i class="fa-solid fa-circle-check fs-3 text-success"></i>
+            <div>
+                <h6 class="fw-bold mb-0">Tạo yêu cầu rút tiền thành công!</h6>
+                <div>@TempData["SuccessMessage"]</div>
+            </div>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null || !string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger rounded-3 d-flex align-items-center gap-3 p-3 mb-4 shadow-sm">
+            <i class="fa-solid fa-triangle-exclamation fs-3 text-danger"></i>
+            <div>
+                <h6 class="fw-bold mb-0">Không thể thực hiện rút tiền</h6>
+                <div>@(TempData["ErrorMessage"] ?? Model.ErrorMessage)</div>
+            </div>
+        </div>
+    }
+
+    <!-- Thống kê Số dư của Streamer -->
+    <div class="streamer-wallet-banner p-4 mb-4">
+        <div class="row align-items-center g-3">
+            <div class="col-12 col-lg-5">
+                <span class="badge bg-success text-white px-3 py-1 rounded-pill mb-2">
+                    <i class="fa-solid fa-video me-1"></i> VÍ STREAMER: @Model.StreamerDisplayName
+                </span>
+                <div class="text-white-50 small text-uppercase fw-semibold">Số dư khả dụng có thể rút</div>
+                <div class="display-6 fw-extrabold text-white mt-1">
+                    <span id="availableBalanceText">@Model.CurrentBalance.ToString("N0")</span> <small class="fs-4">VNĐ</small>
+                </div>
+                @if (Model.CurrentBalance == 0)
+                {
+                    <div class="small text-warning mt-1">
+                        <i class="fa-solid fa-circle-info me-1"></i> Chưa có dữ liệu donate khả dụng (Số dư: 0 VNĐ)
+                    </div>
+                }
+            </div>
+            <div class="col-12 col-lg-7">
+                <div class="row g-3">
+                    <div class="col-12 col-sm-4">
+                        <div class="stat-mini-box h-100">
+                            <div class="small text-white-50">Tổng donate đã nhận</div>
+                            <div class="fs-6 fw-bold text-white mt-1">@Model.TotalReceived.ToString("N0") VNĐ</div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-4">
+                        <div class="stat-mini-box h-100">
+                            <div class="small text-white-50">Đã tạo lệnh rút</div>
+                            <div class="fs-6 fw-bold text-info mt-1">@Model.TotalWithdrawn.ToString("N0") VNĐ</div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-4">
+                        <div class="stat-mini-box h-100">
+                            <div class="small text-white-50">Số dư còn lại sau rút</div>
+                            <div class="fs-6 fw-bold text-warning mt-1" id="remainingBalancePreview">
+                                @(Math.Max(0, Model.CurrentBalance - Model.Amount).ToString("N0")) VNĐ
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Cột trái: Form tạo yêu cầu rút tiền -->
+        <div class="col-12 col-lg-6">
+            <div class="card card-custom bg-white border-0 shadow-sm p-4 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-dark-green mb-0">
+                        <i class="fa-solid fa-paper-plane text-success me-2"></i> TẠO YÊU CẦU RÚT TIỀN
+                    </h5>
+                    <span class="badge bg-light-green text-dark-green border px-3 py-2">
+                        Tối thiểu: <strong>50.000 VNĐ</strong>
+                    </span>
+                </div>
+
+                <form asp-action="Withdraw" asp-controller="Wallet" method="post" id="withdrawForm">
+                    @Html.AntiForgeryToken()
+
+                    <!-- Số tiền muốn rút -->
+                    <div class="mb-3">
+                        <label asp-for="Amount" class="form-label fw-semibold text-dark-green">
+                            Số tiền muốn rút (VNĐ) <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group input-group-lg mb-2">
+                            <span class="input-group-text bg-light-green text-success border-end-0">
+                                <i class="fa-solid fa-sack-dollar"></i>
+                            </span>
+                            <input asp-for="Amount"
+                                   id="withdrawAmountInput"
+                                   type="number"
+                                   min="50000"
+                                   step="10000"
+                                   class="form-control fw-bold text-danger fs-4"
+                                   placeholder="Nhập số tiền cần rút"
+                                   required />
+                            <span class="input-group-text bg-light-green fw-bold text-dark-green">VNĐ</span>
+                        </div>
+                        <span asp-validation-for="Amount" class="text-danger small d-block"></span>
+
+                        <!-- Cảnh báo realtime khi người dùng nhập số tiền rút vượt quá số dư -->
+                        <div id="exceedBalanceAlert" class="alert alert-warning py-2 px-3 small mt-2 d-none mb-2">
+                            <i class="fa-solid fa-triangle-exclamation me-1 text-danger"></i>
+                            Số tiền muốn rút đang lớn hơn số dư khả dụng hiện tại của bạn (<strong>@Model.CurrentBalance.ToString("N0") VNĐ</strong>).
+                        </div>
+
+                        <!-- Các nút chọn nhanh số tiền rút -->
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            <button type="button" class="quick-withdraw-btn" onclick="setWithdrawAmount(50000, this)">50.000đ</button>
+                            <button type="button" class="quick-withdraw-btn" onclick="setWithdrawAmount(100000, this)">100.000đ</button>
+                            <button type="button" class="quick-withdraw-btn" onclick="setWithdrawAmount(200000, this)">200.000đ</button>
+                            <button type="button" class="quick-withdraw-btn" onclick="setWithdrawAmount(500000, this)">500.000đ</button>
+                            <button type="button" class="quick-withdraw-btn border-success text-success" onclick="setWithdrawAll(this)">
+                                <i class="fa-solid fa-wallet me-1"></i> Rút toàn bộ (@Model.CurrentBalance.ToString("N0")đ)
+                            </button>
+                        </div>
+                    </div>
+
+                    <hr class="my-3 text-muted opacity-25" />
+
+                    <h6 class="fw-bold text-dark-green mb-3">
+                        <i class="fa-solid fa-building-columns text-success me-1"></i> Thông tin tài khoản ngân hàng nhận tiền
+                    </h6>
+
+                    <div class="mb-3">
+                        <label asp-for="BankName" class="form-label small fw-semibold text-dark-green">Tên Ngân hàng <span class="text-danger">*</span></label>
+                        <input asp-for="BankName" class="form-control form-control-custom" placeholder="VD: MB Bank, Vietcombank, Techcombank..." required />
+                        <span asp-validation-for="BankName" class="text-danger small"></span>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-6">
+                            <label asp-for="BankAccountNumber" class="form-label small fw-semibold text-dark-green">Số tài khoản <span class="text-danger">*</span></label>
+                            <input asp-for="BankAccountNumber" class="form-control form-control-custom fw-semibold" placeholder="Nhập số tài khoản nhận tiền" required />
+                            <span asp-validation-for="BankAccountNumber" class="text-danger small"></span>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label asp-for="BankAccountName" class="form-label small fw-semibold text-dark-green">Tên chủ tài khoản <span class="text-danger">*</span></label>
+                            <input asp-for="BankAccountName" class="form-control form-control-custom text-uppercase fw-semibold" placeholder="NGUYEN VAN A" required />
+                            <span asp-validation-for="BankAccountName" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label asp-for="Note" class="form-label small fw-semibold text-dark-green">Ghi chú yêu cầu rút (Tùy chọn)</label>
+                        <textarea asp-for="Note" class="form-control form-control-custom" rows="2" placeholder="Ghi chú thêm cho yêu cầu rút tiền..."></textarea>
+                        <span asp-validation-for="Note" class="text-danger small"></span>
+                    </div>
+
+                    <button type="submit" id="submitWithdrawBtn" class="btn btn-dark-green w-100 py-3 rounded-pill fw-bold fs-6 shadow-sm">
+                        <i class="fa-solid fa-money-check-dollar me-2"></i> XÁC NHẬN RÚT TIỀN &amp; TẠO YÊU CẦU
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Cột phải: Danh sách Yêu cầu rút tiền của Streamer -->
+        <div class="col-12 col-lg-6">
+            <div class="card card-custom bg-white border-0 shadow-sm p-4 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-dark-green mb-0">
+                        <i class="fa-solid fa-list-check text-success me-2"></i> DANH SÁCH YÊU CẦU RÚT TIỀN
+                    </h5>
+                    <a href="/Transactions" class="small text-success fw-semibold text-decoration-none">
+                        Lịch sử chung <i class="fa-solid fa-arrow-right ms-1"></i>
+                    </a>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="small text-dark-green">MÃ YÊU CẦU</th>
+                                <th class="small text-dark-green">SỐ TIỀN RÚT</th>
+                                <th class="small text-dark-green">NGÂN HÀNG NHẬN</th>
+                                <th class="small text-dark-green">SỐ DƯ CÒN LẠI</th>
+                                <th class="small text-dark-green">TRẠNG THÁI</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.WithdrawalHistory != null && Model.WithdrawalHistory.Any())
+                            {
+                                foreach (var req in Model.WithdrawalHistory)
+                                {
+                                    <tr>
+                                        <td>
+                                            <code class="fw-bold text-dark-green">@req.TransactionCode</code>
+                                            <div class="text-muted" style="font-size: 0.72rem;">
+                                                @req.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                            </div>
+                                        </td>
+                                        <td class="fw-bold text-danger">-@req.Amount.ToString("N0") đ</td>
+                                        <td class="small">
+                                            <div class="fw-semibold text-dark-green">@req.BankName</div>
+                                            <div class="text-muted" style="font-size: 0.75rem;">@req.BankAccountNumber - @req.BankAccountName</div>
+                                        </td>
+                                        <td class="fw-semibold text-dark-green small">@req.BalanceAfter.ToString("N0") đ</td>
+                                        <td>
+                                            @if (req.Status == 0)
+                                            {
+                                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1 small">
+                                                    <i class="fa-solid fa-hourglass-half me-1"></i> Đã tạo YC / Chờ duyệt
+                                                </span>
+                                            }
+                                            else if (req.Status == 1)
+                                            {
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1 small">
+                                                    <i class="fa-solid fa-check me-1"></i> Đã giải ngân
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1 small">
+                                                    <i class="fa-solid fa-xmark me-1"></i> Đã từ chối
+                                                </span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-center py-5 text-muted small">
+                                        <i class="fa-solid fa-file-invoice-dollar fs-2 mb-2 d-block opacity-50"></i>
+                                        Chưa có yêu cầu rút tiền nào được tạo.
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        const currentStreamerBalance = @Model.CurrentBalance.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        function setWithdrawAmount(val, btnEl) {
+            const input = document.getElementById('withdrawAmountInput');
+            if (input) {
+                input.value = val;
+            }
+            document.querySelectorAll('.quick-withdraw-btn').forEach(b => b.classList.remove('active'));
+            if (btnEl) btnEl.classList.add('active');
+            validateWithdrawBalance(true);
+        }
+
+        function setWithdrawAll(btnEl) {
+            const input = document.getElementById('withdrawAmountInput');
+            if (input) {
+                input.value = currentStreamerBalance > 0 ? currentStreamerBalance : 50000;
+            }
+            document.querySelectorAll('.quick-withdraw-btn').forEach(b => b.classList.remove('active'));
+            if (btnEl) btnEl.classList.add('active');
+            validateWithdrawBalance(true);
+        }
+
+        function validateWithdrawBalance(showWarningBox) {
+            const input = document.getElementById('withdrawAmountInput');
+            const alertBox = document.getElementById('exceedBalanceAlert');
+            const remainingEl = document.getElementById('remainingBalancePreview');
+            if (!input) return;
+
+            const amount = parseFloat(input.value) || 0;
+
+            if (amount > currentStreamerBalance) {
+                if (alertBox && showWarningBox) {
+                    alertBox.classList.remove('d-none');
+                }
+                if (remainingEl) {
+                    remainingEl.textContent = '0 VNĐ (Vượt số dư)';
+                }
+            } else {
+                if (alertBox) alertBox.classList.add('d-none');
+                const remaining = Math.max(0, currentStreamerBalance - amount);
+                if (remainingEl) {
+                    remainingEl.textContent = remaining.toLocaleString('vi-VN') + ' VNĐ';
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const input = document.getElementById('withdrawAmountInput');
+            if (input) {
+                input.addEventListener('input', function () {
+                    validateWithdrawBalance(true);
+                });
+                validateWithdrawBalance(false);
+            }
+        });
+    </script>
+}

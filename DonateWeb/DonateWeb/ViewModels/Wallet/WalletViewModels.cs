@@ -97,7 +97,9 @@ namespace DonateWeb.ViewModels.Wallet
         public string? Note { get; set; }
 
         // Thông tin số dư & thống kê đồng bộ trên View
+        // CurrentBalance là doanh thu streamer dùng để rút.
         public decimal CurrentBalance { get; set; }
+        public decimal SpendingBalance { get; set; }
         public decimal TotalReceived { get; set; }
         public decimal TotalWithdrawn { get; set; }
         public decimal PendingWithdrawalAmount { get; set; }

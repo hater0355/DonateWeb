@@ -1,0 +1,1612 @@
+@model DonateWeb.ViewModels.Streamer.StreamerDonateViewModel
+@using Microsoft.EntityFrameworkCore
+@inject DonateWeb.Data.AppDbContext DbContext
+@{
+    // Chỉ hiển thị form chỉnh sửa nếu người dùng đang đăng nhập là CHỦ SỞ HỮU của chính kênh streamer này.
+    // Nếu là streamer khác, viewer hoặc khách vãng lai, chỉ xem và gửi donate như viewer bình thường.
+    var isOwnerStreamer = (ViewBag.IsOwnerStreamer == true);
+    var isStreamerAccount = isOwnerStreamer;
+    ViewData["Title"] = isOwnerStreamer ? $"Trang cá nhân - {Model.DisplayName}" : $"Donate cho {Model.DisplayName} (ID: {Model.Slug})";
+}
+
+@if (isStreamerAccount)
+{
+    <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
+}
+
+<style>
+    .streamer-cover {
+        height: 240px;
+        background-size: cover;
+        background-position: center;
+        border-radius: 16px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+    }
+    .streamer-cover-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(13,38,27,0.85) 100%);
+    }
+    .streamer-header-info {
+        position: absolute;
+        bottom: 20px;
+        left: 24px;
+        right: 24px;
+        display: flex;
+        align-items: flex-end;
+        gap: 20px;
+    }
+    .streamer-profile-avatar {
+        width: 95px;
+        height: 95px;
+        border-radius: 50%;
+        border: 4px solid #ffffff;
+        object-fit: cover;
+        background-color: #fff;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+    .greeting-bubble {
+        background-color: rgba(255, 255, 255, 0.92);
+        border-left: 4px solid var(--primary-green);
+        border-radius: 10px;
+        padding: 14px 18px;
+        font-size: 0.95rem;
+        color: var(--dark-green);
+        backdrop-filter: blur(8px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .status-feed-card {
+        border-color: rgba(45, 106, 79, 0.15) !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .status-feed-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(0,0,0,0.08) !important;
+    }
+    .like-btn {
+        background: transparent;
+        border: none;
+        outline: none;
+        padding: 5px 12px;
+        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .like-btn:hover {
+        background-color: rgba(220, 53, 69, 0.08);
+    }
+    .like-btn.liked {
+        color: #e63946;
+        font-weight: 700;
+    }
+    .like-btn:not(.liked) {
+        color: #6c757d;
+    }
+    .like-btn i {
+        font-size: 1.15rem;
+        transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .like-btn:active i {
+        transform: scale(1.35);
+    }
+    .quick-amount-btn {
+        border: 1px solid var(--border-color);
+        background-color: rgba(255,255,255,0.8);
+        color: var(--dark-green);
+        font-weight: 600;
+        font-size: 0.85rem;
+        border-radius: 8px;
+        padding: 8px 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .quick-amount-btn:hover, .quick-amount-btn.active {
+        background-color: var(--dark-green);
+        color: #ffffff;
+        border-color: var(--dark-green);
+    }
+    .payment-method-card {
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 12px;
+        background-color: #ffffff;
+        cursor: pointer;
+        transition: 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .payment-method-card:hover {
+        border-color: var(--primary-green);
+        background-color: var(--light-green);
+    }
+    .payment-method-card input[type="radio"]:checked + label {
+        color: var(--primary-green);
+        font-weight: bold;
+    }
+    .ql-editor { min-height: 180px; font-size: 0.95rem; color: var(--dark-green, #1a3a28); line-height: 1.65; }
+    .ql-toolbar.ql-snow { border-radius: 10px 10px 0 0; border-color: var(--border-color, #dee2e6); background-color: #f8faf9; }
+    .ql-container.ql-snow { border-radius: 0 0 10px 10px; border-color: var(--border-color, #dee2e6); background: #fff; }
+    .heart-beat-anim {
+        animation: heartBeat 0.45s ease-in-out;
+    }
+    @@keyframes heartBeat {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.35); }
+        100% { transform: scale(1); }
+    }
+    .follow-btn-interactive {
+        transition: all 0.25s ease;
+    }
+    .follow-btn-interactive:hover {
+        transform: translateY(-2px);
+    }
+</style>
+
+<div class="pb-5">
+
+    <!-- 1. Streamer Cover Banner & Header Info -->
+    <div class="streamer-cover mb-4" id="streamerCoverHeader" style="background-image: url('@(string.IsNullOrEmpty(Model.BannerUrl) ? "/images/default-banner.jpg" : Model.BannerUrl)');">
+        <div class="streamer-cover-overlay"></div>
+        <div class="streamer-header-info">
+            <img id="streamerAvatarHeader"
+                 src="@(string.IsNullOrEmpty(Model.AvatarUrl) ? "/images/default-avatar.png" : Model.AvatarUrl)" 
+                 alt="@Model.DisplayName" 
+                 class="streamer-profile-avatar" />
+            
+            <div class="text-white flex-grow-1">
+                <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                    <h3 class="fw-bold mb-0 text-white">@Model.DisplayName</h3>
+                    @if (Model.IsVerified)
+                    {
+                        <span class="badge bg-success rounded-pill px-2 py-1 small" title="Streamer đã xác minh">
+                            <i class="fa-solid fa-check me-1"></i> Đã xác minh
+                        </span>
+                    }
+                    <span class="badge bg-white text-dark-green rounded-pill px-2 py-1 small fw-bold">
+                        <i class="fa-solid fa-trophy text-warning me-1"></i> Rank #@Model.Rank
+                    </span>
+                </div>
+                <div class="text-white-50 small d-flex align-items-center gap-3">
+                    <span><i class="fa-solid fa-link me-1"></i> domain.com/@Model.Slug</span>
+                    <span><i class="fa-solid fa-users me-1"></i> <span id="headerFollowerCount">@Model.FollowerCount.ToString("N0")</span> người theo dõi</span>
+                </div>
+            </div>
+
+            <!-- Follow Button / Shop / Cart Action & Social Links -->
+            <div class="d-flex align-items-center gap-2">
+                @if (isOwnerStreamer)
+                {
+                    <span class="badge bg-white text-dark-green rounded-pill px-3 py-2 fw-bold shadow-sm d-flex align-items-center gap-1" title="Kênh của bạn">
+                        <i class="fa-solid fa-user-check text-success"></i> Kênh của bạn
+                    </span>
+                }
+                else
+                {
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <button type="button" 
+                                id="btnFollowStreamer"
+                                class="btn @(Model.IsFollowedByCurrentUser ? "btn-danger text-white" : "btn-outline-light") rounded-pill px-3 py-2 fw-bold d-flex align-items-center gap-2 shadow-sm follow-btn-interactive"
+                                onclick="toggleFollowStreamer(@Model.StreamerProfileId)"
+                                title="@(Model.IsFollowedByCurrentUser ? "Nhấn để hủy theo dõi" : "Nhấn để theo dõi và thêm vào mục Streamer Yêu Thích")">
+                            <i id="followHeartIcon" class="fa-@(Model.IsFollowedByCurrentUser ? "solid" : "regular") fa-heart @(Model.IsFollowedByCurrentUser ? "text-white" : "text-danger")"></i>
+                            <span id="followBtnText">@(Model.IsFollowedByCurrentUser ? "Đang theo dõi" : "Theo dõi")</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <a href="/Auth/Login?returnUrl=/@Model.Slug" 
+                           class="btn btn-outline-light rounded-pill px-3 py-2 fw-bold d-flex align-items-center gap-2 shadow-sm"
+                           title="Đăng nhập để theo dõi @Model.DisplayName">
+                            <i class="fa-regular fa-heart text-danger"></i>
+                            <span>Theo dõi</span>
+                        </a>
+                    }
+                }
+
+
+                @if (!string.IsNullOrEmpty(Model.YoutubeUrl))
+                {
+                    <a href="@Model.YoutubeUrl" target="_blank" class="btn btn-sm btn-light rounded-circle text-danger d-none d-md-inline-flex" title="YouTube"><i class="fa-brands fa-youtube"></i></a>
+                }
+                @if (!string.IsNullOrEmpty(Model.TwitchUrl))
+                {
+                    <a href="@Model.TwitchUrl" target="_blank" class="btn btn-sm btn-light rounded-circle d-none d-md-inline-flex" style="color:#9146FF;" title="Twitch"><i class="fa-brands fa-twitch"></i></a>
+                }
+                @if (!string.IsNullOrEmpty(Model.DiscordUrl))
+                {
+                    <a href="@Model.DiscordUrl" target="_blank" class="btn btn-sm btn-light rounded-circle d-none d-md-inline-flex" style="color:#5865F2;" title="Discord"><i class="fa-brands fa-discord"></i></a>
+                }
+                @if (!string.IsNullOrEmpty(Model.FacebookUrl))
+                {
+                    <a href="@Model.FacebookUrl" target="_blank" class="btn btn-sm btn-light rounded-circle d-none d-md-inline-flex" style="color:#1877F2;" title="Facebook"><i class="fa-brands fa-facebook"></i></a>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Thông báo TempData khi Streamer cập nhật Bio -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success rounded-3 d-flex align-items-center gap-2 p-3 mb-4 shadow-sm">
+            <i class="fa-solid fa-circle-check fs-4 text-success"></i>
+            <div class="fw-semibold">@TempData["SuccessMessage"]</div>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger rounded-3 d-flex align-items-center gap-2 p-3 mb-4 shadow-sm">
+            <i class="fa-solid fa-triangle-exclamation fs-4 text-danger"></i>
+            <div class="fw-semibold">@TempData["ErrorMessage"]</div>
+        </div>
+    }
+
+    <!-- 2. Streamer Greeting Message (Lời chào) -->
+    <div class="greeting-bubble mb-3">
+        <div class="d-flex align-items-start gap-3">
+            <i class="fa-solid fa-quote-left text-success fs-3 mt-1 opacity-50"></i>
+            <div>
+                <div class="fw-bold small text-uppercase text-success mb-1">Lời chào từ Streamer:</div>
+                <div class="fst-italic text-dark-green">
+                    "@(string.IsNullOrWhiteSpace(Model.GreetingMessage) ? "Cảm ơn bạn đã luôn đồng hành và ủng hộ mình nhé!" : Model.GreetingMessage)"
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2a. Streamer Merch & Shop Spotlight Banner -->
+    <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden" style="background: linear-gradient(135deg, #1b4533 0%, #29503e 100%); color: white;">
+        <div class="card-body p-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle p-3 bg-white text-dark-green d-flex align-items-center justify-content-center shadow-sm" style="width: 52px; height: 52px;">
+                    <i class="fa-solid fa-store fs-4 text-success"></i>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-warning text-dark fw-bold px-2 py-1 small">GIAN HÀNG CHÍNH THỨC</span>
+                        <span class="small text-white-50">Độc quyền từ @Model.DisplayName</span>
+                    </div>
+                    <h5 class="fw-bold mb-1 text-white">Mua sắm vật phẩm &amp; phụ kiện từ Idol</h5>
+                    <p class="mb-0 text-white-50 small">
+                        Áo thun, pad chuột, bình giữ nhiệt, móc khóa... Mua hàng và thanh toán bằng số dư ví hoặc PayOS!
+                    </p>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="/Shop/StreamerShop?slug=@Model.Slug" class="btn btn-warning rounded-pill px-4 py-2 fw-bold text-dark shadow-sm">
+                    <i class="fa-solid fa-cart-shopping me-1"></i> Vào Giỏ Hàng Mua Ngay
+                </a>
+                @if (isOwnerStreamer)
+                {
+                    <a href="/Shop/MyProducts" class="btn btn-outline-light rounded-pill px-3 py-2 fw-semibold small">
+                        <i class="fa-solid fa-boxes-stacked me-1"></i> Quản lý Shop
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- 2b. Streamer Bio / About Me (Giới thiệu bản thân hiển thị công khai) -->
+    <div class="card border-0 shadow-sm rounded-3 mb-4 overflow-hidden">
+        <div class="card-header bg-light-green border-0 py-2 px-4 d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-id-card text-success"></i>
+                <span class="fw-bold text-dark-green small text-uppercase">Giới thiệu về @Model.DisplayName (Bio)</span>
+            </div>
+        </div>
+        <div class="card-body px-4 py-3">
+            <div id="publicBioDisplay" class="streamer-bio-content" style="color: var(--dark-green, #1a3a28); line-height: 1.75; font-size: 0.95rem;">
+                @if (!string.IsNullOrWhiteSpace(Model.Bio))
+                {
+                    @Html.Raw(Model.Bio)
+                }
+                else
+                {
+                    <span class="text-muted fst-italic small">Chưa có lời giới thiệu bản thân.</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- CẢNH BÁO KÊNH BỊ KHÓA DO VI PHẠM CHÍNH SÁCH -->
+    @if (!Model.IsActive)
+    {
+        <div class="alert alert-danger rounded-4 p-4 mb-4 border-2 border-danger shadow-sm">
+            <div class="d-flex align-items-center gap-3">
+                <i class="fa-solid fa-ban fs-1 text-danger"></i>
+                <div>
+                    <h5 class="fw-bold text-danger mb-1">
+                        ⚠️ KÊNH STREAMER ĐANG BỊ TẠM KHÓA HOẠT ĐỘNG
+                    </h5>
+                    <p class="mb-1 text-dark">
+                        Kênh của streamer này hiện đang bị Quản trị viên tạm ngừng hoạt động do vi phạm chính sách của nền tảng.
+                    </p>
+                    @if (!string.IsNullOrEmpty(Model.LockReason))
+                    {
+                        <div class="small fw-semibold text-danger">
+                            <i class="fa-solid fa-circle-exclamation me-1"></i> Lý do: @Model.LockReason
+                        </div>
+                    }
+                    <div class="small text-muted mt-1">
+                        Chức năng gửi Donate tạm thời bị vô hiệu hóa cho đến khi kênh được mở lại.
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Alerts Feedback (dành cho Viewer/Admin khi gửi Donate) -->
+    @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+    {
+        <div class="alert alert-success rounded-3 d-flex align-items-center gap-3 p-3 mb-4 shadow-sm">
+            <i class="fa-solid fa-circle-check fs-2 text-success"></i>
+            <div>
+                <h6 class="fw-bold mb-1">Donate thành công!</h6>
+                <div>@Model.SuccessMessage</div>
+            </div>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger rounded-3 d-flex align-items-center gap-3 p-3 mb-4 shadow-sm">
+            <i class="fa-solid fa-triangle-exclamation fs-2 text-danger"></i>
+            <div>
+                <h6 class="fw-bold mb-1">Không thể thực hiện Donate</h6>
+                <div>@Model.ErrorMessage</div>
+            </div>
+        </div>
+    }
+
+    <!-- 3. PHẦN CHÍNH: Nếu là Tài khoản Streamer -> Hiển thị Thông tin cá nhân & Cập nhật Lời giới thiệu (Bỏ phần Gửi Donate) -->
+    <!--                 Nếu là Viewer hoặc Admin -> Giữ nguyên Form Gửi Donate -->
+    <div class="row g-4">
+        <div class="col-12 col-lg-7">
+            @if (isStreamerAccount)
+            {
+                <!-- TRONG TÀI KHOẢN STREAMER: Bỏ phần gửi Donate, thay bằng Cập nhật Thông tin cá nhân & Lời giới thiệu (Bio) -->
+                <div class="card card-custom p-4 bg-white border-0 shadow-sm h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold text-dark-green mb-0">
+                            <i class="fa-solid fa-user-pen text-success me-2"></i> THÔNG TIN CÁ NHÂN &amp; CẬP NHẬT LỜI GIỚI THIỆU
+                        </h5>
+                        <span class="badge bg-light-green text-dark-green border px-3 py-2">
+                            Tài khoản Streamer
+                        </span>
+                    </div>
+
+                    <form asp-action="UpdateBio" asp-controller="Streamer" method="post" enctype="multipart/form-data" id="streamerBioForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="slug" value="@Model.Slug" />
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-semibold text-dark-green">Tên hiển thị kênh</label>
+                                <input type="text" name="displayName" value="@Model.DisplayName" class="form-control form-control-custom" required />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-semibold text-dark-green">Tên miền trang cá nhân (ID Streamer)</label>
+                                <input type="text" value="domain.com/@Model.Slug" class="form-control form-control-custom" readonly />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-semibold text-dark-green">Ảnh đại diện (Tải lên từ máy tính)</label>
+                                <input type="file" name="avatarFile" accept="image/*" class="form-control form-control-custom"
+                                       onchange="if(this.files && this.files[0]) { var el = document.getElementById('streamerAvatarHeader'); if(el) el.src = window.URL.createObjectURL(this.files[0]); }" />
+                                <input type="hidden" name="avatarUrl" value="@Model.AvatarUrl" />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-semibold text-dark-green">Ảnh bìa (Tải lên từ máy tính)</label>
+                                <input type="file" name="bannerFile" accept="image/*" class="form-control form-control-custom"
+                                       onchange="if(this.files && this.files[0]) { var el = document.getElementById('streamerCoverHeader'); if(el) el.style.backgroundImage = 'url(' + window.URL.createObjectURL(this.files[0]) + ')'; }" />
+                                <input type="hidden" name="bannerUrl" value="@Model.BannerUrl" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-semibold text-dark-green">Lời chào ngắn trên trang cá nhân</label>
+                                <input type="text" name="greetingMessage" value="@Model.GreetingMessage" class="form-control form-control-custom" placeholder="Nhập lời chào..." />
+                            </div>
+                        </div>
+
+                        <!-- Lời giới thiệu (Bio) -->
+                        <div class="mb-4">
+                            <label class="form-label small fw-bold text-dark-green mb-1">
+                                <i class="fa-solid fa-pen-nib text-success me-1"></i> Lời giới thiệu bản thân (Bio / About Me)
+                            </label>
+                            <div class="text-muted small mb-2" style="font-size: 0.78rem;">
+                                Nhập hoặc chỉnh sửa đoạn giới thiệu về bản thân, lịch stream, cấu hình máy... Nội dung sẽ hiển thị trực tiếp trên trang cá nhân cho Viewer xem.
+                            </div>
+                            <input type="hidden" name="bio" id="streamerBioHiddenInput" value="@Model.Bio" />
+                            <div id="streamerBioEditor"></div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-dark-green flex-grow-1 py-3 rounded-pill fw-bold fs-6 shadow-sm">
+                                <i class="fa-solid fa-floppy-disk me-2"></i> LƯU THÔNG TIN &amp; LỜI GIỚI THIỆU (BIO)
+                            </button>
+                            <a href="/Streamer/Config" class="btn btn-outline-success py-3 px-4 rounded-pill fw-semibold" title="Cấu hình mã QR & mạng xã hội">
+                                <i class="fa-solid fa-sliders"></i>
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            }
+            else
+            {
+                <!-- TRONG TÀI KHOẢN VIEWER & ADMIN (HOẶC KHÁCH): Giữ nguyên Form Gửi Donate -->
+                <div class="card card-custom p-4 bg-white border-0 shadow-sm">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold text-dark-green mb-0">
+                            <i class="fa-solid fa-heart text-danger me-2"></i> GỬI DONATE
+                        </h5>
+                        <span class="badge bg-light-green text-dark-green border px-3 py-2">
+                            Tối thiểu: <strong class="text-success">@Model.MinDonateAmount.ToString("N0") VNĐ</strong>
+                        </span>
+                    </div>
+
+                    <form asp-action="Donate" asp-controller="Streamer" method="post" id="donateForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="Slug" id="donateSlugInput" />
+                        <input type="hidden" asp-for="StreamerProfileId" />
+
+                        <!-- Tên người ủng hộ -->
+                        <div class="mb-3">
+                            <label asp-for="DonorName" class="form-label small fw-semibold text-dark-green">Tên của bạn / Biệt danh</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-user"></i></span>
+                                <input asp-for="DonorName" class="form-control" placeholder="Nhập tên hiển thị trên màn hình livestream" required />
+                            </div>
+                            <span asp-validation-for="DonorName" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Số tiền donate -->
+                        <div class="mb-3">
+                            <label asp-for="Amount" class="form-label small fw-semibold text-dark-green">Số tiền Donate (VNĐ)</label>
+                            <div class="input-group mb-2">
+                                <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-coins text-warning"></i></span>
+                                <input asp-for="Amount" id="donateAmountInput" type="number" step="1000" min="@Model.MinDonateAmount" class="form-control fw-bold text-success fs-5" required />
+                                <span class="input-group-text bg-light-green text-dark-green fw-bold">VNĐ</span>
+                            </div>
+                            <span asp-validation-for="Amount" class="text-danger small"></span>
+
+                            <!-- Các nút chọn tiền nhanh -->
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <button type="button" class="quick-amount-btn" onclick="setAmount(10000)">10.000đ</button>
+                                <button type="button" class="quick-amount-btn" onclick="setAmount(20000)">20.000đ</button>
+                                <button type="button" class="quick-amount-btn" onclick="setAmount(50000)">50.000đ</button>
+                                <button type="button" class="quick-amount-btn" onclick="setAmount(100000)">100.000đ</button>
+                                <button type="button" class="quick-amount-btn" onclick="setAmount(200000)">200.000đ</button>
+                                <button type="button" class="quick-amount-btn" onclick="setAmount(500000)">500.000đ</button>
+                            </div>
+                        </div>
+
+                        <!-- Lời nhắn -->
+                        <div class="mb-4">
+                            <label asp-for="Message" class="form-label small fw-semibold text-dark-green">Lời nhắn gửi Streamer (Text-to-Speech)</label>
+                            <textarea asp-for="Message" class="form-control" rows="3" placeholder="Gửi lời nhắn động viên, bài hát yêu cầu hoặc lời chúc..."></textarea>
+                            <span asp-validation-for="Message" class="text-danger small"></span>
+                        </div>
+
+                        <!-- ========================================================================= -->
+                        <!-- [CHỈNH SỬA & MỚI THÊM]: Phương thức thanh toán cho Viewer (Chỉ để 2 phương thức) -->
+                        <!-- 1. Donate từ số dư có sẵn trong tài khoản (PaymentMethod = 1)              -->
+                        <!-- 2. Chuyển khoản ngân hàng kèm mã QR thanh toán động (PaymentMethod = 2)     -->
+                        <!-- ========================================================================= -->
+                        <div class="mb-4">
+                            <label class="form-label small fw-semibold text-dark-green mb-2">Phương thức thanh toán</label>
+                            <div class="row g-2">
+                                <!-- Phương thức 1: Donate từ số dư có sẵn trong tài khoản -->
+                                <div class="col-12 col-md-6">
+                                    <label class="payment-method-card w-100 mb-0" for="paymentWalletRadio">
+                                        <input type="radio" asp-for="PaymentMethod" id="paymentWalletRadio" value="1" class="form-check-input mt-0" onchange="handlePaymentMethodChange()" />
+                                        <div>
+                                            <div class="small fw-semibold text-dark-green">
+                                                <i class="fa-solid fa-wallet text-success me-1"></i> Số dư tài khoản
+                                            </div>
+                                            <div class="text-muted" style="font-size: 0.72rem;">
+                                                Số dư có sẵn: <strong class="text-success">@Model.CurrentWalletBalance.ToString("N0") VNĐ</strong>
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <!-- Phương thức 2: Chuyển khoản ngân hàng (Quét mã QR) -->
+                                <div class="col-12 col-md-6">
+                                    <label class="payment-method-card w-100 mb-0" for="paymentBankRadio">
+                                        <input type="radio" asp-for="PaymentMethod" id="paymentBankRadio" value="2" class="form-check-input mt-0" onchange="handlePaymentMethodChange()" />
+                                        <div>
+                                            <div class="small fw-semibold text-dark-green">
+                                                <i class="fa-solid fa-building-columns text-primary me-1"></i> Thanh toán PayOS
+                                            </div>
+                                            <div class="text-muted" style="font-size: 0.72rem;">
+                                                Tạo QR PayOS riêng sau khi nhập số tiền và lời nhắn
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                            <span asp-validation-for="PaymentMethod" class="text-danger small"></span>
+
+                            <!-- [MỚI THÊM]: Thông báo trạng thái số dư khi chọn Donate từ số dư tài khoản -->
+                            <div id="walletPaymentInfoBox" class="mt-3 p-3 rounded-3 bg-light-green border border-success border-opacity-25">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="small text-dark-green">
+                                        <i class="fa-solid fa-circle-check text-success me-1"></i> Trừ trực tiếp từ số dư tài khoản của bạn:
+                                    </span>
+                                    <strong class="text-success">@Model.CurrentWalletBalance.ToString("N0") VNĐ</strong>
+                                </div>
+                                <div id="walletInsufficientWarning" class="small text-danger mt-1 d-none">
+                                    <i class="fa-solid fa-triangle-exclamation me-1"></i> Số dư hiện tại không đủ cho mức Donate này. Vui lòng nạp thêm hoặc chọn <strong>Chuyển khoản ngân hàng</strong>.
+                                </div>
+                            </div>
+
+                            <!-- PayOS tạo QR theo từng đơn sau khi người xem bấm nút ủng hộ. -->
+                            <div id="bankQrPaymentBox" class="mt-3 p-3 rounded-3 bg-light border border-primary border-opacity-25 d-none">
+                                <div class="small text-primary"><i class="fa-solid fa-circle-info me-1"></i>Nhập tên, số tiền và lời nhắn rồi bấm nút bên dưới. Mã QR PayOS cùng trang thanh toán sẽ hiện ra; hệ thống tự theo dõi trạng thái giao dịch.</div>
+                            </div>
+                        </div>
+
+                        <!-- Nút Submit -->
+                        @if (Model.IsActive)
+                        {
+                            <button type="submit" id="submitDonateBtn" class="btn btn-dark-green w-100 py-3 rounded-pill fw-bold fs-6 shadow-sm">
+                                <i class="fa-solid fa-paper-plane me-2"></i> ỦNG HỘ NGAY (@Model.DisplayName)
+                            </button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-secondary w-100 py-3 rounded-pill fw-bold fs-6 shadow-sm" disabled>
+                                <i class="fa-solid fa-lock me-2"></i> KÊNH ĐANG BỊ KHÓA - KHÔNG THỂ GỬI DONATE
+                            </button>
+                        }
+                    </form>
+                </div>
+            }
+        </div>
+
+        <!-- Cột phải: Khung Mã QR Donate Streamer (Đã xóa thông tin ngân hàng, chỉ giữ lại mã QR) -->
+        <div class="col-12 col-lg-5">
+            <div class="card card-custom p-4 bg-white border-0 shadow-sm h-100 d-flex flex-column">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h6 class="fw-bold text-dark-green mb-0 text-uppercase">
+                        <i class="fa-solid fa-qrcode text-success me-2"></i> MÃ QR DONATE
+                    </h6>
+                    <span class="badge bg-light-green text-dark-green border small">
+                        <i class="fa-solid fa-bolt text-success me-1"></i> Quét nhanh
+                    </span>
+                </div>
+
+                <!-- Khung hiển thị Mã QR chính -->
+                <div class="text-center p-3 bg-light rounded-3 border mb-3">
+                    <div class="bg-white p-2 rounded-3 border shadow-sm d-inline-block position-relative">
+                        @{
+                            var qrSource = Model.DonatePageQrBase64;
+                        }
+                        <img id="sideGeneratedQrImg"
+                             src="@qrSource"
+                             alt="Mã QR nhận donate @Model.DisplayName"
+                             class="img-fluid rounded-2 @(string.IsNullOrEmpty(qrSource) ? "d-none" : "")"
+                             style="max-height: 220px; min-width: 180px; object-fit: contain;" />
+                        
+                        <div id="sideQrPlaceholder" class="p-4 d-flex flex-column align-items-center justify-content-center @(!string.IsNullOrEmpty(qrSource) ? "d-none" : "")" style="min-width: 190px; min-height: 190px;">
+                            <div class="p-3 rounded-circle bg-light-green mb-2">
+                                <i class="fa-solid fa-qrcode text-success display-4"></i>
+                            </div>
+                            <span class="fw-bold text-dark-green small">Mã QR Streamer</span>
+                            <span class="text-muted small mt-1" style="font-size: 0.75rem;">QR mở trang donate</span>
+                        </div>
+                    </div>
+                    <div class="small text-dark-green fw-semibold mt-2">
+                        <i class="fa-solid fa-camera text-success me-1"></i> Quét để mở trang donate
+                    </div>
+                    <div class="small text-muted" style="font-size: 0.75rem;">
+                        Nhập khoản ủng hộ rồi thanh toán qua PayOS
+                    </div>
+                </div>
+
+                <!-- Hướng dẫn quy trình thanh toán PayOS -->
+                <div class="bg-light-green p-3 rounded-3 border flex-grow-1 d-flex flex-column justify-content-between">
+                    <div class="small text-dark-green"><strong>Cách ủng hộ:</strong><ol class="mt-2 mb-0 ps-3"><li>Điền tên, số tiền và lời nhắn.</li><li>Bấm <strong>Ủng hộ</strong> để tạo QR PayOS.</li><li>Quét QR hoặc mở liên kết thanh toán. Webhook sẽ tự xác nhận khi tiền về.</li></ol></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- BẢNG TIN / STATUS CỦA STREAMER -->
+    <!-- ========================================================================= -->
+    @{
+        var streamerStatuses = ViewBag.StreamerStatuses as List<DonateWeb.Models.Entities.StreamerStatus> ?? new List<DonateWeb.Models.Entities.StreamerStatus>();
+        var likedIds = ViewBag.LikedStatusIds as HashSet<string> ?? new HashSet<string>();
+    }
+
+    <div class="card card-custom p-4 bg-white border-0 shadow-sm mb-4" id="streamerStatusSection">
+        <div class="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom flex-wrap gap-2">
+            <div>
+                <h5 class="fw-bold text-dark-green mb-1">
+                    <i class="fa-solid fa-newspaper text-success me-2"></i> BẢNG TIN &amp; STATUS CỦA @Model.DisplayName
+                </h5>
+                <small class="text-muted">Cập nhật tin tức, hình ảnh và hoạt động mới nhất từ streamer</small>
+            </div>
+            @if (isOwnerStreamer)
+            {
+                <button type="button" class="btn btn-success rounded-pill px-3 py-2 fw-semibold btn-sm shadow-sm" onclick="toggleStatusComposeBox()">
+                    <i class="fa-solid fa-pen-to-square me-1"></i> Đăng Status Mới
+                </button>
+            }
+        </div>
+
+        @if (isOwnerStreamer)
+        {
+            <!-- Khung Đăng Status của Streamer Chủ Kênh -->
+            <div id="statusComposeBox" class="p-3 mb-4 rounded-4 bg-light border border-success border-opacity-25 shadow-sm">
+                <form asp-controller="Streamer" asp-action="CreateStatus" method="post" enctype="multipart/form-data" id="createStatusForm">
+                    <input type="hidden" name="streamerProfileId" value="@Model.StreamerProfileId" />
+                    <input type="hidden" name="returnUrl" value="@Context.Request.Path" />
+
+                    <div class="d-flex gap-3 align-items-start mb-3">
+                        <img src="@Model.AvatarUrl" alt="@Model.DisplayName" class="rounded-circle border" style="width: 44px; height: 44px; object-fit: cover;" onerror="this.src='/images/default-avatar.png'" />
+                        <div class="flex-grow-1">
+                            <textarea name="content" 
+                                      id="statusContentInput" 
+                                      class="form-control border-0 bg-white rounded-3 shadow-none p-3" 
+                                      rows="3" 
+                                      placeholder="@Model.DisplayName ơi, bạn muốn chia sẻ điều gì hôm nay với người xem?..." 
+                                      style="resize: none; font-size: 0.95rem;"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Khung preview ảnh nếu streamer chọn tệp -->
+                    <div id="statusImagePreviewContainer" class="mb-3 d-none position-relative d-inline-block">
+                        <img id="statusSelectedImagePreview" src="" alt="Xem trước ảnh" class="rounded-3 shadow-sm border" style="max-height: 220px; max-width: 100%; object-fit: cover;" />
+                        <button type="button" class="btn btn-danger btn-sm rounded-circle position-absolute top-0 end-0 m-2 shadow" onclick="clearSelectedStatusImage()" title="Xóa ảnh này">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-between pt-2 border-top flex-wrap gap-2">
+                        <div>
+                            <label for="statusImageUploadInput" class="btn btn-outline-success btn-sm rounded-pill px-3 fw-semibold cursor-pointer mb-0">
+                                <i class="fa-solid fa-image text-success me-1"></i> Thêm ảnh
+                            </label>
+                            <input type="file" id="statusImageUploadInput" name="imageFile" accept="image/jpeg,image/png,image/gif,image/webp" class="d-none" onchange="handleStatusImageSelect(this)" />
+                            <small class="text-muted ms-2 d-none d-sm-inline" style="font-size: 0.78rem;">(Hỗ trợ JPEG, PNG, GIF, WebP tối đa 8MB)</small>
+                        </div>
+                        <button type="submit" class="btn btn-success rounded-pill px-4 py-2 fw-bold shadow-sm" id="btnSubmitStatus">
+                            <i class="fa-solid fa-paper-plane me-1"></i> Đăng bài
+                        </button>
+                    </div>
+                </form>
+            </div>
+        }
+
+        <!-- Danh sách Status đã đăng -->
+        <div class="row g-4" id="statusListContainer">
+            @if (streamerStatuses.Any())
+            {
+                foreach (var status in streamerStatuses)
+                {
+                    var isLiked = likedIds.Contains(status.Id.ToString());
+                    <div class="col-12 col-md-6" id="status-card-@status.Id">
+                        <div class="card h-100 rounded-4 border p-3 shadow-sm position-relative bg-white status-feed-card">
+                            <!-- Header bài đăng -->
+                            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                                <div class="d-flex align-items-center gap-2">
+                                    <img src="@Model.AvatarUrl" alt="@Model.DisplayName" class="rounded-circle border" style="width: 42px; height: 42px; object-fit: cover;" onerror="this.src='/images/default-avatar.png'" />
+                                    <div>
+                                        <div class="fw-bold text-dark-green d-flex align-items-center gap-1" style="font-size: 0.9rem;">
+                                            @Model.DisplayName
+                                            @if (Model.IsVerified)
+                                            {
+                                                <i class="fa-solid fa-circle-check text-info" style="font-size: 0.75rem;" title="Đã xác minh"></i>
+                                            }
+                                        </div>
+                                        <small class="text-muted" style="font-size: 0.75rem;">
+                                            <i class="fa-regular fa-clock me-1"></i>@status.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                                        </small>
+                                    </div>
+                                </div>
+
+                                @if (isOwnerStreamer)
+                                {
+                                    <!-- Nút xóa bài viết cho chủ kênh -->
+                                    <button type="button" 
+                                            class="btn btn-outline-danger btn-sm rounded-pill px-2 py-1" 
+                                            onclick="confirmDeleteStatus(@status.Id)" 
+                                            title="Xóa bài viết này">
+                                        <i class="fa-solid fa-trash-can me-1"></i> Xóa bài
+                                    </button>
+                                }
+                            </div>
+
+                            <!-- Caption -->
+                            <div class="status-caption mb-3 text-dark" style="font-size: 0.92rem; line-height: 1.5; white-space: pre-line;">
+                                @status.Content
+                            </div>
+
+                            <!-- Ảnh đính kèm (nếu có) -->
+                            @if (!string.IsNullOrEmpty(status.ImageUrl))
+                            {
+                                <div class="status-media mb-3 rounded-3 overflow-hidden text-center bg-light" onclick="previewStatusMedia('@status.ImageUrl', '@Model.DisplayName')" style="cursor: pointer;" title="Bấm để xem ảnh lớn">
+                                    <img src="@status.ImageUrl" alt="Ảnh status @Model.DisplayName" class="img-fluid rounded-3" style="max-height: 320px; width: 100%; object-fit: cover; transition: transform 0.25s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'" />
+                                </div>
+                            }
+
+                            <!-- Footer: Thả tim -->
+                            <div class="mt-auto pt-2 border-top d-flex align-items-center justify-content-between">
+                                <button type="button" 
+                                        class="like-btn @(isLiked ? "liked" : "")" 
+                                        data-status-id="@status.Id" 
+                                        onclick="toggleStreamerStatusLike(this, @status.Id)" 
+                                        title="Thả tim bài viết">
+                                    <i class="@(isLiked ? "fa-solid fa-heart text-danger" : "fa-regular fa-heart")"></i>
+                                    <span class="like-count fw-bold" style="font-size: 0.88rem;">@status.LikeCount.ToString("N0")</span>
+                                </button>
+
+                                <span class="badge bg-light text-muted border small">
+                                    <i class="fa-regular fa-heart text-danger me-1"></i> Lượt tim
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="col-12 py-5 text-center text-muted">
+                    <div class="p-3 bg-light d-inline-block rounded-circle mb-3">
+                        <i class="fa-regular fa-newspaper display-5 text-success opacity-75"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark">Chưa có status nào được đăng tải</h6>
+                    <p class="small text-muted mb-3">
+                        @(isOwnerStreamer 
+                            ? "Hãy là người đầu tiên đăng status để chia sẻ thông báo và hình ảnh tới người xem nhé!" 
+                            : $"{Model.DisplayName} chưa đăng bài viết nào gần đây.")
+                    </p>
+                    @if (isOwnerStreamer)
+                    {
+                        <button type="button" class="btn btn-outline-success btn-sm rounded-pill px-3" onclick="toggleStatusComposeBox()">
+                            <i class="fa-solid fa-plus me-1"></i> Đăng bài viết đầu tiên
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+
+    <!-- ========================================================================= -->
+    <!-- MODAL THANH TOÁN VIETQR REAL-TIME (TỰ ĐỘNG NHẬN DIỆN QUA PAYOS & SIGNALR) -->
+    <!-- ========================================================================= -->
+    <div class="modal fade" id="vietQrPaymentModal" tabindex="-1" aria-labelledby="vietQrPaymentModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
+                <!-- Header -->
+                <div class="modal-header text-white px-4 py-3" style="background: linear-gradient(135deg, #0d3b2e 0%, #1b4332 50%, #2d6a4f 100%);">
+                    <h5 class="modal-title fw-bold" id="vietQrPaymentModalLabel">
+                        <i class="fa-solid fa-qrcode text-warning me-2"></i> THANH TOÁN ỦNG HỘ QUA PAYOS
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" onclick="stopDonateListening()"></button>
+                </div>
+
+                <div class="modal-body p-4">
+                    <!-- TRẠNG THÁI 1: ĐANG CHỜ QUÉT MÃ THANH TOÁN -->
+                    <div id="modalWaitingPaymentState">
+                        <div class="row g-4 align-items-center">
+                            <!-- Khung chứa ảnh QR Napas247 -->
+                            <div class="col-12 col-md-5 text-center">
+                                <div class="p-3 bg-light rounded-4 border position-relative d-inline-block shadow-sm">
+                                    <div class="position-relative" style="overflow: hidden; border-radius: 12px; background: #fff;">
+                                        <img id="modalVietQrImage" src="" alt="Mã VietQR Thanh Toán" class="img-fluid" style="max-height: 250px; min-width: 200px;" />
+                                    </div>
+                                </div>
+                                <div class="mt-2 small text-dark-green fw-semibold">
+                                    <i class="fa-solid fa-mobile-screen me-1 text-success"></i> Mở app ngân hàng quét QR PayOS
+                                </div>
+                                <div class="small text-muted" style="font-size: 0.75rem;">
+                                    Tự động điền đúng Số tiền &amp; Nội dung
+                                </div>
+                            </div>
+
+                            <!-- Chi tiết đơn thanh toán -->
+                            <div class="col-12 col-md-7">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="badge bg-light-green text-dark-green border px-3 py-2 fw-semibold">
+                                        <i class="fa-solid fa-user text-success me-1"></i> Streamer: <strong id="modalStreamerNameDisplay">@Model.DisplayName</strong>
+                                    </span>
+                                    <div class="d-flex align-items-center gap-1 text-danger fw-bold">
+                                        <i class="fa-regular fa-clock"></i>
+                                        <span id="modalCountdownDisplay">10:00</span>
+                                    </div>
+                                </div>
+
+                                <div class="p-3 rounded-3 bg-light border mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                        <span class="text-muted small">Số tiền ủng hộ:</span>
+                                        <strong id="modalAmountDisplay" class="fs-5 text-danger">0 VNĐ</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                        <span class="text-muted small">Ngân hàng:</span>
+                                        <span id="modalBankNameDisplay" class="fw-semibold text-dark-green small">MB Bank</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                        <span class="text-muted small">Số tài khoản:</span>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <strong id="modalAccountNoDisplay" class="text-primary font-monospace">0354031024</strong>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="copyModalField('modalAccountNoDisplay', this)" title="Sao chép">
+                                                <i class="fa-regular fa-copy"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                        <span class="text-muted small">Chủ tài khoản:</span>
+                                        <span id="modalAccountNameDisplay" class="fw-semibold text-dark small text-uppercase">NGUYEN ANH HIEU</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="text-muted small d-block">Nội dung PayOS tự điền:</span>
+                                            <strong id="modalMemoDisplay" class="text-success font-monospace fs-6">DN...</strong>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-success py-1 px-3 rounded-pill fw-semibold" onclick="copyModalField('modalMemoDisplay', this)">
+                                            <i class="fa-regular fa-copy me-1"></i> Sao chép
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <a id="modalPayOSCheckoutLink" class="btn btn-outline-primary w-100 rounded-pill mb-3" href="#" target="_blank" rel="noopener noreferrer">
+                                    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Mở trang thanh toán PayOS
+                                </a>
+
+                                <!-- Trạng thái đang lắng nghe Webhook PayOS qua SignalR -->
+                                <div class="p-2 rounded-3 bg-light-green border border-success border-opacity-25 d-flex align-items-center gap-2">
+                                    <div class="spinner-border spinner-border-sm text-success" role="status"></div>
+                                    <span class="small text-dark-green fw-semibold" id="modalListeningStatusText">
+                                        Đang tự động lắng nghe giao dịch chuyển khoản từ PayOS (Real-time)...
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TRẠNG THÁI 2: THANH TOÁN THÀNH CÔNG (TỰ ĐỘNG CHUYỂN SANG KHÔNG CẦN F5) -->
+                    <div id="modalSuccessPaymentState" class="d-none text-center py-4">
+                        <div class="mb-3">
+                            <div class="d-inline-flex p-3 rounded-circle bg-success bg-opacity-10 text-success mb-2">
+                                <i class="fa-solid fa-circle-check display-3 text-success"></i>
+                            </div>
+                            <h4 class="fw-bold text-success mb-1">ỦNG HỘ STREAMER THÀNH CÔNG!</h4>
+                            <p class="text-muted small mb-3">Khoản quyên góp của bạn đã được hệ thống xác nhận tự động qua PayOS.</p>
+                        </div>
+
+                        <div class="p-3 rounded-4 bg-light-green border border-success border-opacity-50 mx-auto mb-4" style="max-width: 480px;">
+                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                <span class="text-muted small">Số tiền đã ủng hộ:</span>
+                                <strong id="successModalAmount" class="text-success fs-5">0 VNĐ</strong>
+                            </div>
+                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                <span class="text-muted small">Streamer nhận:</span>
+                                <strong id="successModalStreamer" class="text-dark-green">@Model.DisplayName</strong>
+                            </div>
+                            <div class="d-flex justify-content-between py-1">
+                                <span class="text-muted small">Mã giao dịch:</span>
+                                <strong id="successModalTxCode" class="text-muted font-monospace">DN...</strong>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info py-2 small d-inline-block mb-3 border-0 bg-opacity-25">
+                            <i class="fa-solid fa-bullhorn text-primary me-1"></i> Thông báo donate và lời nhắn đang được phát trực tiếp trên màn hình livestream của Streamer!
+                        </div>
+
+                        <div>
+                            <button type="button" class="btn btn-dark-green px-5 py-2 rounded-pill fw-bold" data-bs-dismiss="modal" onclick="location.reload()">
+                                <i class="fa-solid fa-check me-2"></i> HOÀN TẤT
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal xem ảnh lớn bài viết Status của Streamer -->
+<div class="modal fade" id="statusMediaLightboxModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-body p-0 text-center position-relative">
+                <button type="button" class="btn btn-dark btn-sm rounded-circle position-absolute top-0 end-0 m-3 shadow" data-bs-dismiss="modal" style="width: 36px; height: 36px; z-index: 10;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <img id="statusLightboxImg" src="" alt="Ảnh bài viết" class="img-fluid rounded-3 shadow-lg" style="max-height: 85vh; object-fit: contain; background: #000;" />
+                <div id="statusLightboxCaption" class="mt-2 text-white bg-dark bg-opacity-75 p-2 rounded small d-inline-block"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+<script>
+    // =========================================================================
+    // [MỚI THÊM]: Script xử lý chọn phương thức thanh toán và tự động sinh mã QR
+    // chứa thông tin Số tiền + Nội dung chuyển khoản ngay trên giao diện Viewer
+    // =========================================================================
+    const currentWalletBalance = @Model.CurrentWalletBalance.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    const streamerSlug = '@Model.Slug';
+
+    // Biến quản lý phiên thanh toán PayOS
+    let donateHubConnection = null;
+    let donatePollingInterval = null;
+    let donateCountdownInterval = null;
+    let currentDonationId = null;
+    let currentDonationCode = null;
+    let donateRemainingSeconds = 600;
+
+    function setAmount(val) {
+        const amountInput = document.getElementById('donateAmountInput');
+        if (amountInput) {
+            amountInput.value = val;
+        }
+        document.querySelectorAll('.quick-amount-btn').forEach(btn => btn.classList.remove('active'));
+        if (event && event.target) {
+            event.target.classList.add('active');
+        }
+        // Cập nhật cảnh báo số dư khi chọn mệnh giá nhanh.
+        checkWalletBalance();
+    }
+
+    // [MỚI THÊM]: Kiểm tra số dư ví có đủ so với số tiền nhập hay không
+    function checkWalletBalance() {
+        const amountInput = document.getElementById('donateAmountInput');
+        const warningEl = document.getElementById('walletInsufficientWarning');
+        const walletRadio = document.getElementById('paymentWalletRadio');
+        if (!amountInput || !warningEl || !walletRadio) return;
+
+        const amount = parseFloat(amountInput.value) || 0;
+        if (walletRadio.checked && amount > currentWalletBalance) {
+            warningEl.classList.remove('d-none');
+        } else {
+            warningEl.classList.add('d-none');
+        }
+    }
+
+    // [MỚI THÊM]: Chuyển đổi hiển thị giữa "Số dư tài khoản" và "Chuyển khoản ngân hàng (Mã QR)"
+    function handlePaymentMethodChange() {
+        const walletRadio = document.getElementById('paymentWalletRadio');
+        const bankRadio = document.getElementById('paymentBankRadio');
+        const walletBox = document.getElementById('walletPaymentInfoBox');
+        const bankQrBox = document.getElementById('bankQrPaymentBox');
+        const submitBtn = document.getElementById('submitDonateBtn');
+
+        if (!walletRadio || !bankRadio) return;
+
+        if (bankRadio.checked) {
+            if (walletBox) walletBox.classList.add('d-none');
+            if (bankQrBox) bankQrBox.classList.remove('d-none');
+            if (submitBtn) {
+                submitBtn.innerHTML = '<i class="fa-solid fa-qrcode me-2"></i> TẠO THANH TOÁN PAYOS (@Model.DisplayName)';
+            }
+        } else {
+            if (walletBox) walletBox.classList.remove('d-none');
+            if (bankQrBox) bankQrBox.classList.add('d-none');
+            if (submitBtn) {
+                submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane me-2"></i> ỦNG HỘ NGAY (@Model.DisplayName)';
+            }
+            checkWalletBalance();
+        }
+    }
+
+    // Sao chép nội dung chuyển khoản nhanh
+    function copyTransferContent(elementId) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        const text = (el.innerText || el.textContent || '').trim();
+        if (!text) return;
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function() {
+                showCopyToast('Đã sao chép nội dung: ' + text);
+            }).catch(function() {
+                fallbackCopyText(text);
+            });
+        } else {
+            fallbackCopyText(text);
+        }
+    }
+
+    function fallbackCopyText(text) {
+        const tempInput = document.createElement('textarea');
+        tempInput.value = text;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        showCopyToast('Đã sao chép nội dung: ' + text);
+    }
+
+    function showCopyToast(msg) {
+        alert(msg);
+    }
+
+    // Theo dõi số dư ví khi người xem thay đổi số tiền.
+    document.addEventListener('DOMContentLoaded', function () {
+        const amountInput = document.getElementById('donateAmountInput');
+        const donorInput = document.getElementById('DonorName');
+        const messageInput = document.getElementById('Message');
+
+        if (amountInput) {
+            amountInput.addEventListener('input', function () {
+                checkWalletBalance();
+            });
+        }
+
+        handlePaymentMethodChange();
+
+        // Gắn sự kiện submit cho form donate
+        const donateForm = document.getElementById('donateForm');
+        if (donateForm) {
+            donateForm.addEventListener('submit', function (e) {
+                const bankRadio = document.getElementById('paymentBankRadio');
+                // Nếu người dùng chọn thanh toán PayOS
+                if (bankRadio && bankRadio.checked) {
+                    e.preventDefault();
+                    handleBankDonateSubmit();
+                }
+            });
+        }
+    });
+
+    // =========================================================================
+    // XỬ LÝ QUÉT MÃ VIETQR REAL-TIME QUA PAYOS & SIGNALR
+    // =========================================================================
+
+    // Gửi yêu cầu tạo đơn donate Pending và mở modal PayOS
+    async function handleBankDonateSubmit() {
+        const submitBtn = document.getElementById('submitDonateBtn');
+        const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+
+        const amountInput = document.getElementById('donateAmountInput');
+        const donorInput = document.getElementById('DonorName');
+        const messageInput = document.getElementById('Message');
+        const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+
+        const amount = parseFloat(amountInput ? amountInput.value : 0) || 0;
+        const donorName = donorInput ? donorInput.value.trim() : '';
+        const message = messageInput ? messageInput.value.trim() : '';
+
+        if (amount < @Model.MinDonateAmount) {
+            alert('Số tiền ủng hộ tối thiểu là @Model.MinDonateAmount.ToString("N0") VNĐ.');
+            if (amountInput) amountInput.focus();
+            return;
+        }
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Đang tạo thanh toán PayOS...';
+        }
+
+        try {
+            const formData = new URLSearchParams();
+            formData.append('slug', streamerSlug);
+            formData.append('donorName', donorName);
+            formData.append('amount', amount);
+            formData.append('message', message);
+            if (tokenInput) formData.append('__RequestVerificationToken', tokenInput.value);
+
+            const response = await fetch('/Streamer/CreateBankDonation', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData.toString()
+            });
+
+            const result = await response.json();
+
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
+            }
+
+            if (!response.ok || !result.success) {
+                alert(result.message || 'Không thể khởi tạo thanh toán PayOS. Vui lòng thử lại sau.');
+                return;
+            }
+
+            // Hiển thị QR và liên kết thanh toán PayOS riêng cho đơn này.
+            openVietQrModal(result);
+
+        } catch (err) {
+            console.error('Lỗi khi gọi API CreateBankDonation:', err);
+            alert('Đã xảy ra lỗi kết nối với máy chủ. Vui lòng thử lại.');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
+            }
+        }
+    }
+
+    // Mở modal QR PayOS và kích hoạt lắng nghe SignalR cùng Polling dự phòng.
+    function openVietQrModal(data) {
+        currentDonationId = data.donationId;
+        currentDonationCode = data.transactionCode;
+        donateRemainingSeconds = data.expireSeconds || 600;
+
+        // Điền dữ liệu vào Modal
+        document.getElementById('modalVietQrImage').src = data.qrUrl;
+        document.getElementById('modalAmountDisplay').textContent = data.formattedAmount;
+        document.getElementById('modalBankNameDisplay').textContent = data.bankId || 'PayOS';
+        document.getElementById('modalAccountNoDisplay').textContent = data.accountNo || 'Theo mã QR';
+        document.getElementById('modalAccountNameDisplay').textContent = data.accountName || 'Tài khoản PayOS';
+        document.getElementById('modalMemoDisplay').textContent = data.memo;
+        document.getElementById('modalStreamerNameDisplay').textContent = data.streamerName || '@Model.DisplayName';
+        const checkoutLink = document.getElementById('modalPayOSCheckoutLink');
+        if (checkoutLink) checkoutLink.href = data.checkoutUrl || '#';
+
+        // Đảm bảo trạng thái ban đầu là đang chờ quét mã
+        document.getElementById('modalWaitingPaymentState').classList.remove('d-none');
+        document.getElementById('modalSuccessPaymentState').classList.add('d-none');
+
+        // Khởi chạy đếm ngược 10 phút
+        startDonateCountdown();
+
+        // 1. Kích hoạt kết nối SignalR Real-time Hub (0 delay)
+        initSignalRDonation(data.transactionCode, data.donationId, data.orderCode);
+
+        // 2. Kích hoạt Polling AJAX dự phòng mỗi 3 giây
+        startDonatePolling(data.donationId, data.transactionCode);
+
+        // Hiển thị Bootstrap Modal
+        const modalEl = document.getElementById('vietQrPaymentModal');
+        const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modalInstance.show();
+    }
+
+    // Khởi tạo kết nối SignalR lắng nghe sự kiện DonationSuccess khi Webhook PayOS xử lý thành công
+    function initSignalRDonation(txCode, donationId, orderCode) {
+        if (typeof signalR === 'undefined') {
+            console.warn('[SignalR] Thư viện SignalR chưa nạp, sử dụng Polling AJAX Fallback.');
+            return;
+        }
+
+        try {
+            if (donateHubConnection) {
+                donateHubConnection.stop();
+                donateHubConnection = null;
+            }
+
+            donateHubConnection = new signalR.HubConnectionBuilder()
+                .withUrl('/paymentHub')
+                .withAutomaticReconnect([0, 2000, 5000, 10000])
+                .build();
+
+            // Lắng nghe sự kiện DonationSuccess từ PaymentWebhookController
+            donateHubConnection.on('DonationSuccess', function (res) {
+                console.log('[SignalR Real-time] Nhận sự kiện DonationSuccess từ PayOS Webhook:', res);
+                if (res && (res.transactionCode === txCode || res.donationId == donationId || res.orderCode == orderCode)) {
+                    showDonationSuccessUI(res);
+                }
+            });
+
+            donateHubConnection.start().then(function () {
+                console.log('[SignalR Real-time] Đã kết nối PaymentHub cho giao dịch donate:', txCode);
+                // Tham gia nhóm giao dịch
+                donateHubConnection.invoke('JoinTransactionGroup', txCode);
+                if (donationId) {
+                    donateHubConnection.invoke('JoinTransactionGroup', donationId.toString());
+                }
+                if (orderCode) {
+                    donateHubConnection.invoke('JoinTransactionGroup', orderCode.toString());
+                }
+            }).catch(function (err) {
+                console.warn('[SignalR] Lỗi kết nối Hub, tiếp tục với Polling AJAX:', err);
+            });
+
+        } catch (err) {
+            console.error('[SignalR] Ngoại lệ khi tạo SignalR Connection:', err);
+        }
+    }
+
+    // Polling AJAX dự phòng kiểm tra trạng thái mỗi 3 giây
+    function startDonatePolling(donationId, txCode) {
+        clearInterval(donatePollingInterval);
+
+        donatePollingInterval = setInterval(async () => {
+            if (!currentDonationId) return;
+
+            try {
+                const res = await fetch(`/Streamer/CheckDonationStatus?donationId=${encodeURIComponent(donationId)}&transactionCode=${encodeURIComponent(txCode)}`);
+                if (!res.ok) return;
+
+                const data = await res.json();
+                if (data && data.isPaid) {
+                    console.log('[Polling AJAX] Đã phát hiện giao dịch donate thành công từ API:', data);
+                    showDonationSuccessUI(data);
+                }
+            } catch (e) {
+                console.error('Lỗi khi polling trạng thái donate:', e);
+            }
+        }, 3000);
+    }
+
+    // Hiển thị giao diện "Thanh toán & Gửi Donate thành công" tự động mà không cần F5
+    function showDonationSuccessUI(data) {
+        // Dừng toàn bộ timer, polling và ngắt kết nối SignalR
+        stopDonateListening();
+
+        // Ẩn giao diện quét mã, hiển thị giao diện chúc mừng
+        const waitingState = document.getElementById('modalWaitingPaymentState');
+        const successState = document.getElementById('modalSuccessPaymentState');
+        if (waitingState) waitingState.classList.add('d-none');
+        if (successState) successState.classList.remove('d-none');
+
+        // Cập nhật thông tin vào màn hình chúc mừng
+        const amountEl = document.getElementById('successModalAmount');
+        const streamerEl = document.getElementById('successModalStreamer');
+        const txCodeEl = document.getElementById('successModalTxCode');
+
+        if (amountEl && data.amount) amountEl.textContent = '+' + Number(data.amount).toLocaleString('vi-VN') + ' VNĐ';
+        if (streamerEl && data.streamerName) streamerEl.textContent = data.streamerName;
+        if (txCodeEl) txCodeEl.textContent = data.transactionCode || currentDonationCode || 'Thành công';
+
+        // Tự động phát âm thanh thông báo vui tươi nếu trình duyệt cho phép
+        try {
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3');
+            audio.volume = 0.6;
+            audio.play().catch(() => {});
+        } catch (e) {}
+    }
+
+    // Đồng hồ đếm ngược 10 phút trong modal
+    function startDonateCountdown() {
+        clearInterval(donateCountdownInterval);
+        const timerEl = document.getElementById('modalCountdownDisplay');
+
+        function update() {
+            const m = Math.floor(donateRemainingSeconds / 60);
+            const s = donateRemainingSeconds % 60;
+            if (timerEl) timerEl.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+
+            if (donateRemainingSeconds <= 0) {
+                clearInterval(donateCountdownInterval);
+                clearInterval(donatePollingInterval);
+                if (timerEl) timerEl.textContent = 'HẾT HẠN';
+                alert('Mã thanh toán này đã hết hạn sau 10 phút. Vui lòng tạo đơn mới để tiếp tục.');
+                stopDonateListening();
+                const modalEl = document.getElementById('vietQrPaymentModal');
+                const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                if (modalInstance) modalInstance.hide();
+            } else {
+                donateRemainingSeconds--;
+            }
+        }
+
+        update();
+        donateCountdownInterval = setInterval(update, 1000);
+    }
+
+    // Dừng toàn bộ tiến trình lắng nghe thanh toán
+    function stopDonateListening() {
+        if (donatePollingInterval) clearInterval(donatePollingInterval);
+        if (donateCountdownInterval) clearInterval(donateCountdownInterval);
+        donatePollingInterval = null;
+        donateCountdownInterval = null;
+        currentDonationId = null;
+        currentDonationCode = null;
+
+        if (donateHubConnection) {
+            donateHubConnection.stop();
+            donateHubConnection = null;
+        }
+    }
+
+    // Hàm sao chép thông tin trong modal
+    function copyModalField(fieldId, btnElement) {
+        const el = document.getElementById(fieldId);
+        if (!el) return;
+        const text = (el.innerText || el.textContent || '').trim();
+        if (!text) return;
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                showModalCopiedFeedback(btnElement);
+            }).catch(() => {
+                fallbackCopyModal(text, btnElement);
+            });
+        } else {
+            fallbackCopyModal(text, btnElement);
+        }
+    }
+
+    function fallbackCopyModal(text, btnElement) {
+        const temp = document.createElement('textarea');
+        temp.value = text;
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand('copy');
+        document.body.removeChild(temp);
+        showModalCopiedFeedback(btnElement);
+    }
+
+    function showModalCopiedFeedback(btnElement) {
+        if (!btnElement) return;
+        const orig = btnElement.innerHTML;
+        btnElement.innerHTML = '<i class="fa-solid fa-check me-1"></i> Đã chép!';
+        setTimeout(() => {
+            btnElement.innerHTML = orig;
+        }, 2000);
+    }
+
+    // Toggle Follow Streamer (Theo dõi / Bỏ theo dõi Streamer)
+    function toggleFollowStreamer(streamerProfileId) {
+        var btn = document.getElementById('btnFollowStreamer');
+        var btnText = document.getElementById('followBtnText');
+        var heartIcon = document.getElementById('followHeartIcon');
+        var countDisplay = document.getElementById('headerFollowerCount');
+        if (!btn) return;
+
+        btn.disabled = true;
+        fetch('/Streamer/ToggleFollow', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ streamerProfileId: streamerProfileId })
+        })
+        .then(function(res) {
+            if (!res.ok) throw new Error('Network error');
+            return res.json();
+        })
+        .then(function(data) {
+            btn.disabled = false;
+            if (data.success) {
+                if (data.isFollowing) {
+                    btn.className = 'btn btn-danger text-white rounded-pill px-3 py-2 fw-bold d-flex align-items-center gap-2 shadow-sm follow-btn-interactive';
+                    btn.title = 'Nhấn để hủy theo dõi';
+                    if (heartIcon) {
+                        heartIcon.className = 'fa-solid fa-heart text-white heart-beat-anim';
+                    }
+                    if (btnText) btnText.textContent = 'Đang theo dõi';
+                } else {
+                    btn.className = 'btn btn-outline-light rounded-pill px-3 py-2 fw-bold d-flex align-items-center gap-2 shadow-sm follow-btn-interactive';
+                    btn.title = 'Nhấn để theo dõi và thêm vào mục Streamer Yêu Thích';
+                    if (heartIcon) {
+                        heartIcon.className = 'fa-regular fa-heart text-danger';
+                    }
+                    if (btnText) btnText.textContent = 'Theo dõi';
+                }
+                if (countDisplay && data.followerCount !== undefined) {
+                    countDisplay.textContent = Number(data.followerCount).toLocaleString('vi-VN');
+                }
+            } else {
+                alert(data.message || 'Không thể thực hiện thao tác.');
+            }
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            console.error(err);
+            alert('Có lỗi kết nối, vui lòng thử lại sau.');
+        });
+    }
+
+    // =========================================================================
+    // XỬ LÝ STATUS CỦA STREAMER (ĐĂNG BÀI, XÓA BÀI, THẢ TIM, XEM ẢNH)
+    // =========================================================================
+    function toggleStatusComposeBox() {
+        var box = document.getElementById('statusComposeBox');
+        if (!box) return;
+        if (box.classList.contains('d-none')) {
+            box.classList.remove('d-none');
+            var input = document.getElementById('statusContentInput');
+            if (input) input.focus();
+        } else {
+            box.classList.add('d-none');
+        }
+    }
+
+    function handleStatusImageSelect(input) {
+        if (!input || !input.files || !input.files[0]) return;
+        var file = input.files[0];
+        if (file.size > 8 * 1024 * 1024) {
+            alert('Ảnh tải lên không được vượt quá 8MB.');
+            input.value = '';
+            return;
+        }
+
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var container = document.getElementById('statusImagePreviewContainer');
+            var previewImg = document.getElementById('statusSelectedImagePreview');
+            if (previewImg && container) {
+                previewImg.src = e.target.result;
+                container.classList.remove('d-none');
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function clearSelectedStatusImage() {
+        var input = document.getElementById('statusImageUploadInput');
+        var container = document.getElementById('statusImagePreviewContainer');
+        var previewImg = document.getElementById('statusSelectedImagePreview');
+        if (input) input.value = '';
+        if (previewImg) previewImg.src = '';
+        if (container) container.classList.add('d-none');
+    }
+
+    function confirmDeleteStatus(statusId) {
+        if (!statusId) return;
+        if (!confirm('Bạn có chắc chắn muốn xóa bài viết status này không?')) return;
+
+        var formData = new FormData();
+        formData.append('statusId', statusId);
+
+        fetch('/Streamer/DeleteStatus', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.success) {
+                var card = document.getElementById('status-card-' + statusId);
+                if (card) {
+                    card.style.transition = 'all 0.3s ease';
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.9)';
+                    setTimeout(function() {
+                        card.remove();
+                        var container = document.getElementById('statusListContainer');
+                        if (container && container.querySelectorAll('.status-feed-card').length === 0) {
+                            container.innerHTML = `
+                                <div class="col-12 py-5 text-center text-muted">
+                                    <div class="p-3 bg-light d-inline-block rounded-circle mb-3">
+                                        <i class="fa-regular fa-newspaper display-5 text-success opacity-75"></i>
+                                    </div>
+                                    <h6 class="fw-bold text-dark">Chưa có status nào được đăng tải</h6>
+                                    <p class="small text-muted mb-3">Hãy đăng status mới để chia sẻ thông báo và hình ảnh tới người xem nhé!</p>
+                                </div>
+                            `;
+                        }
+                    }, 300);
+                }
+            } else {
+                alert(data.message || 'Không thể xóa status. Vui lòng thử lại.');
+            }
+        })
+        .catch(err => {
+            console.error('Lỗi khi xóa status:', err);
+            alert('Có lỗi xảy ra khi xóa status.');
+        });
+    }
+
+    function toggleStreamerStatusLike(btn, statusId) {
+        if (!statusId) return;
+        
+        var icon = btn.querySelector('i');
+        var countSpan = btn.querySelector('.like-count');
+        
+        var isCurrentlyLiked = btn.classList.contains('liked');
+        var currentCount = parseInt((countSpan.textContent || '0').replace(/,/g, '')) || 0;
+        
+        if (isCurrentlyLiked) {
+            btn.classList.remove('liked');
+            icon.className = 'fa-regular fa-heart';
+            countSpan.textContent = Math.max(0, currentCount - 1).toLocaleString('vi-VN');
+        } else {
+            btn.classList.add('liked');
+            icon.className = 'fa-solid fa-heart text-danger';
+            countSpan.textContent = (currentCount + 1).toLocaleString('vi-VN');
+        }
+
+        var formData = new FormData();
+        formData.append('statusId', statusId);
+
+        fetch('/Streamer/ToggleLikeStatus', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.success) {
+                if (data.isLiked) {
+                    btn.classList.add('liked');
+                    icon.className = 'fa-solid fa-heart text-danger';
+                } else {
+                    btn.classList.remove('liked');
+                    icon.className = 'fa-regular fa-heart';
+                }
+                countSpan.textContent = data.likeCount.toLocaleString('vi-VN');
+            } else {
+                if (isCurrentlyLiked) {
+                    btn.classList.add('liked');
+                    icon.className = 'fa-solid fa-heart text-danger';
+                    countSpan.textContent = currentCount.toLocaleString('vi-VN');
+                } else {
+                    btn.classList.remove('liked');
+                    icon.className = 'fa-regular fa-heart';
+                    countSpan.textContent = currentCount.toLocaleString('vi-VN');
+                }
+            }
+        })
+        .catch(err => {
+            console.error('Lỗi khi thả tim:', err);
+        });
+    }
+
+    function previewStatusMedia(url, streamerName) {
+        if (!url) return;
+        var modalEl = document.getElementById('statusMediaLightboxModal');
+        var img = document.getElementById('statusLightboxImg');
+        var cap = document.getElementById('statusLightboxCaption');
+        if (img) img.src = url;
+        if (cap) cap.textContent = 'Ảnh đăng bởi ' + (streamerName || 'Streamer');
+        if (window.bootstrap && bootstrap.Modal) {
+            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        }
+    }
+</script>
+
+@if (isStreamerAccount)
+{
+    <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const editorContainer = document.getElementById('streamerBioEditor');
+            const hiddenInput = document.getElementById('streamerBioHiddenInput');
+            const publicBioDisplay = document.getElementById('publicBioDisplay');
+
+            if (editorContainer && hiddenInput) {
+                const quill = new Quill('#streamerBioEditor', {
+                    theme: 'snow',
+                    placeholder: 'Nhập lời giới thiệu bản thân (Bio / About Me)...',
+                    modules: {
+                        toolbar: [
+                            [{ 'header': [2, 3, false] }],
+                            ['bold', 'italic', 'underline', 'strike'],
+                            [{ 'color': [] }],
+                            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                            ['link', 'blockquote', 'clean']
+                        ]
+                    }
+                });
+
+                if (hiddenInput.value) {
+                    quill.root.innerHTML = hiddenInput.value;
+                }
+
+                quill.on('text-change', function () {
+                    const html = quill.root.innerHTML;
+                    const isEmpty = quill.getText().trim().length === 0 && !html.includes('<img');
+                    hiddenInput.value = isEmpty ? '' : html;
+
+                    if (publicBioDisplay) {
+                        publicBioDisplay.innerHTML = isEmpty
+                            ? '<span class="text-muted fst-italic small">Chưa có lời giới thiệu bản thân.</span>'
+                            : html;
+                    }
+                });
+
+                const form = document.getElementById('streamerBioForm');
+                if (form) {
+                    form.addEventListener('submit', function () {
+                        const html = quill.root.innerHTML;
+                        const isEmpty = quill.getText().trim().length === 0 && !html.includes('<img');
+                        hiddenInput.value = isEmpty ? '' : html;
+                    });
+                }
+            }
+        });
+    </script>
+}
+

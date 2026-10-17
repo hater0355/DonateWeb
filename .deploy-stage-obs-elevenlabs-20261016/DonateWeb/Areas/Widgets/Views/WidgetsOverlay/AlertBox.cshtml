@@ -1,0 +1,369 @@
+@model DonateWeb.Areas.Widgets.ViewModels.AlertBoxConfigViewModel
+@{
+    Layout = "_OverlayLayout";
+}
+
+<!-- Khung chứa Alert Box hiển thị thông báo Donate trên màn hình Livestream OBS -->
+<div id="alertBoxWrapper" style="display: flex; align-items: center; justify-content: center; width: 100vw; height: 100vh;">
+    <div id="alertBoxContainer" style="display: none; text-align: center; max-width: 650px;" class="animate__animated">
+        <!-- Ảnh GIF hoặc Video WebM/MP4 hoạt ảnh -->
+        <div style="margin-bottom: 15px;">
+            <img id="alertImage" src="@Model.ImageUrl" alt="Donate Alert" style="max-height: 260px; max-width: 450px; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.7)); @(Model.MediaType == "video" ? "display: none;" : "")" />
+            <video id="alertVideo" autoplay loop muted playsinline style="max-height: 260px; max-width: 450px; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.7)); @(Model.MediaType == "video" ? "" : "display: none;")"></video>
+        </div>
+
+        <!-- Dòng tiêu đề thông báo chính -->
+        <div id="alertTitle" style="color: @Model.TextColor; font-family: '@Model.FontFamily', sans-serif; font-size: @(Model.FontSize)px; font-weight: 800; text-shadow: 2px 2px 8px #000, 0 0 16px rgba(0,0,0,0.9); line-height: 1.3;">
+            @Model.DisplayName
+        </div>
+
+        <!-- Số tiền được tách riêng để người xem dễ đọc trên livestream -->
+        <div id="alertAmount" style="display: none; margin-top: 6px; color: #fbbf24; font-family: '@Model.FontFamily', sans-serif; font-size: 30px; font-weight: 900; text-shadow: 2px 2px 8px #000;"></div>
+
+        <!-- Lời nhắn của người Donate -->
+        <div id="alertMessageWrapper" style="display: none; margin-top: 12px; padding: 10px 20px; background: rgba(15, 23, 42, 0.85); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 12px; backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgba(0,0,0,0.6);">
+            <div id="alertMessageText" style="color: #f8fafc; font-family: 'Inter', sans-serif; font-size: 20px; font-weight: 500; text-shadow: 1px 1px 4px #000; word-break: break-word;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Audio Player ẩn dùng để phát âm thanh hiệu ứng -->
+<audio id="alertAudioPlayer" preload="auto"></audio>
+<!-- Audio MP3 do máy chủ lấy từ ElevenLabs, phát ra Browser Source để OBS thu tiếng -->
+<audio id="ttsAudioPlayer" preload="none"></audio>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+    <script>
+        // Cấu hình ban đầu từ ViewModel
+        const streamerSlug = '@Html.Raw(Model.StreamerSlug)';
+        // Token này chỉ dùng để lấy audio cho khoản donate hợp lệ; API key ElevenLabs không gửi xuống trình duyệt.
+        const widgetToken = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.WidgetToken));
+        const defaultImageUrl = '@Html.Raw(Model.ImageUrl)';
+        const defaultSoundUrl = '@Html.Raw(Model.SoundUrl)';
+        const defaultDuration = @Model.DurationSeconds;
+        const defaultVolume = @Model.SoundVolume;
+        const defaultAnimIn = '@Html.Raw(Model.AnimationIn)';
+        const defaultAnimOut = '@Html.Raw(Model.AnimationOut)';
+        const defaultTtsEnabled = @Model.IsTtsEnabled.ToString().ToLowerInvariant();
+
+        const alertContainer = document.getElementById('alertBoxContainer');
+        const alertImage = document.getElementById('alertImage');
+        const alertVideo = document.getElementById('alertVideo');
+        const alertTitle = document.getElementById('alertTitle');
+        const alertAmount = document.getElementById('alertAmount');
+        const alertMessageWrapper = document.getElementById('alertMessageWrapper');
+        const alertMessageText = document.getElementById('alertMessageText');
+        const audioPlayer = document.getElementById('alertAudioPlayer');
+        const ttsAudioPlayer = document.getElementById('ttsAudioPlayer');
+
+        // Hàng đợi các Alert đang chờ phát lần lượt
+        let alertQueue = [];
+        let isPlayingAlert = false;
+        let lastDonationId = 0;
+        const seenDonationIds = new Set();
+        const seenDonationOrder = [];
+
+        function enqueueAlert(alertData) {
+            if (!alertData) return;
+            const donationId = Number(alertData.donationId || 0);
+            if (donationId > 0) {
+                if (seenDonationIds.has(donationId)) return;
+                seenDonationIds.add(donationId);
+                seenDonationOrder.push(donationId);
+                if (seenDonationOrder.length > 500) {
+                    seenDonationIds.delete(seenDonationOrder.shift());
+                }
+            }
+            alertQueue.push(alertData);
+            processQueue();
+        }
+
+        // Khởi động lấy id ban đầu
+        async function initAlertState() {
+            try {
+                // Thăm dò API lần đầu để lấy lastId hiện tại, tránh phát lại toàn bộ lịch sử donate cũ khi vừa mở OBS
+                const res = await fetch('/api/widgets/recent-donations/' + encodeURIComponent(streamerSlug) + '?limit=1');
+                const json = await res.json();
+                if (json.success && json.data && json.data.length > 0) {
+                    lastDonationId = json.data[0].id;
+                }
+            } catch (err) {
+                console.error("Lỗi khởi tạo trạng thái alert:", err);
+            }
+
+            // Kết nối SignalR Real-time Hub nhận diện tức thì (0 delay)
+            initObsSignalR();
+
+            // Bắt đầu vòng lặp polling dự phòng
+            pollLoop();
+        }
+
+        // Khởi tạo kết nối SignalR Real-time cho OBS Studio Alert Box
+        function initObsSignalR() {
+            if (typeof signalR === 'undefined') return;
+
+            try {
+                const hubConn = new signalR.HubConnectionBuilder()
+                    .withUrl('/paymentHub')
+                    .withAutomaticReconnect([0, 2000, 5000, 10000])
+                    .build();
+
+                // Nhận cả sự kiện mới theo streamer ID và sự kiện cũ theo slug.
+                // enqueueAlert tự loại bản ghi trùng nếu Polling cũng trả về cùng khoản donate.
+                const handleDonationAlert = function (alertData) {
+                    console.log('[OBS SignalR Real-time] Nhận donate mới:', alertData);
+                    enqueueAlert(alertData);
+                };
+                hubConn.on('OnNewDonation', handleDonationAlert);
+                hubConn.on('ReceiveAlert', handleDonationAlert);
+
+                const joinStreamerGroup = function () {
+                    hubConn.invoke('JoinStreamerGroup', streamerSlug);
+                };
+
+                hubConn.onreconnected(function () {
+                    console.log('[OBS SignalR] Đã kết nối lại, đăng ký nhóm streamer.');
+                    joinStreamerGroup().catch(err => console.warn('[OBS SignalR] Không thể tham gia lại nhóm streamer:', err));
+                });
+
+                hubConn.start().then(function () {
+                    console.log('[OBS SignalR] Kết nối PaymentHub thành công cho Streamer:', streamerSlug);
+                    return joinStreamerGroup();
+                }).catch(function (err) {
+                    console.warn('[OBS SignalR] Không thể kết nối Hub, tiếp tục với Polling 2.5s:', err);
+                });
+
+            } catch (e) {
+                console.error('[OBS SignalR] Lỗi:', e);
+            }
+        }
+
+        // Vòng lặp Polling kiểm tra donate mới hoặc Test Alert từ streamer
+        async function pollLoop() {
+            try {
+                const url = '/api/widgets/alertbox/poll/' + encodeURIComponent(streamerSlug) + '?lastId=' + lastDonationId;
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result.success) {
+                    if (result.hasAlert && result.data) {
+                        // Cập nhật lastDonationId nếu đây là donate thật
+                        if (result.data.donationId > 0) {
+                            lastDonationId = Math.max(lastDonationId, result.data.donationId);
+                        }
+
+                        // Đưa thông báo vào hàng đợi phát
+                        enqueueAlert(result.data);
+                    }
+                }
+            } catch (err) {
+                console.log("Polling error (sẽ thử lại):", err);
+            } finally {
+                // Tiếp tục lặp sau 2.5 giây
+                setTimeout(pollLoop, 2500);
+            }
+        }
+
+        // Xử lý hàng đợi phát thông báo
+        function processQueue() {
+            if (isPlayingAlert || alertQueue.length === 0) return;
+
+            isPlayingAlert = true;
+            const currentAlert = alertQueue.shift();
+            playSingleAlert(currentAlert);
+        }
+
+        // Đọc lời nhắn trực tiếp trong Browser Source của OBS bằng Web Speech API.
+        function speakMessage(text) {
+            if (!('speechSynthesis' in window) || !text || !text.trim()) {
+                return Promise.resolve();
+            }
+
+            return new Promise(resolve => {
+                const speech = window.speechSynthesis;
+                speech.cancel(); // Tránh câu trước bị đọc chồng lên donate hiện tại.
+
+                const utterance = new SpeechSynthesisUtterance(text.trim());
+                utterance.lang = 'vi-VN';
+                utterance.rate = 1.0;
+
+                const voices = speech.getVoices();
+                const vietnameseVoices = voices.filter(voice =>
+                    voice.lang && (voice.lang.toLowerCase().includes('vi') || voice.lang.toUpperCase().includes('VIE')));
+                const preferredVoice = vietnameseVoices.find(voice => /google|microsoft/i.test(voice.name))
+                    || vietnameseVoices[0];
+                if (preferredVoice) utterance.voice = preferredVoice;
+
+                let settled = false;
+                const finishSpeech = () => {
+                    if (settled) return;
+                    settled = true;
+                    resolve();
+                };
+
+                // Tránh làm kẹt hàng đợi nếu trình duyệt không phát hoặc không gửi onend.
+                const safetyTimer = setTimeout(() => {
+                    speech.cancel();
+                    finishSpeech();
+                }, 30000);
+                utterance.onend = () => { clearTimeout(safetyTimer); finishSpeech(); };
+                utterance.onerror = () => { clearTimeout(safetyTimer); finishSpeech(); };
+
+                try {
+                    speech.speak(utterance);
+                } catch (error) {
+                    clearTimeout(safetyTimer);
+                    console.warn('[OBS TTS] Không thể phát giọng đọc:', error);
+                    finishSpeech();
+                }
+            });
+        }
+
+        // Ưu tiên lấy giọng ElevenLabs từ máy chủ. Nếu chưa cấu hình hoặc có lỗi mạng,
+        // dùng giọng tiếng Việt của trình duyệt làm dự phòng để alert vẫn đọc được.
+        async function speakDonationWithElevenLabs(alertData, text) {
+            const donationId = Math.max(0, Number(alertData.donationId || 0));
+            try {
+                const response = await fetch(
+                    '/api/widgets/tts/audio/' + encodeURIComponent(streamerSlug) + '/' + donationId,
+                    { headers: { 'X-Widget-Token': widgetToken } });
+                if (!response.ok) throw new Error('ElevenLabs audio HTTP ' + response.status);
+
+                const audioBlob = await response.blob();
+                if (!audioBlob.size) throw new Error('ElevenLabs trả về audio rỗng');
+
+                const audioUrl = URL.createObjectURL(audioBlob);
+                await new Promise((resolve, reject) => {
+                    let finished = false;
+                    let safetyTimer;
+                    const finish = (error) => {
+                        if (finished) return;
+                        finished = true;
+                        clearTimeout(safetyTimer);
+                        ttsAudioPlayer.onended = null;
+                        ttsAudioPlayer.onerror = null;
+                        if (error) {
+                            ttsAudioPlayer.pause();
+                            ttsAudioPlayer.removeAttribute('src');
+                            ttsAudioPlayer.load();
+                        }
+                        URL.revokeObjectURL(audioUrl);
+                        error ? reject(error) : resolve();
+                    };
+
+                    ttsAudioPlayer.volume = 1;
+                    ttsAudioPlayer.onended = () => finish();
+                    ttsAudioPlayer.onerror = () => finish(new Error('OBS không phát được audio ElevenLabs'));
+                    safetyTimer = setTimeout(() => finish(new Error('Audio ElevenLabs phát quá lâu')), 45000);
+                    ttsAudioPlayer.src = audioUrl;
+                    ttsAudioPlayer.play().catch(finish);
+                });
+            } catch (error) {
+                console.warn('[OBS TTS] ElevenLabs chưa phát được, chuyển sang giọng trình duyệt:', error);
+                await speakMessage(text);
+            }
+        }
+
+        // Thực thi phát một Alert cụ thể
+        function playSingleAlert(alertData) {
+            const mediaUrl = alertData.mediaUrl || alertData.imageUrl || defaultImageUrl;
+            const soundUrl = alertData.soundUrl || defaultSoundUrl;
+            const durationSec = alertData.durationSeconds || defaultDuration;
+            const volume = typeof alertData.soundVolume === 'number' ? alertData.soundVolume : defaultVolume;
+            const animIn = alertData.animationIn || defaultAnimIn;
+            const animOut = alertData.animationOut || defaultAnimOut;
+
+            const isVideo = (alertData.mediaType === 'video') || mediaUrl.endsWith('.webm') || mediaUrl.endsWith('.mp4');
+
+            // 1. Cập nhật Media hiển thị (Video WebM/MP4 hoặc Ảnh GIF)
+            if (isVideo) {
+                alertImage.style.display = 'none';
+                alertVideo.style.display = 'inline-block';
+                alertVideo.src = mediaUrl;
+                alertVideo.currentTime = 0;
+                alertVideo.play().catch(e => console.log("Không thể tự động phát video:", e));
+            } else {
+                alertVideo.style.display = 'none';
+                alertVideo.pause();
+                alertImage.style.display = 'inline-block';
+                alertImage.src = mediaUrl;
+            }
+
+            // Cập nhật nội dung chữ
+            alertTitle.innerText = alertData.displayText || (alertData.donorName + ' vừa ủng hộ ' + alertData.formattedAmount + '!');
+            alertTitle.style.color = alertData.textColor || '#10b981';
+            alertTitle.style.fontFamily = (alertData.fontFamily || 'Inter') + ', sans-serif';
+            alertTitle.style.fontSize = (alertData.fontSize || 28) + 'px';
+
+            const amount = Number(alertData.amount || 0);
+            if (amount > 0) {
+                alertAmount.innerText = new Intl.NumberFormat('vi-VN').format(amount) + ' đồng';
+                alertAmount.style.display = 'block';
+            } else {
+                alertAmount.style.display = 'none';
+            }
+
+            if (alertData.message && alertData.message.trim() !== '') {
+                alertMessageText.innerText = '"' + alertData.message.trim() + '"';
+                alertMessageWrapper.style.display = 'block';
+            } else {
+                alertMessageWrapper.style.display = 'none';
+            }
+
+            // 2. Phát âm thanh MP3
+            if (soundUrl) {
+                audioPlayer.src = soundUrl;
+                audioPlayer.volume = Math.max(0, Math.min(1, volume / 100));
+                audioPlayer.play().catch(e => console.log("Không thể tự động phát âm thanh:", e));
+            }
+
+            let visualFinished = false;
+            let speechFinished = true;
+            let finishStarted = false;
+            const finishAlertIfReady = () => {
+                if (!visualFinished || !speechFinished || finishStarted) return;
+                finishStarted = true;
+                if (isVideo) alertVideo.pause();
+                isPlayingAlert = false;
+                processQueue();
+            };
+
+            // 4. Kích hoạt hiệu ứng xuất hiện (Animation In)
+            alertContainer.className = 'animate__animated animate__' + animIn;
+            alertContainer.style.display = 'block';
+
+            // Giọng đọc chỉ bật khi streamer đã bật TTS trong cấu hình Alert Box.
+            const shouldSpeak = alertData.isTtsEnabled !== undefined
+                ? Boolean(alertData.isTtsEnabled)
+                : defaultTtsEnabled;
+            if (shouldSpeak) {
+                const donorName = alertData.donorName || 'Người ủng hộ ẩn danh';
+                const spokenAmount = new Intl.NumberFormat('vi-VN').format(amount);
+                const donationMessage = (alertData.message || '').trim() || 'Đã gửi ủng hộ';
+                const spokenText = donorName + ' ủng hộ ' + spokenAmount + ' đồng. Lời nhắn: ' + donationMessage;
+                speechFinished = false;
+                speakDonationWithElevenLabs(alertData, spokenText).then(() => {
+                    speechFinished = true;
+                    finishAlertIfReady();
+                });
+            }
+
+            // Popup hiển thị ít nhất 8 giây; nếu giọng đọc dài hơn thì hàng đợi chờ đọc xong.
+            const visibleDurationMs = Math.max(Number(durationSec) * 1000, 8000);
+            setTimeout(() => {
+                alertContainer.className = 'animate__animated animate__' + animOut;
+
+                setTimeout(() => {
+                    alertContainer.style.display = 'none';
+                    visualFinished = true;
+                    finishAlertIfReady();
+                }, 1000);
+            }, visibleDurationMs);
+        }
+
+        // Bắt đầu chạy khi tải xong trang trong OBS
+        window.addEventListener('DOMContentLoaded', initAlertState);
+    </script>
+}

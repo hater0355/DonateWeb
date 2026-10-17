@@ -1,0 +1,323 @@
+@model DonateWeb.ViewModels.Streamer.StreamerRegisterViewModel
+@{
+    ViewData["Title"] = "Đăng ký Streamer";
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var pendingProfile = ViewBag.PendingProfile as DonateWeb.Models.Entities.StreamerProfile;
+}
+
+<div class="container-fluid p-0">
+    <!-- Header -->
+    <div class="mb-4">
+        <h5 class="fw-bold text-dark-green mb-0 d-flex align-items-center gap-2">
+            <span class="text-uppercase">ĐĂNG KÝ STREAMER</span>
+            <i class="fa-solid fa-shield-halved text-dark-green opacity-75"></i>
+        </h5>
+    </div>
+
+    <!-- Alerts -->
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger rounded-3 d-flex align-items-center gap-2 mb-4">
+            <i class="fa-solid fa-triangle-exclamation"></i> @TempData["ErrorMessage"]
+        </div>
+    }
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success rounded-3 d-flex align-items-center gap-2 mb-4">
+            <i class="fa-solid fa-circle-check"></i> @TempData["SuccessMessage"]
+        </div>
+    }
+
+    <!-- NẾU HỒ SƠ ĐANG CHỜ DUYỆT BỞI ADMIN -->
+    @if (pendingProfile != null && pendingProfile.ApprovalStatus == DonateWeb.Models.Enums.StreamerApprovalStatus.Pending)
+    {
+        <div class="card card-custom border-0 mb-4 shadow-sm" style="background-color: #fef3c7; border-left: 5px solid #f59e0b !important;">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="bg-warning text-dark rounded-circle p-2 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 48px; height: 48px;">
+                        <i class="fa-solid fa-hourglass-half fs-4"></i>
+                    </div>
+                    <div>
+                        <h5 class="fw-bold mb-0 text-dark">Hồ sơ đăng ký Streamer của bạn đang chờ Quản trị viên phê duyệt</h5>
+                        <span class="small text-muted">Thời điểm gửi yêu cầu: @pendingProfile.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                    </div>
+                </div>
+                <div class="p-3 bg-white rounded-3 border">
+                    <div class="row g-2 small">
+                        <div class="col-12 col-md-4">
+                            <span class="text-muted">Mã ID hiện tại (Viewer):</span>
+                            <strong class="text-primary font-monospace ms-1">@(User.FindFirst("AccountId")?.Value ?? "Chưa cấp")</strong>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <span class="text-muted">Tên kênh:</span>
+                            <strong class="text-dark ms-1">@pendingProfile.DisplayName</strong>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <span class="text-muted">Tên miền trang cá nhân:</span>
+                            <strong class="text-success ms-1">domain.com/@pendingProfile.Slug</strong>
+                        </div>
+                        <div class="col-12 col-md-6 mt-2">
+                            <span class="text-muted">Ngân hàng nhận donate:</span>
+                            <strong class="text-dark ms-1">@pendingProfile.BankName - @pendingProfile.BankAccountNumber (@pendingProfile.BankAccountName)</strong>
+                        </div>
+                        <div class="col-12 col-md-6 mt-2">
+                            <span class="text-muted">Trạng thái:</span>
+                            <span class="badge bg-warning text-dark px-2 py-1"><i class="fa-solid fa-clock me-1"></i> Chờ Quản trị viên duyệt</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 small text-muted">
+                    <i class="fa-solid fa-circle-info text-warning me-1"></i> Sau khi Quản trị viên duyệt, tài khoản của bạn sẽ tự động được cấp quyền <strong>Streamer</strong> và mã định danh 10 số sẽ được chuyển đổi số đầu tiên từ <strong>9</strong> thành <strong>1</strong>.
+                </div>
+            </div>
+        </div>
+    }
+    else if (pendingProfile != null && pendingProfile.ApprovalStatus == DonateWeb.Models.Enums.StreamerApprovalStatus.Rejected)
+    {
+        <div class="alert alert-danger border-0 rounded-4 p-4 mb-4 shadow-sm">
+            <div class="d-flex align-items-center gap-3 mb-2">
+                <i class="fa-solid fa-circle-xmark fs-2 text-danger flex-shrink-0"></i>
+                <div>
+                    <h6 class="fw-bold mb-0 text-danger">Hồ sơ đăng ký Streamer trước đó của bạn đã bị từ chối</h6>
+                    <div class="small text-dark mt-1">
+                        <strong>Lý do từ chối:</strong> @(string.IsNullOrEmpty(pendingProfile.RejectionReason) ? "Hồ sơ chưa đạt tiêu chuẩn quy định của nền tảng." : pendingProfile.RejectionReason)
+                    </div>
+                </div>
+            </div>
+            <div class="small text-muted mt-2">
+                Bạn có thể kiểm tra và cập nhật lại các thông tin cá nhân, CCCD, tài khoản ngân hàng bên dưới rồi bấm nút <strong>Gửi lại yêu cầu xét duyệt</strong>.
+            </div>
+        </div>
+    }
+
+    <!-- Banner -->
+    <div class="card card-custom border-0 mb-4 shadow-sm" style="background-color: var(--dark-green);">
+        <div class="card-body p-4 d-flex justify-content-between align-items-center">
+            <div class="text-white">
+                <h4 class="fw-bold mb-1 text-uppercase">NHẬN DONATE</h4>
+                <p class="mb-0 text-white-50 small text-uppercase">TỐI ƯU HÓA THU NHẬP CỦA BẠN - TẠO TRANG DONATE RIÊNG</p>
+            </div>
+            <div class="bg-white rounded-3 p-3 d-flex align-items-center justify-content-center shadow-sm" style="width: 70px; height: 70px;">
+                <i class="fa-solid fa-qrcode fs-2 text-dark-green"></i>
+            </div>
+        </div>
+    </div>
+
+    @if (isAuthenticated && pendingProfile == null)
+    {
+        var viewerAccountId = User.FindFirst("AccountId")?.Value;
+        <div class="alert alert-info rounded-3 d-flex align-items-center gap-2 mb-4 border-0 shadow-sm" style="background-color: #e0f2fe; color: #0369a1;">
+            <i class="fa-solid fa-wand-magic-sparkles fs-5 flex-shrink-0"></i>
+            <div>
+                <strong>Nâng cấp tài khoản Streamer:</strong> 
+                @if (!string.IsNullOrEmpty(viewerAccountId) && viewerAccountId.Length == 10 && viewerAccountId.StartsWith("9"))
+                {
+                    <span>Mã ID của bạn hiện tại là <code class="fw-bold text-primary">@viewerAccountId</code> (Viewer). Sau khi Quản trị viên duyệt hồ sơ, số đầu sẽ tự động đổi từ <strong>9</strong> thành <strong>1</strong> (mã mới: <code class="fw-bold text-success">@("1" + viewerAccountId.Substring(1))</code>).</span>
+                }
+                else
+                {
+                    <span>Hệ thống sẽ tự động cấp mã ID Streamer 10 số bắt đầu bằng số <strong>1</strong> sau khi Quản trị viên phê duyệt.</span>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- Form Section -->
+    <form asp-action="Register" asp-controller="Streamer" method="post">
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+
+        <div class="row g-4 align-items-stretch">
+            <!-- Col 1: HỒ SƠ CÁ NHÂN -->
+            <div class="col-12 col-xl-5">
+                <div class="card card-custom p-3 p-xl-4 bg-light-green border-0 h-100 shadow-sm">
+                    <h6 class="fw-bold text-dark-green mb-4 text-uppercase">HỒ SƠ CÁ NHÂN & KÊNH</h6>
+                    <div class="row g-3">
+                        <div class="col-4">
+                            <!-- Avatar Card -->
+                            <div class="bg-white rounded-3 p-2 text-center h-100 d-flex flex-column align-items-center justify-content-center border shadow-sm relative">
+                                <span class="position-absolute top-0 end-0 p-2 small text-muted fw-semibold" style="font-size: 0.7rem;">STREAMER</span>
+                                <div class="bg-light rounded-circle d-flex align-items-center justify-content-center mb-3 mt-2 overflow-hidden" style="width: 75px; height: 75px;">
+                                    <i class="fa-solid fa-user text-success fs-1"></i>
+                                </div>
+                                <div class="fw-bold text-dark-green small text-uppercase" id="previewFullName">@(string.IsNullOrEmpty(Model?.FullName) ? "HỌ VÀ TÊN" : Model.FullName)</div>
+                                <div class="text-muted mb-2" style="font-size: 0.65rem;">domain.com/<span id="previewSlug">@(string.IsNullOrEmpty(Model?.Slug) ? "slug" : Model.Slug)</span></div>
+                                @if (pendingProfile != null && pendingProfile.ApprovalStatus == DonateWeb.Models.Enums.StreamerApprovalStatus.Pending)
+                                {
+                                    <span class="badge rounded-pill w-100 py-2 bg-warning text-dark" style="font-size: 0.7rem;">CHỜ ADMIN DUYỆT</span>
+                                }
+                                else if (pendingProfile != null && pendingProfile.ApprovalStatus == DonateWeb.Models.Enums.StreamerApprovalStatus.Rejected)
+                                {
+                                    <span class="badge rounded-pill w-100 py-2 bg-danger text-white" style="font-size: 0.7rem;">BỊ TỪ CHỐI DUYỆT</span>
+                                }
+                                else
+                                {
+                                    <span class="badge rounded-pill w-100 py-2 bg-secondary text-white" style="font-size: 0.7rem;">CHỜ ĐĂNG KÝ</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="col-8 d-flex flex-column gap-2">
+                            <div>
+                                <label asp-for="FullName" class="form-label small fw-semibold text-dark-green mb-1">Họ tên *</label>
+                                <input asp-for="FullName" id="inputFullName" class="form-control border-0 py-2 shadow-sm" placeholder="Nguyễn Văn A" required oninput="document.getElementById('previewFullName').innerText = this.value || 'HỌ VÀ TÊN'" />
+                                <span asp-validation-for="FullName" class="text-danger small"></span>
+                            </div>
+                            <div>
+                                <label asp-for="Slug" class="form-label small fw-semibold text-dark-green mb-1">Tên miền trang cá nhân * (URL donate: domain.com/ID)</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-white border-0 text-muted">domain.com/</span>
+                                    <input asp-for="Slug" id="inputSlug" class="form-control border-0 py-2 shadow-sm font-monospace" placeholder="@(User.FindFirst("AccountId")?.Value ?? "12026xxxxx")" required oninput="document.getElementById('previewSlug').innerText = this.value || 'ID'" />
+                                </div>
+                                <span asp-validation-for="Slug" class="text-danger small"></span>
+                                <div class="text-muted small mt-1" style="font-size: 0.7rem;">Mặc định là mã ID tài khoản của bạn (hoặc nhập ID mong muốn)</div>
+                            </div>
+                            <div>
+                                <label asp-for="DisplayName" class="form-label small fw-semibold text-dark-green mb-1">Tên hiển thị kênh</label>
+                                <input asp-for="DisplayName" class="form-control border-0 py-2 shadow-sm" placeholder="Ví dụ: Hoàng Nam Gaming" />
+                            </div>
+                            <div>
+                                <label asp-for="DateOfBirth" class="form-label small fw-semibold text-dark-green mb-1">Ngày sinh (dd/mm/yyyy)</label>
+                                <input asp-for="DateOfBirth" class="form-control border-0 py-2 shadow-sm" placeholder="01/01/2000" />
+                            </div>
+                            <div>
+                                <label asp-for="CitizenId" class="form-label small fw-semibold text-dark-green mb-1">Số Căn cước/CCCD *</label>
+                                <input asp-for="CitizenId" class="form-control border-0 py-2 shadow-sm" placeholder="12 chữ số CCCD" required />
+                                <span asp-validation-for="CitizenId" class="text-danger small"></span>
+                            </div>
+
+                            @if (!isAuthenticated)
+                            {
+                                <div class="p-2 bg-white rounded-3 border mt-2">
+                                    <div class="small fw-bold text-success mb-1"><i class="fa-solid fa-lock me-1"></i> Tài khoản đăng nhập mới:</div>
+                                    <div class="mb-2">
+                                        <label asp-for="Email" class="form-label small fw-semibold text-dark-green mb-0">Email *</label>
+                                        <input asp-for="Email" type="email" class="form-control form-control-sm" placeholder="example@email.com" required />
+                                    </div>
+                                    <div>
+                                        <label asp-for="Password" class="form-label small fw-semibold text-dark-green mb-0">Mật khẩu *</label>
+                                        <input asp-for="Password" type="password" class="form-control form-control-sm" placeholder="Tối thiểu 6 ký tự" required />
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Col 2: ĐỊA CHỈ & LIÊN KẾT KÊNH -->
+            <div class="col-12 col-xl-3 d-flex flex-column gap-4">
+                <!-- ĐỊA CHỈ & LIÊN HỆ -->
+                <div class="card card-custom p-3 p-xl-4 bg-light-green border-0 shadow-sm">
+                    <h6 class="fw-bold text-dark-green mb-3 text-uppercase">ĐỊA CHỈ & LIÊN HỆ</h6>
+                    <div class="d-flex flex-column gap-2">
+                        <label asp-for="PermanentAddress" class="form-label small fw-semibold text-dark-green mb-0">Địa chỉ thường trú</label>
+                        <input asp-for="PermanentAddress" class="form-control border-0 py-2 shadow-sm text-muted" placeholder="Địa chỉ thường trú" />
+                        
+                        <label asp-for="CurrentAddress" class="form-label small fw-semibold text-dark-green mb-0">Địa chỉ hiện tại</label>
+                        <input asp-for="CurrentAddress" class="form-control border-0 py-2 shadow-sm text-muted" placeholder="Địa chỉ hiện tại" />
+                        
+                        <label asp-for="PhoneNumber" class="form-label small fw-semibold text-dark-green mb-0">Số điện thoại *</label>
+                        <input asp-for="PhoneNumber" class="form-control border-0 py-2 shadow-sm text-muted" placeholder="Số điện thoại" required />
+                        <span asp-validation-for="PhoneNumber" class="text-danger small"></span>
+                    </div>
+                </div>
+                
+                <!-- LIÊN KẾT KÊNH -->
+                <div class="card card-custom p-3 p-xl-4 bg-light-green border-0 flex-grow-1 shadow-sm">
+                    <h6 class="fw-bold text-dark-green mb-3 text-uppercase">LIÊN KẾT KÊNH STREAM</h6>
+                    <div class="d-flex flex-column gap-2">
+                        <label asp-for="FacebookUrl" class="form-label small fw-semibold text-dark-green mb-0"><i class="fa-brands fa-facebook text-primary me-1"></i> Facebook</label>
+                        <input asp-for="FacebookUrl" class="form-control border-0 py-2 shadow-sm text-muted" placeholder="https://facebook.com/..." />
+                        
+                        <label asp-for="YoutubeUrl" class="form-label small fw-semibold text-dark-green mb-0"><i class="fa-brands fa-youtube text-danger me-1"></i> YouTube</label>
+                        <input asp-for="YoutubeUrl" class="form-control border-0 py-2 shadow-sm text-muted" placeholder="https://youtube.com/..." />
+                        
+                        <label asp-for="TiktokUrl" class="form-label small fw-semibold text-dark-green mb-0"><i class="fa-brands fa-tiktok text-dark me-1"></i> TikTok</label>
+                        <input asp-for="TiktokUrl" class="form-control border-0 py-2 shadow-sm text-muted" placeholder="https://tiktok.com/..." />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Col 3: NGÂN HÀNG & XÁC MINH -->
+            <div class="col-12 col-xl-4 d-flex flex-column gap-4">
+                <!-- LIÊN KẾT NGÂN HÀNG -->
+                <div class="card card-custom p-3 p-xl-4 bg-light-green border-0 shadow-sm">
+                    <h6 class="fw-bold text-dark-green mb-3 text-uppercase">TÀI KHOẢN NHẬN DONATE</h6>
+                    <div class="d-flex flex-column gap-2">
+                        <label asp-for="BankName" class="form-label small fw-semibold text-dark-green mb-0">Ngân hàng *</label>
+                        <input asp-for="BankName" class="form-control border-0 py-2 shadow-sm text-muted" placeholder="Ví dụ: MB Bank, Vietcombank" required />
+                        <span asp-validation-for="BankName" class="text-danger small"></span>
+
+                        <label asp-for="BankAccountNumber" class="form-label small fw-semibold text-dark-green mb-0">Số tài khoản *</label>
+                        <input asp-for="BankAccountNumber" class="form-control border-0 py-2 shadow-sm text-muted" placeholder="Số tài khoản ngân hàng" required />
+                        <span asp-validation-for="BankAccountNumber" class="text-danger small"></span>
+
+                        <label asp-for="BankAccountName" class="form-label small fw-semibold text-dark-green mb-0">Tên chủ tài khoản *</label>
+                        <input asp-for="BankAccountName" class="form-control border-0 py-2 shadow-sm text-muted" placeholder="NGUYEN VAN A (in hoa)" required />
+                        <span asp-validation-for="BankAccountName" class="text-danger small"></span>
+                    </div>
+                </div>
+                
+                <!-- XÁC MINH DANH TÍNH -->
+                <div class="card card-custom p-3 p-xl-4 bg-light-green border-0 flex-grow-1 shadow-sm">
+                    <h6 class="fw-bold text-dark-green mb-3 text-uppercase">XÁC MINH DANH TÍNH (CCCD)</h6>
+                    <div class="row g-3 h-100">
+                        <div class="col-6">
+                            <div class="bg-white rounded-3 d-flex flex-column align-items-center justify-content-center h-100 border p-3 shadow-sm" style="border-style: dashed !important; cursor: pointer; min-height: 120px;">
+                                <i class="fa-solid fa-id-card text-dark-green mb-2 fs-4"></i>
+                                <span class="small text-muted text-center" style="font-size: 0.75rem;">Mặt trước Căn cước</span>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="bg-white rounded-3 d-flex flex-column align-items-center justify-content-center h-100 border p-3 shadow-sm" style="border-style: dashed !important; cursor: pointer; min-height: 120px;">
+                                <i class="fa-solid fa-id-card-clip text-dark-green mb-2 fs-4"></i>
+                                <span class="small text-muted text-center" style="font-size: 0.75rem;">Mặt sau Căn cước</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit Area -->
+        <div class="mt-5 text-center">
+            <div class="d-flex justify-content-center gap-4 mb-4 flex-wrap">
+                <div class="form-check d-flex align-items-center gap-2">
+                    <input class="form-check-input" type="checkbox" checked id="check1" required style="background-color: var(--dark-green); border-color: var(--dark-green);">
+                    <label class="form-check-label small" for="check1">
+                        Tôi đồng ý với <a href="#" class="text-dark-green fw-bold text-decoration-underline">điều khoản sử dụng</a> và <a href="#" class="text-dark-green fw-bold text-decoration-underline">chính sách bảo mật</a>
+                    </label>
+                </div>
+                <div class="form-check d-flex align-items-center gap-2">
+                    <input class="form-check-input" type="checkbox" checked id="check2" required style="background-color: var(--dark-green); border-color: var(--dark-green);">
+                    <label class="form-check-label small" for="check2">
+                        Tôi cam kết các thông tin đã cung cấp là chính xác
+                    </label>
+                </div>
+            </div>
+            
+            @if (pendingProfile != null && pendingProfile.ApprovalStatus == DonateWeb.Models.Enums.StreamerApprovalStatus.Pending)
+            {
+                <button type="submit" class="btn btn-outline-success rounded-pill px-5 py-3 fw-bold shadow-sm" style="min-width: 280px; font-size: 1.05rem;">
+                    <i class="fa-solid fa-pen-to-square me-2"></i> CẬP NHẬT LẠI THÔNG TIN CHỜ DUYỆT
+                </button>
+            }
+            else if (pendingProfile != null && pendingProfile.ApprovalStatus == DonateWeb.Models.Enums.StreamerApprovalStatus.Rejected)
+            {
+                <button type="submit" class="btn btn-dark-green rounded-pill px-5 py-3 fw-bold shadow-lg" style="min-width: 280px; font-size: 1.1rem;">
+                    <i class="fa-solid fa-paper-plane me-2"></i> GỬI LẠI YÊU CẦU XÉT DUYỆT
+                </button>
+            }
+            else
+            {
+                <button type="submit" class="btn btn-dark-green rounded-pill px-5 py-3 fw-bold shadow-lg" style="min-width: 280px; font-size: 1.1rem;">
+                    <i class="fa-solid fa-paper-plane me-2"></i> GỬI YÊU CẦU ĐĂNG KÝ STREAMER
+                </button>
+            }
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

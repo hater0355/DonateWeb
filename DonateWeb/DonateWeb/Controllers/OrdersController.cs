@@ -137,7 +137,7 @@ namespace DonateWeb.Controllers
                 Status = d.Status,
                 StatusBadgeClass = d.Status == DonationStatus.Success ? "bg-success" : (d.Status == DonationStatus.Pending ? "bg-warning text-dark" : "bg-danger"),
                 StatusText = d.Status == DonationStatus.Success ? "Thành công" : (d.Status == DonationStatus.Pending ? "Đang xử lý" : "Thất bại"),
-                EffectTag = d.Amount >= 500000 ? "Pháo hoa Hoàng gia" : (d.Amount >= 200000 ? "Kim cương lấp lánh" : (d.Amount >= 50000 ? "Trái tim rực rỡ" : null))
+                EffectTag = d.SpecialEffectTitle
             }).ToList();
 
             // Tính thống kê Donate gửi đi
@@ -202,7 +202,7 @@ namespace DonateWeb.Controllers
                     Status = d.Status,
                     StatusBadgeClass = d.Status == DonationStatus.Success ? "bg-success" : (d.Status == DonationStatus.Pending ? "bg-warning text-dark" : "bg-danger"),
                     StatusText = d.Status == DonationStatus.Success ? "Thành công" : (d.Status == DonationStatus.Pending ? "Đang xử lý" : "Thất bại"),
-                    EffectTag = d.Amount >= 500000 ? "Pháo hoa Hoàng gia" : (d.Amount >= 200000 ? "Kim cương lấp lánh" : (d.Amount >= 50000 ? "Trái tim rực rỡ" : null))
+                    EffectTag = d.SpecialEffectTitle
                 }).ToList();
 
                 viewModel.TotalDonationReceivedCount = viewModel.ReceivedDonations.Count;
@@ -280,47 +280,29 @@ namespace DonateWeb.Controllers
             viewModel.TotalShopAmount = viewModel.ShopOrders.Where(o => o.PaymentStatus == "Paid").Sum(o => o.TotalAmount);
 
             // ==========================================
-            // 4. DANH SÁCH HIỆU ỨNG ĐẶC BIỆT (TỰ ĐỘNG KHỞI TẠO TỪ CÁC GÓI HIỆU ỨNG HỆ THỐNG)
+            // 4. LỊCH SỬ HIỆU ỨNG SỰ KIỆN THẬT ĐÃ KÍCH HOẠT BỞI DONATE
             // ==========================================
-            var defaultEffects = new List<EffectHistoryItemViewModel>
-            {
-                new EffectHistoryItemViewModel
-                {
-                    Id = "EFF-01",
-                    Name = "Pháo hoa mừng rỡ VIP",
-                    Description = "Bắn pháo hoa rực sáng màn hình livestream khi gửi lời nhắn donate từ 500.000 VNĐ",
-                    IconClass = "fa-wand-magic-sparkles",
-                    Price = 500000,
-                    TargetStreamer = isStreamer ? "Kênh của bạn" : "Tất cả Streamer",
-                    PurchasedAt = DateTime.Now.AddDays(-1),
-                    Status = "Đang kích hoạt"
-                },
-                new EffectHistoryItemViewModel
-                {
-                    Id = "EFF-02",
-                    Name = "Mưa tim & Ngôi sao may mắn",
-                    Description = "Hiệu ứng mưa tim rơi ngập tràn kèm âm thanh vui nhộn khi donate từ 100.000 VNĐ",
-                    IconClass = "fa-heart",
-                    Price = 100000,
-                    TargetStreamer = isStreamer ? "Kênh của bạn" : "Tất cả Streamer",
-                    PurchasedAt = DateTime.Now.AddDays(-3),
-                    Status = "Đang kích hoạt"
-                },
-                new EffectHistoryItemViewModel
-                {
-                    Id = "EFF-03",
-                    Name = "Hào quang Kim Cương SuperChat",
-                    Description = "Ghim lời nhắn lên đầu màn hình live trong 30 giây kèm khung viền kim cương",
-                    IconClass = "fa-gem",
-                    Price = 200000,
-                    TargetStreamer = isStreamer ? "Kênh của bạn" : "Tất cả Streamer",
-                    PurchasedAt = DateTime.Now.AddDays(-5),
-                    Status = "Đang kích hoạt"
-                }
-            };
+            var effectDonations = await _context.Donations
+                .Include(donation => donation.StreamerProfile)
+                .AsNoTracking()
+                .Where(donation => donation.SpecialEffectCode != null &&
+                    (donation.DonorUserId == currentUserId || donation.StreamerProfile.UserId == currentUserId))
+                .OrderByDescending(donation => donation.CreatedAt)
+                .Take(100)
+                .ToListAsync();
 
-            viewModel.EffectItems = defaultEffects;
-            viewModel.TotalEffectsCount = defaultEffects.Count;
+            viewModel.EffectItems = effectDonations.Select(donation => new EffectHistoryItemViewModel
+            {
+                Id = $"DON-{donation.Id:D6}",
+                Name = donation.SpecialEffectTitle ?? "Hiệu ứng sự kiện",
+                Description = "Hiệu ứng sự kiện đã chạy trên AlertBox khi khoản donate thành công.",
+                IconClass = "fa-wand-magic-sparkles",
+                Price = donation.Amount,
+                TargetStreamer = donation.StreamerProfile.DisplayName,
+                PurchasedAt = donation.CreatedAt.ToLocalTime(),
+                Status = "Đã kích hoạt"
+            }).ToList();
+            viewModel.TotalEffectsCount = viewModel.EffectItems.Count;
 
             return View(viewModel);
         }

@@ -255,6 +255,11 @@ namespace DonateWeb.Areas.Widgets.ViewModels
 
         public string? Message { get; set; }
 
+        /// <summary>Mã hiệu ứng sự kiện cần chạy trên Browser Source của OBS, nếu có.</summary>
+        public string? SpecialEffectCode { get; set; }
+
+        public string? SpecialEffectTitle { get; set; }
+
         public string DisplayText { get; set; } = string.Empty;
 
         /// <summary>

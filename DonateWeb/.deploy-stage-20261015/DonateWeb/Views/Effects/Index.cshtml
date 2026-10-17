@@ -1,0 +1,53 @@
+<!-- FILE: Views/Effects/Index.cshtml -->
+@model List<DonateWeb.ViewModels.EffectViewModel>
+@{
+    ViewData["Title"] = "Hiệu ứng đặc biệt";
+}
+
+<h5 class="fw-bold text-dark-green mb-3">HIỆU ỨNG ĐẶC BIỆT</h5>
+
+<ul class="nav nav-pills nav-fill gap-3 mb-4 effect-tabs" id="effectTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" data-bs-toggle="pill" type="button" role="tab">CHƯA KÍCH HOẠT</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="pill" type="button" role="tab">ĐÃ KÍCH HOẠT, CÒN HẠN SỬ DỤNG</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="pill" type="button" role="tab">ĐÃ HẾT HẠN</button>
+    </li>
+</ul>
+
+<div class="row g-4">
+    @if (Model != null && Model.Any())
+    {
+        @foreach (var eff in Model)
+        {
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card card-custom border-success border-opacity-25 h-100 p-1">
+                    <div class="bg-white rounded-3 d-flex align-items-center justify-content-center py-5 mb-3 mx-2 mt-2 border">
+                        <i class="fa-solid @eff.IconClass text-dark-green" style="font-size: 3rem;"></i>
+                    </div>
+                    <div class="px-3 pb-3">
+                        <h6 class="fw-bold text-dark-green">@eff.Name</h6>
+                        <p class="text-muted fs-7 mb-4">@eff.Description</p>
+                        
+                        <div class="d-flex align-items-center justify-content-between border-top pt-3">
+                            <span class="fs-7 text-muted">@eff.Status</span>
+                            <button class="btn btn-sm fw-bold text-dark-green">KÍCH HOẠT</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="col-12">
+            <div class="card card-custom bg-white p-5 text-center shadow-sm">
+                @await Html.PartialAsync("_EmptyState")
+                <p class="text-muted small mt-2">Dữ liệu hiệu ứng sẽ tự động hiển thị khi được cập nhật từ database hệ thống.</p>
+            </div>
+        </div>
+    }
+</div>

@@ -115,6 +115,19 @@ namespace DonateWeb.Models.Entities
         /// </summary>
         public DateTime? ApprovedAt { get; set; }
 
+        /// <summary>JSON thông tin CCCD đã mã hóa bằng ASP.NET Core Data Protection.</summary>
+        public string? IdentityDataProtected { get; set; }
+
+        /// <summary>Khóa ngẫu nhiên của ảnh CCCD đã mã hóa, lưu ngoài thư mục công khai.</summary>
+        [MaxLength(80)]
+        public string? CitizenIdFrontDocumentKey { get; set; }
+
+        [MaxLength(80)]
+        public string? CitizenIdBackDocumentKey { get; set; }
+
+        /// <summary>Thời điểm người đăng ký đồng ý xử lý dữ liệu CCCD.</summary>
+        public DateTime? IdentityDataConsentAt { get; set; }
+
         [Column(TypeName = "decimal(18,2)")]
         public decimal TotalReceived { get; set; } = 0;
 

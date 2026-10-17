@@ -43,6 +43,11 @@ namespace DonateWeb.Security.Controllers
         [HttpPost("moderation")]
         public IActionResult TestModeration([FromBody] TestModerationRequest request)
         {
+            if (!_environment.IsDevelopment())
+            {
+                return NotFound();
+            }
+
             if (string.IsNullOrWhiteSpace(request?.Text))
             {
                 return BadRequest(new { success = false, message = "Vui lòng truyền text để kiểm tra." });
@@ -77,6 +82,11 @@ namespace DonateWeb.Security.Controllers
         [HttpPost("rate-limit")]
         public IActionResult TestRateLimit()
         {
+            if (!_environment.IsDevelopment())
+            {
+                return NotFound();
+            }
+
             var clientIp = _rateLimiter.ResolveClientIp(HttpContext);
             var isAllowed = _rateLimiter.CheckLimit(
                 clientIp,

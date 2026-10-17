@@ -31,7 +31,7 @@ namespace DonateWeb.Services
 
             if (user == null)
             {
-                return (false, "Email hoặc Tên đăng nhập không tồn tại.", null, new List<string>());
+                return (false, "Tên đăng nhập/email hoặc mật khẩu không chính xác.", null, new List<string>());
             }
 
             if (!user.IsActive)
@@ -41,13 +41,13 @@ namespace DonateWeb.Services
 
             if (string.IsNullOrEmpty(user.PasswordHash))
             {
-                return (false, "Tài khoản này được đăng ký qua phương thức liên kết bên thứ 3 (OAuth). Vui lòng chọn đăng nhập bằng Google, Facebook hoặc YouTube.", null, new List<string>());
+                return (false, "Tài khoản này được đăng ký bằng đăng nhập bên thứ ba. Vui lòng chọn đúng nút Google hoặc Facebook.", null, new List<string>());
             }
 
             bool isPasswordValid = _passwordHasher.VerifyPassword(password, user.PasswordHash);
             if (!isPasswordValid)
             {
-                return (false, "Mật khẩu không chính xác.", null, new List<string>());
+                return (false, "Tên đăng nhập/email hoặc mật khẩu không chính xác.", null, new List<string>());
             }
 
             var roles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
@@ -224,15 +224,27 @@ namespace DonateWeb.Services
             }
 
             // 3. Tạo tài khoản mới từ OAuth
-            var baseUsername = !string.IsNullOrEmpty(displayName)
-                ? displayName.Replace(" ", "").ToLower()
-                : (email?.Split('@')[0] ?? $"user_{Guid.NewGuid().ToString("N")[..8]}");
+            // Dùng username hợp lệ theo quy tắc đăng ký DonateWeb, không lấy nguyên tên từ nhà cung cấp.
+            var usernameSource = email?.Split('@')[0] ?? displayName ?? string.Empty;
+            var usernameChars = usernameSource.ToLowerInvariant()
+                .Where(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-')
+                .ToArray();
+            var baseUsername = new string(usernameChars);
+            if (baseUsername.Length < 3)
+            {
+                baseUsername = $"{provider.ToLowerInvariant()}{baseUsername}";
+            }
+            if (baseUsername.Length > 40)
+            {
+                baseUsername = baseUsername[..40];
+            }
 
             var uniqueUsername = baseUsername;
             int counter = 1;
             while (await _context.Users.AnyAsync(u => u.Username.ToLower() == uniqueUsername.ToLower()))
             {
-                uniqueUsername = $"{baseUsername}{counter++}";
+                var suffix = (counter++).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                uniqueUsername = $"{baseUsername[..Math.Min(baseUsername.Length, 50 - suffix.Length)]}{suffix}";
             }
 
             var accountId = await _accountIdService.GenerateAccountIdAsync(isStreamer: false, DateTime.UtcNow.Year);
@@ -242,7 +254,9 @@ namespace DonateWeb.Services
                 AccountId = accountId,
                 Username = uniqueUsername,
                 Email = email ?? $"{uniqueUsername}@{provider.ToLower()}.oauth",
-                FullName = displayName ?? uniqueUsername,
+                FullName = string.IsNullOrWhiteSpace(displayName)
+                    ? uniqueUsername
+                    : displayName[..Math.Min(displayName.Length, 100)],
                 PasswordHash = null, // OAuth không cần mật khẩu ban đầu
                 AvatarUrl = !string.IsNullOrEmpty(avatarUrl) ? avatarUrl : "/images/default-avatar.png",
                 WalletBalance = 0,

@@ -20,9 +20,12 @@
     <a href="/Transactions" class="sidebar-icon @(currentPath.StartsWith("/transactions") ? "active" : "")" title="History">
         <i class="fa-solid fa-clock-rotate-left"></i>
     </a>
-    <a href="/Coupons" class="sidebar-icon @(currentPath.StartsWith("/coupons") ? "active" : "")" title="Coupon">
-        <i class="fa-solid fa-ticket"></i>
-    </a>
+    @if (User.IsInRole(DonateWeb.Models.Enums.UserRoles.Admin))
+    {
+        <a href="/Coupons" class="sidebar-icon @(currentPath.StartsWith("/coupons") ? "active" : "")" title="Quản lý mã giảm giá">
+            <i class="fa-solid fa-ticket"></i>
+        </a>
+    }
     <a href="/Effects" class="sidebar-icon @(currentPath.StartsWith("/effects") ? "active" : "")" title="Effects">
         <i class="fa-solid fa-wand-magic-sparkles"></i>
     </a>

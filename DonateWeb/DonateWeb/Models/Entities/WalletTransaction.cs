@@ -45,7 +45,7 @@ namespace DonateWeb.Models.Entities
         public decimal BalanceBefore { get; set; }
 
         /// <summary>
-        /// Số dư sau giao dịch (đồng bộ với User.WalletBalance)
+        /// Số dư sau giao dịch. Tùy TransactionType, đây là ví tiêu dùng hoặc doanh thu streamer.
         /// </summary>
         [Column(TypeName = "decimal(18,2)")]
         public decimal BalanceAfter { get; set; }

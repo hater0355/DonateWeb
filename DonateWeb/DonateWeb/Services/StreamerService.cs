@@ -74,6 +74,7 @@ namespace DonateWeb.Services
         {
             return await _context.StreamerProfiles
                 .Include(sp => sp.User)
+                .Where(sp => sp.IsActive && sp.ApprovalStatus == StreamerApprovalStatus.Approved)
                 .OrderByDescending(sp => sp.TotalReceived)
                 .ThenByDescending(sp => sp.FollowerCount)
                 .Take(count)
@@ -101,7 +102,8 @@ namespace DonateWeb.Services
             profile.Slug = newSlug;
             profile.DisplayName = model.DisplayName.Trim();
             profile.GreetingMessage = model.GreetingMessage.Trim();
-            profile.Bio = model.Bio; // Lưu nội dung HTML từ rich text editor (Bio / About Me)
+            // Chỉ lưu HTML an toàn từ rich text editor để chặn stored XSS trên trang công khai.
+            profile.Bio = ProfileBioSanitizer.Sanitize(model.Bio);
             if (!string.IsNullOrWhiteSpace(model.AvatarUrl))
             {
                 profile.AvatarUrl = model.AvatarUrl.Trim();
@@ -207,11 +209,12 @@ namespace DonateWeb.Services
                 await _context.Entry(profile).ReloadAsync();
                 if (profile.UserId != donorUser.Id)
                 {
+                    var streamerNet = DonationCommission.StreamerNet(model.Amount);
                     var credited = await _context.Users
                         .Where(user => user.Id == profile.UserId)
                         .ExecuteUpdateAsync(update => update.SetProperty(
-                            user => user.WalletBalance,
-                            user => user.WalletBalance + model.Amount));
+                            user => user.StreamerEarningsBalance,
+                            user => user.StreamerEarningsBalance + streamerNet));
 
                     if (credited > 0 && _context.Users.Local.FirstOrDefault(user => user.Id == profile.UserId) is { } trackedStreamer)
                     {
@@ -246,6 +249,7 @@ namespace DonateWeb.Services
                 CreatedAt = DateTime.UtcNow
             };
 
+            await SpecialEffectAssignment.ApplyToDonationAsync(_context, donation);
             _context.Donations.Add(donation);
             await _context.SaveChangesAsync();
             _context.TransactionAuditLogs.Add(new TransactionAuditLog
@@ -253,7 +257,7 @@ namespace DonateWeb.Services
                 DonationId = donation.Id,
                 TransactionCode = donation.TransactionCode,
                 ActionType = "CREATE_DONATION",
-                Note = $"Giao dịch Donate {donation.Amount:N0} VNĐ từ '{donation.DonorName}' cho kênh '{profile.DisplayName}' qua Ví DonateWeb.",
+                Note = $"Donate {donation.Amount:N0} VNĐ qua Ví DonateWeb. Phí nền tảng: {DonationCommission.PlatformFee(donation.Amount):N0} VNĐ; doanh thu streamer: {DonationCommission.StreamerNet(donation.Amount):N0} VNĐ.",
                 PerformedBy = donation.DonorName,
                 CreatedAt = DateTime.UtcNow
             });
@@ -262,7 +266,10 @@ namespace DonateWeb.Services
             return donation;
         }
 
-        public async Task<(bool Success, string Error, StreamerProfile? Profile)> RegisterStreamerAsync(int? currentUserId, StreamerRegisterViewModel model)
+        public async Task<(bool Success, string Error, StreamerProfile? Profile)> RegisterStreamerAsync(
+            int? currentUserId,
+            StreamerRegisterViewModel model,
+            StreamerIdentitySubmission identitySubmission)
         {
             var normalizedSlug = model.Slug.Trim().ToLower();
 
@@ -299,6 +306,8 @@ namespace DonateWeb.Services
 
                     // Nếu trước đó bị Rejected (từ chối), cho phép cập nhật lại thông tin và gửi lại yêu cầu duyệt
                     var existingProfile = targetUser.StreamerProfile;
+                    targetUser.FullName = model.FullName.Trim();
+                    targetUser.PhoneNumber = model.PhoneNumber.Trim();
                     existingProfile.Slug = normalizedSlug;
                     existingProfile.DisplayName = string.IsNullOrWhiteSpace(model.DisplayName) ? targetUser.FullName : model.DisplayName.Trim();
                     existingProfile.BankName = model.BankName.Trim();
@@ -307,6 +316,10 @@ namespace DonateWeb.Services
                     existingProfile.FacebookUrl = model.FacebookUrl?.Trim();
                     existingProfile.YoutubeUrl = model.YoutubeUrl?.Trim();
                     existingProfile.TiktokUrl = model.TiktokUrl?.Trim();
+                    existingProfile.IdentityDataProtected = identitySubmission.ProtectedData;
+                    existingProfile.CitizenIdFrontDocumentKey = identitySubmission.FrontDocumentKey;
+                    existingProfile.CitizenIdBackDocumentKey = identitySubmission.BackDocumentKey;
+                    existingProfile.IdentityDataConsentAt = identitySubmission.ConsentAtUtc;
                     existingProfile.ApprovalStatus = StreamerApprovalStatus.Pending;
                     existingProfile.RejectionReason = null;
                     existingProfile.UpdatedAt = DateTime.UtcNow;
@@ -400,6 +413,10 @@ namespace DonateWeb.Services
                 TiktokUrl = model.TiktokUrl?.Trim(),
                 IsVerified = false,
                 ApprovalStatus = StreamerApprovalStatus.Pending, // Chờ duyệt
+                IdentityDataProtected = identitySubmission.ProtectedData,
+                CitizenIdFrontDocumentKey = identitySubmission.FrontDocumentKey,
+                CitizenIdBackDocumentKey = identitySubmission.BackDocumentKey,
+                IdentityDataConsentAt = identitySubmission.ConsentAtUtc,
                 IsActive = true,
                 FollowerCount = 0,
                 Rank = 1,

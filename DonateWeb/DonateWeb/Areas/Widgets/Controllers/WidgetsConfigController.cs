@@ -160,14 +160,33 @@ namespace DonateWeb.Areas.Widgets.Controllers
             var slug = await GetOwnedStreamerSlugAsync();
             if (slug == null) return Forbid();
 
-            if (model.NewGoal == null || string.IsNullOrWhiteSpace(model.NewGoal.Title))
+            if (model.NewGoal == null)
             {
-                TempData["ErrorMessage"] = "Tiêu đề mục tiêu không được để trống!";
+                TempData["ErrorMessage"] = "Không nhận được dữ liệu mục tiêu. Vui lòng thử lại.";
                 return RedirectToAction(nameof(Goals));
             }
 
-            await _widgetService.SaveGoalAsync(slug, model.NewGoal);
-            TempData["SuccessMessage"] = "Lưu mục tiêu Donate thành công!";
+            if (!ModelState.IsValid)
+            {
+                var pageModel = await _widgetService.GetGoalManagementAsync(slug, GetBaseUrl());
+                pageModel.NewGoal = model.NewGoal;
+                pageModel.ErrorMessage = ModelState.Values
+                    .SelectMany(entry => entry.Errors)
+                    .Select(error => error.ErrorMessage)
+                    .FirstOrDefault(message => !string.IsNullOrWhiteSpace(message))
+                    ?? "Số tiền hoặc thông tin mục tiêu không hợp lệ. Vui lòng kiểm tra lại.";
+                return View("Goals", pageModel);
+            }
+
+            var saved = await _widgetService.SaveGoalAsync(slug, model.NewGoal);
+            if (saved)
+            {
+                TempData["SuccessMessage"] = "Lưu mục tiêu Donate thành công!";
+            }
+            else
+            {
+                TempData["ErrorMessage"] = "Không thể lưu mục tiêu. Hãy kiểm tra số tiền và thử lại.";
+            }
             return RedirectToAction(nameof(Goals));
         }
 

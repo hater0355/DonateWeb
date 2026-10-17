@@ -73,8 +73,12 @@
                         </h6>
                         <div class="small mb-1"><strong>Streamer:</strong> @Model.StreamerProfile.DisplayName</div>
                         <div class="small mb-1"><strong>Phương thức:</strong> 
-                            @(Model.PaymentMethod == "Wallet" ? "Ví số dư OnlyFan" : "Quét mã VietQR Napas247")
+                            @(Model.PaymentMethod == "Wallet" ? "Ví số dư OnlyFan" : Model.PaymentMethod == "PayOS" ? "PayOS QR" : Model.PaymentMethod == "Coupon" ? "Mã giảm giá" : "VietQR")
                         </div>
+                        @if (!string.IsNullOrWhiteSpace(Model.CouponCode))
+                        {
+                            <div class="small mb-1"><strong>Mã giảm giá:</strong> <span class="font-monospace text-success">@Model.CouponCode</span></div>
+                        }
                         <div class="small mb-1"><strong>Mã giao dịch:</strong> <span class="font-monospace text-muted">@Model.TransactionCode</span></div>
                         <div class="mt-2">
                             <a href="/Shop/StreamerShop?slug=@Model.StreamerProfile.Slug" class="btn btn-sm btn-outline-success rounded-pill px-3">
@@ -116,8 +120,19 @@
                         }
                     </tbody>
                     <tfoot class="bg-light">
+                        @if (Model.DiscountAmount > 0)
+                        {
+                            <tr>
+                                <td colspan="3" class="text-end small py-2">Tạm tính:</td>
+                                <td class="pe-3 text-end font-monospace py-2">@Model.SubtotalAmount.ToString("N0") VNĐ</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="text-end small text-success py-2">Giảm giá:</td>
+                                <td class="pe-3 text-end fw-semibold text-success font-monospace py-2">-@Model.DiscountAmount.ToString("N0") VNĐ</td>
+                            </tr>
+                        }
                         <tr>
-                            <td colspan="3" class="text-end fw-bold py-3">TỔNG CỘNG:</td>
+                            <td colspan="3" class="text-end fw-bold py-3">TỔNG THANH TOÁN:</td>
                             <td class="pe-3 text-end fw-bold text-dark-green fs-5 font-monospace py-3">
                                 @Model.TotalAmount.ToString("N0") VNĐ
                             </td>
@@ -136,3 +151,60 @@
         </div>
     </div>
 </div>
+
+@if (!isPaid && Model.PaymentMethod == "PayOS")
+{
+    <div id="payosOrderStatus" class="alert alert-info mt-3" data-order-code="@Model.OrderCode" role="status">
+        Đang chờ PayOS xác nhận. Trang này sẽ tự cập nhật khi thanh toán thành công.
+    </div>
+}
+
+@section Scripts {
+    @if (!isPaid && Model.PaymentMethod == "PayOS")
+    {
+        <script>
+            (() => {
+                const statusBox = document.getElementById("payosOrderStatus");
+                const orderCode = statusBox?.dataset.orderCode;
+                if (!statusBox || !orderCode) return;
+
+                let checks = 0;
+                let checking = false;
+                const timer = window.setInterval(async () => {
+                    if (checking) return;
+                    checking = true;
+                    checks++;
+                    try {
+                        const response = await fetch(`/Shop/CheckPaymentStatus?orderCode=${encodeURIComponent(orderCode)}`, {
+                            cache: "no-store",
+                            headers: { "Accept": "application/json" }
+                        });
+                        if (response.ok) {
+                            const result = await response.json();
+                            if (result.isPaid) {
+                                window.clearInterval(timer);
+                                statusBox.className = "alert alert-success mt-3";
+                                statusBox.textContent = "PayOS đã xác nhận thanh toán. Đang cập nhật hóa đơn...";
+                                window.setTimeout(() => window.location.reload(), 1200);
+                            } else if (result.status === "Cancelled") {
+                                window.clearInterval(timer);
+                                statusBox.className = "alert alert-warning mt-3";
+                                statusBox.textContent = "Thanh toán PayOS chưa được tạo. Vui lòng liên hệ gian hàng để được hỗ trợ.";
+                            }
+                        }
+                    } catch (error) {
+                        console.warn("Không kiểm tra được trạng thái đơn hàng:", error);
+                    } finally {
+                        checking = false;
+                        if (checks >= 200) {
+                            window.clearInterval(timer);
+                            if (statusBox.classList.contains("alert-info")) {
+                                statusBox.textContent = "Chưa nhận được xác nhận. Tải lại trang sau ít phút để kiểm tra trạng thái.";
+                            }
+                        }
+                    }
+                }, 3000);
+            })();
+        </script>
+    }
+}

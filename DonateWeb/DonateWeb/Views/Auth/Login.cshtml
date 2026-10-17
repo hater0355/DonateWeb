@@ -96,16 +96,6 @@
                         </button>
                     </form>
 
-                    <!-- Quick Demo Accounts -->
-                    <div class="mt-4 p-3 rounded-3 border" style="background-color: rgba(46,125,91,0.06); border-color: var(--border-color) !important;">
-                        <div class="small fw-bold text-dark-green mb-2"><i class="fa-solid fa-key text-warning me-1"></i> Tài khoản thử nghiệm (Test Accounts):</div>
-                        <div class="d-flex flex-wrap gap-2">
-                            <button type="button" class="btn btn-sm btn-outline-success rounded-pill" onclick="fillAccount('admin@donateweb.com', 'Admin@123')">Admin</button>
-                            <button type="button" class="btn btn-sm btn-outline-success rounded-pill" onclick="fillAccount('streamer@donateweb.com', 'Streamer@123')">Streamer (tenstreamer)</button>
-                            <button type="button" class="btn btn-sm btn-outline-success rounded-pill" onclick="fillAccount('viewer@donateweb.com', 'Viewer@123')">Viewer</button>
-                        </div>
-                    </div>
-
                     <!-- Divider for mobile -->
                     <div class="d-md-none border-bottom my-5"></div>
                     
@@ -115,7 +105,7 @@
 
                 <!-- Right Column (OAuth 3rd Party Login) -->
                 <div class="col-12 col-md-6 ps-md-4 d-flex flex-column">
-                    <h6 class="fw-semibold mb-3 text-dark-green opacity-75">Đăng nhập bằng bên thứ 3</h6>
+                    <h6 class="fw-semibold mb-3 text-dark-green opacity-75">Đăng nhập nhanh</h6>
                     
                     <!-- Social Buttons -->
                     <div class="d-flex flex-column gap-3 mb-4">
@@ -125,7 +115,6 @@
                             <i class="fa-brands fa-google fs-5" style="color: #DB4437;"></i>
                             <span class="fw-semibold">Đăng nhập bằng Google</span>
                         </a>
-
                         <a asp-controller="Auth" asp-action="ExternalLogin" asp-route-provider="Facebook" asp-route-returnUrl="@Model?.ReturnUrl"
                            class="btn btn-outline-secondary w-100 rounded-pill py-2 d-flex align-items-center justify-content-center gap-3 bg-white shadow-xs"
                            style="border-color: #dee2e6; color: var(--dark-green); text-decoration: none;">
@@ -133,12 +122,6 @@
                             <span class="fw-semibold">Đăng nhập bằng Facebook</span>
                         </a>
 
-                        <a asp-controller="Auth" asp-action="ExternalLogin" asp-route-provider="YouTube" asp-route-returnUrl="@Model?.ReturnUrl"
-                           class="btn btn-outline-secondary w-100 rounded-pill py-2 d-flex align-items-center justify-content-center gap-3 bg-white shadow-xs"
-                           style="border-color: #dee2e6; color: var(--dark-green); text-decoration: none;">
-                            <i class="fa-brands fa-youtube fs-5" style="color: #FF0000;"></i>
-                            <span class="fw-semibold">Đăng nhập bằng YouTube</span>
-                        </a>
                     </div>
 
                     <!-- Terms -->
@@ -169,10 +152,6 @@
         }
     }
 
-    function fillAccount(email, password) {
-        document.getElementById('UsernameOrEmail').value = email;
-        document.getElementById('passwordInput').value = password;
-    }
 </script>
 
 <style>

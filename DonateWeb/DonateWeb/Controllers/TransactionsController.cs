@@ -72,14 +72,22 @@ namespace DonateWeb.Controllers
             foreach (var wt in walletTxs)
             {
                 var isDeposit = wt.TransactionType == "DEPOSIT";
+                var isEarningsTransfer = wt.TransactionType == "EARNINGS_TRANSFER";
+                var isIncome = wt.TransactionType == "SHOP_SALE";
                 list.Add(new TransactionViewModel
                 {
                     TransactionId = wt.TransactionCode,
                     Time = wt.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss"),
-                    Type = isDeposit
-                        ? $"Nạp tiền vào ví ({wt.PaymentMethodName})"
-                        : $"Rút tiền về {wt.PaymentMethodName}",
-                    TotalAmount = (isDeposit ? "+" : "-") + wt.Amount.ToString("N0") + " VNĐ",
+                    Type = wt.TransactionType switch
+                    {
+                        "DEPOSIT" => $"Nạp tiền vào ví ({wt.PaymentMethodName})",
+                        "EARNINGS_TRANSFER" => "Chuyển doanh thu streamer sang ví donate",
+                        "WITHDRAW" => $"Rút tiền về {wt.PaymentMethodName}",
+                        "SHOP_SALE" => "Doanh thu bán hàng streamer",
+                        "PURCHASE" => "Mua hàng bằng ví donate",
+                        _ => wt.TransactionType
+                    },
+                    TotalAmount = ((isDeposit || isEarningsTransfer || isIncome) ? "+" : "-") + wt.Amount.ToString("N0") + " VNĐ",
                     Status = wt.Status == 1 ? "Thành công" : (wt.Status == 0 ? "Đang chờ duyệt" : "Đã từ chối")
                 });
             }

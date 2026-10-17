@@ -86,7 +86,7 @@
                                         </td>
                                         <td>
                                             <span class="badge bg-light text-dark border">
-                                                @(order.PaymentMethod == "Wallet" ? "Ví số dư" : "VietQR")
+                                                @(order.PaymentMethod == "Wallet" ? "Ví số dư" : order.PaymentMethod == "PayOS" ? "PayOS QR" : "VietQR")
                                             </span>
                                         </td>
                                         <td>
