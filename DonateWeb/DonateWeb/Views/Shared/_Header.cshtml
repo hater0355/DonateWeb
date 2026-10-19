@@ -4,6 +4,11 @@
 <!-- FILE: Views/Shared/_Header.cshtml -->
 <header class="navbar navbar-expand-lg header-custom sticky-top px-3">
     <div class="container-fluid align-items-center">
+        <!-- Menu mobile dùng thay thanh biểu tượng dọc trên màn hình nhỏ. -->
+        <button class="mobile-menu-trigger" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileQuickMenu" aria-controls="mobileQuickMenu" aria-label="Mở menu">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+
         <!-- Logo -->
         <a class="navbar-brand d-flex align-items-center gap-2 fw-bold text-dark-green" href="/">
             <i class="fa-solid fa-leaf text-primary-green"></i> ONLY FAN
@@ -18,7 +23,7 @@
         </ul>
 
         <!-- Thanh Tìm kiếm (Search Bar) -->
-        <form asp-controller="Home" asp-action="Index" method="get" class="header-search-form d-flex align-items-center me-3" role="search">
+        <form asp-controller="Home" asp-action="Index" method="get" class="header-search-form d-flex align-items-center me-3 @(Context.Request.Path.Value == "/" || Context.Request.Path.Value?.Equals("/Home/Index", StringComparison.OrdinalIgnoreCase) == true ? "mobile-home-search" : "")" role="search">
             <div class="input-group input-group-sm header-search-group rounded-pill">
                 <span class="input-group-text bg-transparent border-0 ps-3 pe-1 text-muted">
                     <i class="fa-solid fa-magnifying-glass text-primary-green"></i>
@@ -80,7 +85,10 @@
 
                 <div class="wallet-badge d-flex align-items-center gap-2 px-3 py-1 rounded-pill">
                     <i class="fa-solid fa-wallet text-success"></i>
-                    <span class="fw-bold" id="headerWalletBalance">Ví donate: @walletBalance VNĐ</span>
+                    <span class="fw-bold desktop-wallet-label" id="headerWalletBalance">Ví donate: @walletBalance VNĐ</span>
+                    <a class="mobile-wallet-badge" href="/Wallet" aria-label="Ví donate @walletBalance đồng">
+                        <i class="fa-solid fa-wallet"></i><span id="headerMobileWalletBalance">@walletBalance đ</span>
+                    </a>
                     @if (isStreamer)
                     {
                         <a href="/Wallet/Withdraw" class="badge bg-success text-white text-decoration-none ms-1 px-2 py-1 rounded-pill" title="Doanh thu và chuyển tiền streamer">
@@ -101,15 +109,15 @@
                         <span class="fw-semibold text-dark-green d-none d-md-inline-block">@fullName</span>
                         @if (isAdmin)
                         {
-                            <span class="badge bg-danger ms-1 small" style="font-size: 0.65rem;">Admin</span>
+                            <span class="badge bg-danger ms-1 small mobile-role-badge" style="font-size: 0.65rem;">Admin</span>
                         }
                         else if (isStreamer)
                         {
-                            <span class="badge bg-success ms-1 small" style="font-size: 0.65rem;">Streamer</span>
+                            <span class="badge bg-success ms-1 small mobile-role-badge" style="font-size: 0.65rem;">Streamer</span>
                         }
                         else
                         {
-                            <span class="badge bg-secondary ms-1 small" style="font-size: 0.65rem;">Viewer</span>
+                            <span class="badge bg-secondary ms-1 small mobile-role-badge" style="font-size: 0.65rem;">Viewer</span>
                         }
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end border-0 shadow-sm" style="min-width: 220px;">
@@ -132,9 +140,9 @@
                         
                         @if (isAdmin)
                         {
-                            <li><hr class="dropdown-divider"></li>
-                            <li><h6 class="dropdown-header text-uppercase text-danger" style="font-size: 0.7rem;"><i class="fa-solid fa-shield-halved me-1"></i> Quản trị hệ thống</h6></li>
-                            <li><a class="dropdown-item text-danger fw-semibold" href="/Admin"><i class="fa-solid fa-gauge-high me-2"></i>Trang Quản trị (Admin Panel)</a></li>
+                            <li class="mobile-admin-only"><hr class="dropdown-divider"></li>
+                            <li class="mobile-admin-only"><h6 class="dropdown-header text-uppercase text-danger" style="font-size: 0.7rem;"><i class="fa-solid fa-shield-halved me-1"></i> Quản trị hệ thống</h6></li>
+                            <li class="mobile-admin-only"><a class="dropdown-item text-danger fw-semibold" href="/Admin"><i class="fa-solid fa-gauge-high me-2"></i>Trang Quản trị (Admin Panel)</a></li>
                         }
 
                         @if (isStreamer)
@@ -145,11 +153,11 @@
                             <li><a class="dropdown-item fw-semibold text-primary" href="/Wallet/Withdraw"><i class="fa-solid fa-money-bill-transfer me-2"></i>Rút tiền doanh thu</a></li>
                             <li><a class="dropdown-item" href="/Streamer/Config"><i class="fa-solid fa-sliders me-2 text-muted"></i>Cấu hình nâng cao</a></li>
                             <li><a class="dropdown-item" href="/Streamer/Overview"><i class="fa-solid fa-chart-line me-2 text-muted"></i>Thống kê donate</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><h6 class="dropdown-header text-uppercase" style="font-size: 0.7rem;">Tiện ích OBS (Widgets)</h6></li>
-                            <li><a class="dropdown-item" href="/Widgets/Config/AlertBox"><i class="fa-solid fa-bell me-2 text-warning"></i>Cài đặt Alert Box OBS</a></li>
-                            <li><a class="dropdown-item" href="/Widgets/Config/Goals"><i class="fa-solid fa-bullseye me-2 text-success"></i>Mục tiêu Donate (Goal)</a></li>
-                            <li><a class="dropdown-item" href="/Widgets/Config/Leaderboard"><i class="fa-solid fa-trophy me-2 text-info"></i>Bảng xếp hạng OBS</a></li>
+                            <li class="mobile-obs-only"><hr class="dropdown-divider"></li>
+                            <li class="mobile-obs-only"><h6 class="dropdown-header text-uppercase" style="font-size: 0.7rem;">Tiện ích OBS (Widgets)</h6></li>
+                            <li class="mobile-obs-only"><a class="dropdown-item" href="/Widgets/Config/AlertBox"><i class="fa-solid fa-bell me-2 text-warning"></i>Cài đặt Alert Box OBS</a></li>
+                            <li class="mobile-obs-only"><a class="dropdown-item" href="/Widgets/Config/Goals"><i class="fa-solid fa-bullseye me-2 text-success"></i>Mục tiêu Donate (Goal)</a></li>
+                            <li class="mobile-obs-only"><a class="dropdown-item" href="/Widgets/Config/Leaderboard"><i class="fa-solid fa-trophy me-2 text-info"></i>Bảng xếp hạng OBS</a></li>
                         }
                         else
                         {

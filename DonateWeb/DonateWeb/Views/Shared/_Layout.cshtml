@@ -10,13 +10,20 @@
     <link rel="stylesheet" href="~/lib/fontawesome/css/all.min.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
-<body>
+@{
+    var isWidgetsArea = string.Equals(ViewContext.RouteData.Values["area"]?.ToString(), "Widgets", StringComparison.OrdinalIgnoreCase);
+}
+<body class="@(isWidgetsArea ? "desktop-widget-layout" : "")">
     <div class="animated-bg-container">
         <div class="moving-bar bar-1"></div>
         <div class="moving-bar bar-2"></div>
         <div class="moving-bar bar-3"></div>
     </div>
     @await Html.PartialAsync("_Header")
+    @if (!isWidgetsArea)
+    {
+        @await Html.PartialAsync("_MobileNavigation")
+    }
 
     <div class="d-flex main-wrapper">
         @await Html.PartialAsync("_Sidebar")

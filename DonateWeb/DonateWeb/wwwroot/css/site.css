@@ -529,3 +529,623 @@ body.dark-theme .accordion-body {
     background-color: #10b981 !important;
 }
 
+/* ====================================================================
+   MOBILE APP SHELL (Figma 390px)
+   Không thay đổi bố cục hiện tại từ breakpoint desktop 992px trở lên.
+   ==================================================================== */
+.mobile-menu-trigger,
+.mobile-wallet-badge,
+.mobile-bottom-nav,
+.mobile-quick-menu {
+    display: none;
+}
+
+@media (max-width: 991.98px) {
+    html,
+    body {
+        min-width: 320px;
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    .header-custom {
+        min-height: 0;
+        padding: 0.55rem 0.75rem !important;
+        z-index: 1030;
+    }
+
+    .header-custom > .container-fluid {
+        display: grid !important;
+        grid-template-columns: 36px minmax(0, 1fr) auto;
+        grid-template-areas:
+            "trigger brand actions"
+            "search search search";
+        gap: 0.55rem 0.65rem;
+        padding: 0;
+        flex-wrap: unset;
+    }
+
+    .mobile-menu-trigger {
+        grid-area: trigger;
+        display: inline-flex;
+        width: 36px;
+        height: 36px;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--dark-green);
+        font-size: 1.1rem;
+    }
+
+    .header-custom .navbar-brand {
+        grid-area: brand;
+        min-width: 0;
+        margin: 0;
+        gap: 0.35rem !important;
+        font-size: 0.95rem;
+        white-space: nowrap;
+    }
+
+    .header-custom .header-nav {
+        display: none !important;
+    }
+
+    .header-custom .header-search-form {
+        display: none !important;
+        grid-area: search;
+        width: 100%;
+        min-width: 0;
+        margin: 0 !important;
+    }
+
+    .header-custom .header-search-form.mobile-home-search {
+        display: flex !important;
+    }
+
+    .header-custom .header-search-group {
+        width: 100%;
+        min-width: 0;
+        min-height: 40px;
+    }
+
+    .header-custom .header-search-input {
+        min-width: 0;
+        font-size: 16px;
+    }
+
+    .header-custom .header-actions {
+        grid-area: actions;
+        display: flex !important;
+        min-width: 0;
+        gap: 0.45rem !important;
+        align-items: center;
+    }
+
+    .header-custom .wallet-badge {
+        display: inline-flex !important;
+        gap: 0 !important;
+        padding: 0 !important;
+        border: 0;
+        background: transparent;
+        white-space: nowrap;
+    }
+
+    .header-custom .wallet-badge > i,
+    .header-custom .desktop-wallet-label,
+    .header-custom .wallet-badge > a:not(.mobile-wallet-badge) {
+        display: none !important;
+    }
+
+    .header-custom .mobile-wallet-badge {
+        display: inline-flex;
+        min-height: 34px;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.35rem 0.6rem;
+        border: 1px solid var(--border-color);
+        border-radius: 999px;
+        background: var(--light-green);
+        color: var(--dark-green);
+        font-size: 0.74rem;
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .header-custom .header-actions > .dropdown > a {
+        display: inline-flex !important;
+        align-items: center;
+        min-height: 36px;
+    }
+
+    .header-custom .header-actions > .dropdown img {
+        width: 34px !important;
+        height: 34px !important;
+        margin: 0 !important;
+    }
+
+    .header-custom .header-actions > .dropdown > a > .fw-semibold {
+        display: none !important;
+    }
+
+    .header-custom .header-actions .mobile-role-badge,
+    .header-custom .header-actions .dropdown-toggle::after {
+        display: none !important;
+    }
+
+    .header-custom .header-actions > .d-flex > a {
+        padding: 0.35rem 0.55rem !important;
+        font-size: 0.72rem;
+        white-space: nowrap;
+    }
+
+    .header-custom .header-actions .dropdown-menu {
+        max-width: calc(100vw - 1rem);
+        max-height: calc(100dvh - 100px);
+        overflow-y: auto;
+    }
+
+    /* Trên điện thoại, Admin dùng đúng thanh điều hướng Viewer; quyền máy chủ không đổi. */
+    .header-custom .mobile-admin-only,
+    .header-custom .mobile-obs-only {
+        display: none !important;
+    }
+
+    .main-wrapper {
+        display: block !important;
+        min-height: calc(100dvh - 58px);
+    }
+
+    .sidebar-custom {
+        display: none !important;
+    }
+
+    .main-content {
+        width: 100%;
+        min-width: 0;
+        padding: 0.9rem 0.8rem calc(5.6rem + env(safe-area-inset-bottom)) !important;
+        overflow-x: clip;
+    }
+
+    .main-content > *,
+    .main-content .container,
+    .main-content .container-fluid,
+    .main-content .row,
+    .main-content [class*="col-"] {
+        min-width: 0;
+    }
+
+    .main-content .container,
+    .main-content .container-fluid {
+        max-width: 100%;
+    }
+
+    .mobile-bottom-nav {
+        position: fixed;
+        z-index: 1020;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        padding: 0.35rem 0.4rem calc(0.35rem + env(safe-area-inset-bottom));
+        border-top: 1px solid rgba(163, 199, 181, 0.72);
+        background: rgba(255, 255, 255, 0.97);
+        box-shadow: 0 -4px 18px rgba(31, 69, 47, 0.08);
+        backdrop-filter: blur(12px);
+    }
+
+    .mobile-bottom-nav-link {
+        display: flex;
+        min-width: 0;
+        min-height: 48px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.18rem;
+        padding: 0.2rem 0.05rem;
+        border: 0;
+        border-radius: 12px;
+        background: transparent;
+        color: #60776a;
+        font: inherit;
+        font-size: 0.67rem;
+        font-weight: 600;
+        line-height: 1.1;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .mobile-bottom-nav-link i {
+        font-size: 1.05rem;
+    }
+
+    .mobile-bottom-nav-link.active {
+        background: #e6f0e9;
+        color: var(--dark-green);
+    }
+
+    .mobile-quick-menu {
+        display: flex;
+        width: min(340px, 88vw);
+        color: var(--dark-green);
+        background: #fff;
+    }
+
+    .mobile-menu-heading {
+        margin: 0 0 0.75rem;
+        color: #60776a;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .mobile-quick-links {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+
+    .mobile-quick-links > a,
+    .mobile-logout-form > button,
+    .mobile-theme-toggle {
+        display: flex;
+        width: 100%;
+        min-height: 48px;
+        align-items: center;
+        gap: 0.85rem;
+        padding: 0.65rem 0.8rem;
+        border: 0;
+        border-radius: 12px;
+        background: transparent;
+        color: var(--dark-green);
+        font: inherit;
+        text-align: left;
+        text-decoration: none;
+    }
+
+    .mobile-quick-links > a:hover,
+    .mobile-logout-form > button:hover,
+    .mobile-theme-toggle:hover {
+        background: var(--light-green);
+    }
+
+    .mobile-quick-links > a > i,
+    .mobile-logout-form > button > i,
+    .mobile-theme-toggle > i {
+        width: 1.25rem;
+        color: var(--primary-green);
+        text-align: center;
+    }
+
+    .mobile-logout-form {
+        margin: 0;
+    }
+
+    .mobile-logout-form > button {
+        color: #b42335;
+    }
+
+    .mobile-logout-form > button > i {
+        color: #b42335;
+    }
+
+    /* Form fields, tables and dialogs remain usable inside the viewport. */
+    .main-content input:not([type="checkbox"]):not([type="radio"]),
+    .main-content select,
+    .main-content textarea {
+        max-width: 100%;
+        font-size: 16px;
+    }
+
+    .main-content .form-control,
+    .main-content .form-select,
+    .main-content .btn {
+        max-width: 100%;
+    }
+
+    .main-content .table-responsive {
+        max-width: 100%;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .main-content table {
+        max-width: 100%;
+    }
+
+    .main-content .input-group > .form-control,
+    .main-content .input-group > .form-select,
+    .main-content .input-group > .btn {
+        min-width: 0;
+    }
+
+    .main-content .alert,
+    .main-content .badge {
+        overflow-wrap: anywhere;
+    }
+
+    .main-content .modal-dialog {
+        width: auto;
+        max-width: calc(100vw - 1rem);
+        margin: 0.5rem auto;
+    }
+
+    .main-content .modal-content {
+        max-height: calc(100dvh - 1rem);
+        overflow-y: auto;
+    }
+
+    .main-content .modal-body {
+        min-width: 0;
+        overflow-x: hidden;
+    }
+
+    .main-content img,
+    .main-content video,
+    .main-content canvas {
+        max-width: 100%;
+    }
+
+    .main-content [style*="min-width: 280px"],
+    .main-content [style*="min-width: 320px"] {
+        min-width: 0 !important;
+        width: 100%;
+    }
+
+    .main-content .btn-group,
+    .main-content .nav-tabs,
+    .main-content .orders-nav-tabs {
+        max-width: 100%;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+
+    .main-content .orders-nav-tabs .nav-link {
+        padding: 0.55rem 0.75rem;
+    }
+
+    .main-content h1,
+    .main-content .display-6 {
+        font-size: clamp(1.35rem, 6vw, 1.8rem);
+        overflow-wrap: anywhere;
+    }
+
+    .main-content h2 {
+        font-size: clamp(1.25rem, 5vw, 1.6rem);
+        overflow-wrap: anywhere;
+    }
+
+    .main-content .card-body {
+        min-width: 0;
+    }
+
+    .main-content .donate-campaign-banner {
+        min-height: 145px;
+        padding: 1.5rem 1rem;
+    }
+
+    .main-content .donate-campaign-banner h2 {
+        font-size: 1.2rem !important;
+        overflow-wrap: anywhere;
+    }
+
+    /* Các mã QR trong trang donate co theo chiều rộng thiết bị. */
+    .main-content #sideQrPlaceholder {
+        min-width: 0 !important;
+        width: 100%;
+    }
+
+    .main-content #sideGeneratedQrImg,
+    .main-content #modalVietQrImage {
+        min-width: 0 !important;
+        width: min(100%, 240px);
+        height: auto;
+    }
+
+    .main-content .qr-image-wrapper {
+        min-width: 0 !important;
+        max-width: 100%;
+    }
+
+    .main-content .qr-image-wrapper img {
+        width: min(260px, 100%) !important;
+        height: auto !important;
+        aspect-ratio: 1;
+        object-fit: contain;
+    }
+
+    .main-content .sticky-cart-sidebar {
+        position: static;
+        top: auto;
+    }
+
+    .main-content .orders-hero {
+        padding: 1.15rem;
+        border-radius: 16px;
+    }
+
+    .main-content .orders-hero .display-6 {
+        font-size: 1.45rem;
+    }
+
+    body.dark-theme .mobile-bottom-nav,
+    body.dark-theme .mobile-quick-menu {
+        background: #161d19;
+        border-color: #24352b;
+        color: #e0e0e0;
+    }
+
+    body.dark-theme .mobile-bottom-nav-link,
+    body.dark-theme .mobile-quick-links > a,
+    body.dark-theme .mobile-theme-toggle {
+        color: #b9c7be;
+    }
+
+    body.dark-theme .mobile-bottom-nav-link.active,
+    body.dark-theme .mobile-quick-links > a:hover,
+    body.dark-theme .mobile-theme-toggle:hover {
+        background: #24352b;
+        color: #a9dbbb;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .header-custom {
+        padding-right: 0.65rem !important;
+        padding-left: 0.65rem !important;
+    }
+
+    .header-custom > .container-fluid {
+        grid-template-columns: 34px minmax(0, 1fr) auto;
+        column-gap: 0.45rem;
+    }
+
+    .header-custom .navbar-brand {
+        font-size: 0.88rem;
+    }
+
+    .header-custom .mobile-wallet-badge {
+        padding: 0.32rem 0.48rem;
+        font-size: 0.69rem;
+    }
+
+    .main-content {
+        padding-right: 0.65rem;
+        padding-left: 0.65rem;
+    }
+
+    .main-content .row {
+        --bs-gutter-x: 0.85rem;
+        --bs-gutter-y: 0.85rem;
+    }
+
+    .main-content .card-body {
+        padding: 1rem !important;
+    }
+
+    .main-content .orders-hero .badge {
+        white-space: normal;
+    }
+
+    .main-content .modal-dialog {
+        max-width: calc(100vw - 0.75rem);
+        margin: 0.375rem auto;
+    }
+
+    .main-content .modal-content {
+        max-height: calc(100dvh - 0.75rem);
+    }
+
+    .main-content .table-responsive table {
+        font-size: 0.82rem;
+    }
+}
+
+/* Widget/OBS pages keep their existing small-screen shell. */
+@media (max-width: 991.98px) {
+    body.desktop-widget-layout .mobile-menu-trigger,
+    body.desktop-widget-layout .mobile-bottom-nav,
+    body.desktop-widget-layout .mobile-quick-menu {
+        display: none !important;
+    }
+
+    body.desktop-widget-layout .header-custom > .container-fluid {
+        display: flex !important;
+        grid-template-columns: none;
+        grid-template-areas: none;
+        gap: 0;
+        flex-wrap: wrap;
+    }
+
+    body.desktop-widget-layout .header-custom .navbar-brand,
+    body.desktop-widget-layout .header-custom .header-search-form,
+    body.desktop-widget-layout .header-custom .header-actions {
+        grid-area: auto;
+    }
+
+    body.desktop-widget-layout .header-custom .navbar-brand {
+        margin-right: 1rem;
+    }
+
+    body.desktop-widget-layout .header-custom .header-search-form {
+        display: flex !important;
+        flex: 0 1 260px;
+        width: auto;
+        min-width: 180px;
+        margin-right: 1rem !important;
+    }
+
+    body.desktop-widget-layout .header-custom .header-actions {
+        display: flex !important;
+        flex-wrap: wrap;
+        gap: 0.75rem !important;
+    }
+
+    body.desktop-widget-layout .header-custom .wallet-badge {
+        display: inline-flex !important;
+        gap: 0.5rem !important;
+        padding: 0.25rem 0.65rem !important;
+        border: 1px solid var(--border-color);
+        background: var(--light-green);
+    }
+
+    body.desktop-widget-layout .header-custom .wallet-badge > i,
+    body.desktop-widget-layout .header-custom .desktop-wallet-label,
+    body.desktop-widget-layout .header-custom .wallet-badge > a:not(.mobile-wallet-badge) {
+        display: inline-block !important;
+    }
+
+    body.desktop-widget-layout .header-custom .mobile-wallet-badge {
+        display: none !important;
+    }
+
+    body.desktop-widget-layout .header-custom .header-actions > .dropdown > a > .fw-semibold {
+        display: none !important;
+    }
+
+    body.desktop-widget-layout .header-custom .header-actions .mobile-role-badge,
+    body.desktop-widget-layout .header-custom .header-actions .dropdown-toggle::after {
+        display: inline-block !important;
+    }
+
+    body.desktop-widget-layout .main-wrapper {
+        display: flex !important;
+        min-height: calc(100vh - 70px);
+    }
+
+    body.desktop-widget-layout .sidebar-custom {
+        display: flex !important;
+        width: 70px;
+        position: sticky;
+        top: 70px;
+        height: calc(100vh - 70px);
+    }
+
+    body.desktop-widget-layout .main-content {
+        width: auto;
+        padding: 1.5rem !important;
+        overflow: visible;
+    }
+
+    body.desktop-widget-layout .header-custom .mobile-admin-only,
+    body.desktop-widget-layout .header-custom .mobile-obs-only {
+        display: none !important;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+    body.desktop-widget-layout .header-custom .header-actions > .dropdown > a > .fw-semibold.d-md-inline-block {
+        display: inline-block !important;
+    }
+}
+
+@media (max-width: 767.98px) {
+    body.desktop-widget-layout .sidebar-custom {
+        width: 50px;
+    }
+}
+

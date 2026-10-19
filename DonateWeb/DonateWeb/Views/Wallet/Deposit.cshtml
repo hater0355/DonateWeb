@@ -980,6 +980,10 @@
             if (headerBalanceEl && newBalance !== undefined && newBalance !== null) {
                 headerBalanceEl.textContent = `Ví: ${Number(newBalance).toLocaleString('vi-VN')} VNĐ`;
             }
+            const mobileHeaderBalanceEl = document.getElementById('headerMobileWalletBalance');
+            if (mobileHeaderBalanceEl && newBalance !== undefined && newBalance !== null) {
+                mobileHeaderBalanceEl.textContent = `${Number(newBalance).toLocaleString('vi-VN')} đ`;
+            }
 
             // 2. Cập nhật số dư ở Banner
             const bannerBalanceEl = document.getElementById('currentBalanceDisplay');

@@ -1,0 +1,100 @@
+@using DonateWeb.Models.Enums
+@{
+    var currentPath = Context.Request.Path.Value?.ToLowerInvariant() ?? "/";
+    var isAdmin = User.IsInRole(UserRoles.Admin);
+    var isStreamer = User.IsInRole(UserRoles.Streamer) && !isAdmin;
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var profileUrl = User.FindFirst("StreamerSlug")?.Value;
+    var isHome = currentPath == "/" || currentPath.StartsWith("/home");
+    var isProfile = currentPath.StartsWith("/profile")
+        || (isStreamer && currentPath.StartsWith("/streamer/donate"))
+        || (isStreamer && !string.IsNullOrWhiteSpace(profileUrl) && currentPath == "/" + profileUrl.ToLowerInvariant());
+    var isWallet = currentPath.StartsWith("/wallet");
+    var isOrders = currentPath.StartsWith("/orders") || currentPath.StartsWith("/shop/history");
+}
+
+<!-- Thanh điều hướng cố định theo thiết kế mobile Figma. -->
+<nav class="mobile-bottom-nav" aria-label="Điều hướng chính">
+    <a class="mobile-bottom-nav-link @(isHome ? "active" : "")" href="/" aria-current="@(isHome ? "page" : null)">
+        <i class="fa-solid fa-house" aria-hidden="true"></i><span>Home</span>
+    </a>
+    <a class="mobile-bottom-nav-link @(isProfile ? "active" : "")" href="/Profile" aria-current="@(isProfile ? "page" : null)">
+        <i class="fa-regular fa-user" aria-hidden="true"></i><span>Hồ sơ</span>
+    </a>
+    <a class="mobile-bottom-nav-link @(isWallet ? "active" : "")" href="/Wallet" aria-current="@(isWallet ? "page" : null)">
+        <i class="fa-solid fa-wallet" aria-hidden="true"></i><span>Ví tiền</span>
+    </a>
+    <a class="mobile-bottom-nav-link @(isOrders ? "active" : "")" href="/Orders" aria-current="@(isOrders ? "page" : null)">
+        <i class="fa-solid fa-receipt" aria-hidden="true"></i><span>Đơn hàng</span>
+    </a>
+    <button class="mobile-bottom-nav-link" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileQuickMenu" aria-controls="mobileQuickMenu">
+        <i class="fa-solid fa-ellipsis" aria-hidden="true"></i><span>Thêm</span>
+    </button>
+</nav>
+
+<!-- Menu nhanh gom các trang ngoài 5 mục chính. Không đưa Admin/OBS lên mobile. -->
+<div class="offcanvas offcanvas-start mobile-quick-menu" tabindex="-1" id="mobileQuickMenu" aria-labelledby="mobileQuickMenuLabel">
+    <div class="offcanvas-header border-bottom">
+        <a class="navbar-brand d-flex align-items-center gap-2 fw-bold text-dark-green mb-0" href="/">
+            <i class="fa-solid fa-leaf text-primary-green"></i> ONLY FAN
+        </a>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Đóng menu"></button>
+    </div>
+    <div class="offcanvas-body d-flex flex-column">
+        <h2 class="mobile-menu-heading" id="mobileQuickMenuLabel">Menu</h2>
+        <div class="mobile-quick-links">
+            <a href="/Shop"><i class="fa-solid fa-store"></i><span>Cửa hàng</span></a>
+            <a href="/Guides"><i class="fa-solid fa-book-open"></i><span>Hướng dẫn</span></a>
+            <a href="/Effects"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Hiệu ứng</span></a>
+            @if (isStreamer)
+            {
+                <a href="/@(string.IsNullOrWhiteSpace(profileUrl) ? "Streamer/Donate" : profileUrl)"><i class="fa-solid fa-id-card"></i><span>Trang streamer</span></a>
+                <a href="/Streamer/Overview"><i class="fa-solid fa-chart-line"></i><span>Thống kê streamer</span></a>
+                <a href="/Streamer/Config"><i class="fa-solid fa-sliders"></i><span>Cấu hình kênh</span></a>
+                <a href="/Shop/MyProducts"><i class="fa-solid fa-boxes-stacked"></i><span>Sản phẩm của tôi</span></a>
+            }
+            else
+            {
+                <a href="/Streamer/Register"><i class="fa-solid fa-video"></i><span>Đăng ký Streamer</span></a>
+            }
+            @if (isAuthenticated)
+            {
+                <a href="/Transactions"><i class="fa-solid fa-clock-rotate-left"></i><span>Lịch sử giao dịch</span></a>
+                <a href="/Shop/History"><i class="fa-solid fa-bag-shopping"></i><span>Lịch sử mua hàng</span></a>
+                <form asp-controller="Auth" asp-action="Logout" method="post" class="mobile-logout-form">
+                    @Html.AntiForgeryToken()
+                    <button type="submit"><i class="fa-solid fa-right-from-bracket"></i><span>Đăng xuất</span></button>
+                </form>
+            }
+            else
+            {
+                <a href="/Auth/Login"><i class="fa-solid fa-right-to-bracket"></i><span>Đăng nhập</span></a>
+                <a href="/Auth/Register"><i class="fa-solid fa-user-plus"></i><span>Đăng ký tài khoản</span></a>
+            }
+        </div>
+        <div class="mt-auto pt-3 border-top">
+            <button type="button" class="mobile-theme-toggle" id="mobileThemeToggleBtn">
+                <i class="fa-solid fa-moon"></i><span>Đổi giao diện sáng/tối</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const button = document.getElementById('mobileThemeToggleBtn');
+        if (!button) return;
+        const icon = button.querySelector('i');
+        const syncIcon = () => {
+            const dark = document.body.classList.contains('dark-theme');
+            icon.classList.toggle('fa-sun', dark);
+            icon.classList.toggle('fa-moon', !dark);
+        };
+        syncIcon();
+        button.addEventListener('click', function () {
+            const dark = document.body.classList.toggle('dark-theme');
+            localStorage.setItem('theme', dark ? 'dark' : 'light');
+            syncIcon();
+        });
+    });
+</script>
