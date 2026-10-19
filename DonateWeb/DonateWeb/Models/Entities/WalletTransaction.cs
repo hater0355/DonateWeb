@@ -25,6 +25,25 @@ namespace DonateWeb.Models.Entities
         /// </summary>
         public long? OrderCode { get; set; }
 
+        [MaxLength(2000)]
+        public string? PaymentQrCode { get; set; }
+
+        [MaxLength(1000)]
+        public string? PaymentCheckoutUrl { get; set; }
+
+        [MaxLength(20)]
+        public string? PaymentBankId { get; set; }
+
+        [MaxLength(50)]
+        public string? PaymentAccountNo { get; set; }
+
+        [MaxLength(100)]
+        public string? PaymentAccountName { get; set; }
+
+        public DateTime? FailedAt { get; set; }
+
+        public DateTime? CompletedAt { get; set; }
+
         /// <summary>
         /// Loại giao dịch: "DEPOSIT" (Nạp tiền), "WITHDRAW" (Rút tiền)
         /// </summary>

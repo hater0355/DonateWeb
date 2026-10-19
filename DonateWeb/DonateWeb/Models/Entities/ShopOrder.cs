@@ -14,6 +14,12 @@ namespace DonateWeb.Models.Entities
         [MaxLength(50)]
         public string OrderCode { get; set; } = string.Empty;
 
+        /// <summary>
+        /// SHA-256 hash of a random guest access token. Null for account-owned orders.
+        /// </summary>
+        [MaxLength(64)]
+        public string? GuestAccessTokenHash { get; set; }
+
         public int StreamerProfileId { get; set; }
         [ForeignKey("StreamerProfileId")]
         public virtual StreamerProfile StreamerProfile { get; set; } = null!;

@@ -4,8 +4,9 @@
     var orderCode = ViewBag.OrderCode;
     var balance = ViewBag.WalletBalance ?? Model?.WalletBalance ?? 0;
     var isPaid = tx?.Status == DonateWeb.Models.Entities.WalletTransaction.StatusCompleted;
+    var isFailed = tx?.Status == DonateWeb.Models.Entities.WalletTransaction.StatusFailed;
     var hasTransaction = tx != null;
-    ViewData["Title"] = isPaid ? "Nạp tiền thành công" : "Đang xác nhận nạp tiền";
+    ViewData["Title"] = isPaid ? "Nạp tiền thành công" : isFailed ? "Nạp tiền thất bại" : "Đang xác nhận nạp tiền";
 }
 
 <div class="container py-5">
@@ -13,14 +14,14 @@
         <div class="col-12 col-md-8 col-lg-6">
             <div class="card card-custom bg-white border-0 shadow-lg p-4 p-md-5 text-center rounded-4">
                 <div class="mb-4">
-                    <div id="depositStatusIcon" class="mx-auto rounded-circle @(isPaid ? "bg-success-subtle text-success" : "bg-warning-subtle text-warning") d-flex align-items-center justify-content-center shadow-sm" style="width: 90px; height: 90px; font-size: 3rem;">
-                        <i class="fa-solid @(isPaid ? "fa-circle-check" : "fa-clock")"></i>
+                    <div id="depositStatusIcon" class="mx-auto rounded-circle @(isPaid ? "bg-success-subtle text-success" : isFailed ? "bg-danger-subtle text-danger" : "bg-warning-subtle text-warning") d-flex align-items-center justify-content-center shadow-sm" style="width: 90px; height: 90px; font-size: 3rem;">
+                        <i class="fa-solid @(isPaid ? "fa-circle-check" : isFailed ? "fa-circle-xmark" : "fa-clock")"></i>
                     </div>
                 </div>
 
-                <h3 id="depositStatusTitle" class="fw-bold text-dark-green mb-2">@(isPaid ? "NẠP TIỀN THÀNH CÔNG!" : hasTransaction ? "ĐANG CHỜ XÁC NHẬN" : "KHÔNG TÌM THẤY GIAO DỊCH")</h3>
+                <h3 id="depositStatusTitle" class="fw-bold text-dark-green mb-2">@(isPaid ? "NẠP TIỀN THÀNH CÔNG!" : isFailed ? "THANH TOÁN THẤT BẠI" : hasTransaction ? "ĐANG CHỜ XÁC NHẬN" : "KHÔNG TÌM THẤY GIAO DỊCH")</h3>
                 <p id="depositStatusMessage" class="text-muted mb-4">
-                    @(isPaid ? "PayOS đã xác nhận thanh toán và số tiền đã được ghi nhận vào ví của bạn." : hasTransaction ? "PayOS đã chuyển bạn quay lại. Chúng tôi đang chờ xác nhận thanh toán từ hệ thống; số dư chỉ thay đổi sau khi xác minh hoàn tất." : "Không tìm thấy giao dịch nạp tiền thuộc tài khoản của bạn.")
+                    @(isPaid ? "PayOS đã xác nhận thanh toán và số tiền đã được ghi nhận vào ví của bạn." : isFailed ? "Mã thanh toán đã hết hạn sau 10 phút mà chưa nhận được xác nhận. Vui lòng tạo mã mới nếu bạn vẫn muốn nạp tiền." : hasTransaction ? "PayOS đã chuyển bạn quay lại. Chúng tôi đang chờ xác nhận thanh toán từ hệ thống; số dư chỉ thay đổi sau khi xác minh hoàn tất." : "Không tìm thấy giao dịch nạp tiền thuộc tài khoản của bạn.")
                 </p>
 
                 <div class="bg-light rounded-3 p-3 p-md-4 text-start mb-4 border">
@@ -48,7 +49,7 @@
                     </div>
                 </div>
 
-                @if (hasTransaction && !isPaid)
+                @if (hasTransaction && tx!.Status == DonateWeb.Models.Entities.WalletTransaction.StatusPending)
                 {
                     <p id="depositPollingStatus" class="small text-muted" role="status">Đang tự động kiểm tra trạng thái giao dịch...</p>
                 }
@@ -63,7 +64,7 @@
     </div>
 </div>
 
-@if (hasTransaction && !isPaid)
+@if (hasTransaction && tx!.Status == DonateWeb.Models.Entities.WalletTransaction.StatusPending)
 {
     <script>
         (() => {
@@ -84,6 +85,8 @@
                     }
                     const result = await response.json();
                     if (result.isPaid) {
+                        window.location.reload();
+                    } else if (result.status === 2) {
                         window.location.reload();
                     }
                 } catch {

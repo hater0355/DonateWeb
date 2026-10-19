@@ -107,10 +107,12 @@ namespace DonateWeb.Security.Webhook
                     walletTx = await _context.WalletTransactions
                         .Include(wt => wt.User)
                         .FirstOrDefaultAsync(wt => wt.OrderCode == orderCode &&
-                            wt.TransactionType == "DEPOSIT" && wt.Status == WalletTransaction.StatusPending);
+                            wt.TransactionType == "DEPOSIT" &&
+                            (wt.Status == WalletTransaction.StatusPending || wt.Status == WalletTransaction.StatusFailed));
 
                     if (walletTx != null)
                     {
+                        var wasExpired = walletTx.Status == WalletTransaction.StatusFailed;
                         if (walletTx.Amount != amount)
                         {
                             var mismatchAlreadyRecorded = await _context.WalletTransactionAuditLogs.AnyAsync(log =>
@@ -139,6 +141,7 @@ namespace DonateWeb.Security.Webhook
                         }
 
                         walletTx.Status = WalletTransaction.StatusCompleted;
+                        walletTx.CompletedAt = DateTime.UtcNow;
                         walletTx.BalanceBefore = walletTx.User.WalletBalance;
                         walletTx.User.WalletBalance += walletTx.Amount;
                         walletTx.BalanceAfter = walletTx.User.WalletBalance;
@@ -147,11 +150,13 @@ namespace DonateWeb.Security.Webhook
                         _context.WalletTransactionAuditLogs.Add(new WalletTransactionAuditLog
                         {
                             WalletTransactionId = walletTx.Id,
-                            ActionType = "PAYOS_DEPOSIT_COMPLETED",
+                            ActionType = wasExpired ? "PAYOS_DEPOSIT_COMPLETED_AFTER_EXPIRY" : "PAYOS_DEPOSIT_COMPLETED",
                             ExpectedAmount = walletTx.Amount,
                             ReceivedAmount = amount,
                             ReferenceCode = data.reference,
-                            Note = $"PayOS deposit credited. OrderCode: {orderCode}.",
+                            Note = wasExpired
+                                ? $"Verified PayOS deposit credited after the local 10-minute expiration. OrderCode: {orderCode}."
+                                : $"PayOS deposit credited. OrderCode: {orderCode}.",
                             CreatedAt = DateTime.UtcNow
                         });
                         await _context.SaveChangesAsync();

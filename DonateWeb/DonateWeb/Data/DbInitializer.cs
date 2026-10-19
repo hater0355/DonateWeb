@@ -151,6 +151,7 @@ namespace DonateWeb.Data
                         CREATE TABLE dbo.ShopOrders (
                             Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
                             OrderCode NVARCHAR(50) NOT NULL,
+                            GuestAccessTokenHash NVARCHAR(64) NULL,
                             StreamerProfileId INT NOT NULL,
                             BuyerUserId INT NULL,
                             BuyerName NVARCHAR(100) NOT NULL,
@@ -175,6 +176,8 @@ namespace DonateWeb.Data
                     END
                     ELSE
                     BEGIN
+                        IF COL_LENGTH('dbo.ShopOrders', 'GuestAccessTokenHash') IS NULL
+                            ALTER TABLE dbo.ShopOrders ADD GuestAccessTokenHash NVARCHAR(64) NULL;
                         IF COL_LENGTH('dbo.ShopOrders', 'SubtotalAmount') IS NULL
                         BEGIN
                             ALTER TABLE dbo.ShopOrders ADD SubtotalAmount DECIMAL(18,2) NOT NULL CONSTRAINT DF_ShopOrders_SubtotalAmount DEFAULT 0;
@@ -596,6 +599,13 @@ namespace DonateWeb.Data
                             BalanceAfter DECIMAL(18,2) NOT NULL DEFAULT 0,
                             PaymentMethodName NVARCHAR(100) NULL,
                             OrderCode BIGINT NULL,
+                            PaymentQrCode NVARCHAR(2000) NULL,
+                            PaymentCheckoutUrl NVARCHAR(1000) NULL,
+                            PaymentBankId NVARCHAR(20) NULL,
+                            PaymentAccountNo NVARCHAR(50) NULL,
+                            PaymentAccountName NVARCHAR(100) NULL,
+                            FailedAt DATETIME2 NULL,
+                            CompletedAt DATETIME2 NULL,
                             [Status] INT NOT NULL DEFAULT 1,
                             Note NVARCHAR(500) NULL,
                             CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -611,8 +621,26 @@ namespace DonateWeb.Data
                         IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.WalletTransactions') AND name = 'OrderCode')
                             ALTER TABLE dbo.WalletTransactions ADD OrderCode BIGINT NULL;
 
+                        IF COL_LENGTH('dbo.WalletTransactions', 'PaymentQrCode') IS NULL
+                            ALTER TABLE dbo.WalletTransactions ADD PaymentQrCode NVARCHAR(2000) NULL;
+                        IF COL_LENGTH('dbo.WalletTransactions', 'PaymentCheckoutUrl') IS NULL
+                            ALTER TABLE dbo.WalletTransactions ADD PaymentCheckoutUrl NVARCHAR(1000) NULL;
+                        IF COL_LENGTH('dbo.WalletTransactions', 'PaymentBankId') IS NULL
+                            ALTER TABLE dbo.WalletTransactions ADD PaymentBankId NVARCHAR(20) NULL;
+                        IF COL_LENGTH('dbo.WalletTransactions', 'PaymentAccountNo') IS NULL
+                            ALTER TABLE dbo.WalletTransactions ADD PaymentAccountNo NVARCHAR(50) NULL;
+                        IF COL_LENGTH('dbo.WalletTransactions', 'PaymentAccountName') IS NULL
+                            ALTER TABLE dbo.WalletTransactions ADD PaymentAccountName NVARCHAR(100) NULL;
+                        IF COL_LENGTH('dbo.WalletTransactions', 'FailedAt') IS NULL
+                            ALTER TABLE dbo.WalletTransactions ADD FailedAt DATETIME2 NULL;
+                        IF COL_LENGTH('dbo.WalletTransactions', 'CompletedAt') IS NULL
+                            ALTER TABLE dbo.WalletTransactions ADD CompletedAt DATETIME2 NULL;
+
                         IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.WalletTransactions') AND name = 'IX_WalletTransactions_OrderCode')
                             EXEC(N'CREATE UNIQUE NONCLUSTERED INDEX IX_WalletTransactions_OrderCode ON dbo.WalletTransactions (OrderCode) WHERE [OrderCode] IS NOT NULL;');
+
+                        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('dbo.WalletTransactions') AND name = 'IX_WalletTransactions_PendingDepositExpiry')
+                            EXEC(N'CREATE NONCLUSTERED INDEX IX_WalletTransactions_PendingDepositExpiry ON dbo.WalletTransactions (CreatedAt) WHERE TransactionType = N''DEPOSIT'' AND [Status] = 0;');
                     END
 
                     IF OBJECT_ID('dbo.WalletTransactionAuditLogs', 'U') IS NULL

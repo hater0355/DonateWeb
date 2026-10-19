@@ -48,6 +48,7 @@ builder.Services.AddSingleton<IStreamerIdentityDocumentService, StreamerIdentity
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IWidgetService, WidgetService>();
 builder.Services.AddScoped<IQrCodeService, QrCodeService>();
+builder.Services.AddHostedService<PendingWalletDepositExpirationService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<IStreamerBankQrService, StreamerBankQrService>(client =>
 {

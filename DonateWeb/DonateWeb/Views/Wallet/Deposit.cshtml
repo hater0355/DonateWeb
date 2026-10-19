@@ -369,6 +369,13 @@
                     </div>
 
                     <!-- Nút bấm Tiếp tục tạo mã QR -->
+                    @if (ViewBag.DepositBlockedUntil is DateTime depositBlockedUntil && depositBlockedUntil > DateTime.UtcNow)
+                    {
+                        <div class="alert alert-warning small mb-3" role="status">
+                            Bạn đã có 3 lần tạo mã chưa thanh toán. Có thể nạp tiền lại sau
+                            <strong>@depositBlockedUntil.ToLocalTime().ToString("HH:mm:ss")</strong>.
+                        </div>
+                    }
                     <button type="submit" id="btnCreateQr" class="btn btn-dark-green w-100 py-3 rounded-pill fw-bold fs-5 shadow-sm">
                         <i class="fa-solid fa-arrow-right me-2"></i> TIẾP TỤC TẠO MÃ QR
                     </button>
@@ -813,7 +820,9 @@
             document.getElementById('step2Container').classList.remove('d-none');
 
             // Khởi động đồng hồ đếm ngược 10 phút
-            remainingSeconds = 600;
+            remainingSeconds = data.expireSeconds !== undefined && data.expireSeconds !== null
+                ? Math.max(0, Number(data.expireSeconds))
+                : 600;
             startCountdown();
 
             // Khởi tạo SignalR Real-time
@@ -865,18 +874,12 @@
 
                 if (remainingSeconds <= 0) {
                     clearInterval(countdownInterval);
-                    clearInterval(pollingInterval);
                     timerEl.textContent = 'HẾT HẠN';
                     timerEl.classList.remove('text-warning');
                     timerEl.classList.add('text-danger');
-                    Swal.fire({
-                        icon: 'info',
-                        title: 'Đơn hàng hết hạn',
-                        text: 'Thời gian thanh toán cho đơn hàng đã hết. Vui lòng tạo mã mới để tiếp tục.',
-                        confirmButtonColor: '#2d6a4f'
-                    }).then(() => {
-                        backToStep1();
-                    });
+                    const statusText = document.getElementById('pollingStatusText');
+                    if (statusText) statusText.textContent = 'Đã hết thời hạn thanh toán. Đang xác nhận trạng thái cuối cùng...';
+                    checkStatusAjax(currentOrderCode);
                 } else {
                     remainingSeconds--;
                 }
@@ -944,10 +947,30 @@
                 const data = await res.json();
                 if (data && data.isPaid) {
                     handlePaymentSuccess(data);
+                } else if (data && data.status === 2) {
+                    handlePaymentFailure();
                 }
             } catch (e) {
                 console.error('Lỗi khi polling trạng thái:', e);
             }
+        }
+
+        function handlePaymentFailure() {
+            clearInterval(pollingInterval);
+            clearInterval(countdownInterval);
+            pollingInterval = null;
+            countdownInterval = null;
+            if (paymentHubConnection) {
+                paymentHubConnection.stop();
+                paymentHubConnection = null;
+            }
+
+            Swal.fire({
+                icon: 'error',
+                title: 'Thanh toán thất bại',
+                text: 'Mã thanh toán đã hết hạn sau 10 phút. Vui lòng tạo mã mới nếu bạn vẫn muốn nạp tiền.',
+                confirmButtonColor: '#2d6a4f'
+            }).then(() => backToStep1());
         }
 
         // Kiểm tra ngay khi bấm nút
@@ -1128,6 +1151,23 @@
             const input = document.getElementById('depositAmountInput');
             if (input) {
                 input.addEventListener('input', updateExpectedBalance);
+            }
+
+            @if (Model.PaymentInfo != null)
+            {
+                <text>
+                const savedPayment = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    success = true,
+                    orderCode = Model.PaymentInfo.OrderCode,
+                    checkoutUrl = Model.PaymentInfo.CheckoutUrl,
+                    qrCode = Model.PaymentInfo.QrCode,
+                    amount = Model.PaymentInfo.Amount,
+                    description = Model.PaymentInfo.Memo,
+                    data = Model.PaymentInfo
+                }, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)));
+                displayStep2Payment(savedPayment);
+                </text>
             }
         });
     </script>

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Data;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -60,6 +61,13 @@ namespace DonateWeb.Controllers
                         BalanceAfter DECIMAL(18,2) NOT NULL DEFAULT 0,
                         PaymentMethodName NVARCHAR(100) NULL,
                         OrderCode BIGINT NULL,
+                        PaymentQrCode NVARCHAR(2000) NULL,
+                        PaymentCheckoutUrl NVARCHAR(1000) NULL,
+                        PaymentBankId NVARCHAR(20) NULL,
+                        PaymentAccountNo NVARCHAR(50) NULL,
+                        PaymentAccountName NVARCHAR(100) NULL,
+                        FailedAt DATETIME2 NULL,
+                        CompletedAt DATETIME2 NULL,
                         [Status] INT NOT NULL DEFAULT 1,
                         Note NVARCHAR(500) NULL,
                         CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -76,6 +84,20 @@ namespace DonateWeb.Controllers
                     BEGIN
                         ALTER TABLE dbo.WalletTransactions ADD OrderCode BIGINT NULL;
                     END
+                    IF COL_LENGTH('dbo.WalletTransactions', 'PaymentQrCode') IS NULL
+                        ALTER TABLE dbo.WalletTransactions ADD PaymentQrCode NVARCHAR(2000) NULL;
+                    IF COL_LENGTH('dbo.WalletTransactions', 'PaymentCheckoutUrl') IS NULL
+                        ALTER TABLE dbo.WalletTransactions ADD PaymentCheckoutUrl NVARCHAR(1000) NULL;
+                    IF COL_LENGTH('dbo.WalletTransactions', 'PaymentBankId') IS NULL
+                        ALTER TABLE dbo.WalletTransactions ADD PaymentBankId NVARCHAR(20) NULL;
+                    IF COL_LENGTH('dbo.WalletTransactions', 'PaymentAccountNo') IS NULL
+                        ALTER TABLE dbo.WalletTransactions ADD PaymentAccountNo NVARCHAR(50) NULL;
+                    IF COL_LENGTH('dbo.WalletTransactions', 'PaymentAccountName') IS NULL
+                        ALTER TABLE dbo.WalletTransactions ADD PaymentAccountName NVARCHAR(100) NULL;
+                    IF COL_LENGTH('dbo.WalletTransactions', 'FailedAt') IS NULL
+                        ALTER TABLE dbo.WalletTransactions ADD FailedAt DATETIME2 NULL;
+                    IF COL_LENGTH('dbo.WalletTransactions', 'CompletedAt') IS NULL
+                        ALTER TABLE dbo.WalletTransactions ADD CompletedAt DATETIME2 NULL;
                     IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WalletTransactions_OrderCode')
                     BEGIN
                         EXEC(N'CREATE UNIQUE NONCLUSTERED INDEX IX_WalletTransactions_OrderCode ON dbo.WalletTransactions (OrderCode) WHERE [OrderCode] IS NOT NULL;');
@@ -170,6 +192,22 @@ namespace DonateWeb.Controllers
             }
 
             var (bankId, accountNo, accountName, bankName) = GetBankConfig();
+            var now = DateTime.UtcNow;
+            var cutoff = now.AddMinutes(-10);
+            await _context.WalletTransactions
+                .Where(wt => wt.UserId == userId && wt.TransactionType == "DEPOSIT"
+                    && wt.Status == WalletTransaction.StatusPending && wt.CreatedAt <= cutoff)
+                .ExecuteUpdateAsync(update => update
+                    .SetProperty(wt => wt.Status, WalletTransaction.StatusFailed)
+                    .SetProperty(wt => wt.FailedAt, now));
+
+            var pendingDeposit = await _context.WalletTransactions
+                .AsNoTracking()
+                .Where(wt => wt.UserId == userId && wt.TransactionType == "DEPOSIT"
+                    && wt.Status == WalletTransaction.StatusPending && wt.CreatedAt > cutoff)
+                .OrderByDescending(wt => wt.CreatedAt)
+                .FirstOrDefaultAsync();
+            ViewBag.DepositBlockedUntil = await GetDepositBlockedUntilAsync(userId, now);
             ViewBag.EnablePaymentSimulation = _environment.IsDevelopment();
 
             var model = new DepositViewModel
@@ -183,6 +221,9 @@ namespace DonateWeb.Controllers
                 AccountNo = accountNo,
                 AccountName = accountName,
                 BankName = bankName,
+                PaymentInfo = pendingDeposit == null || string.IsNullOrWhiteSpace(pendingDeposit.PaymentQrCode)
+                    ? null
+                    : BuildDepositPaymentInfo(pendingDeposit),
                 RecentTransactions = await _context.WalletTransactions
                     .Where(wt => wt.UserId == userId && wt.TransactionType == "DEPOSIT")
                     .OrderByDescending(wt => wt.CreatedAt)
@@ -248,14 +289,84 @@ namespace DonateWeb.Controllers
                 return Json(new { success = false, message = "Số tiền nạp phải là số nguyên VNĐ." });
             }
 
+            WalletTransaction? walletTx = null;
             try
             {
+                await using var depositTransaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+                var lockResource = $"WalletDepositCreate:{userId}";
+                await _context.Database.ExecuteSqlInterpolatedAsync($@"
+                    DECLARE @lockResult INT;
+                    EXEC @lockResult = sys.sp_getapplock
+                        @Resource = {lockResource},
+                        @LockMode = 'Exclusive',
+                        @LockOwner = 'Transaction',
+                        @LockTimeout = 10000;
+                    IF @lockResult < 0
+                        THROW 51000, 'Could not acquire wallet deposit creation lock.', 1;");
+
+                var now = DateTime.UtcNow;
+                var cutoff = now.AddMinutes(-10);
+                await _context.WalletTransactions
+                    .Where(wt => wt.UserId == userId && wt.TransactionType == "DEPOSIT"
+                        && wt.Status == WalletTransaction.StatusPending && wt.CreatedAt <= cutoff)
+                    .ExecuteUpdateAsync(update => update
+                        .SetProperty(wt => wt.Status, WalletTransaction.StatusFailed)
+                        .SetProperty(wt => wt.FailedAt, now));
+
+                var existingPending = await _context.WalletTransactions
+                    .AsNoTracking()
+                    .Where(wt => wt.UserId == userId && wt.TransactionType == "DEPOSIT"
+                        && wt.Status == WalletTransaction.StatusPending && wt.CreatedAt > cutoff)
+                    .OrderByDescending(wt => wt.CreatedAt)
+                    .FirstOrDefaultAsync();
+
+                if (existingPending != null)
+                {
+                    await depositTransaction.CommitAsync();
+                    if (string.IsNullOrWhiteSpace(existingPending.PaymentQrCode))
+                    {
+                        return Json(new
+                        {
+                            success = false,
+                            pending = true,
+                            message = "Mã nạp tiền đang được tạo. Vui lòng đợi vài giây rồi thử mở lại trang nạp tiền."
+                        });
+                    }
+
+                    var existingPayment = BuildDepositPaymentInfo(existingPending);
+                    return Json(new
+                    {
+                        success = true,
+                        orderCode = existingPending.OrderCode,
+                        checkoutUrl = existingPending.PaymentCheckoutUrl,
+                        qrCode = existingPending.PaymentQrCode,
+                        data = existingPayment,
+                        amount = existingPending.Amount,
+                        description = existingPayment.Memo,
+                        message = "Đang tiếp tục mã QR chưa hết hạn của bạn."
+                    });
+                }
+
+                var blockedUntil = await GetDepositBlockedUntilAsync(userId, now);
+                if (blockedUntil.HasValue && blockedUntil.Value > now)
+                {
+                    await depositTransaction.CommitAsync();
+                    var remainingSeconds = Math.Max(1, (int)Math.Ceiling((blockedUntil.Value - now).TotalSeconds));
+                    return StatusCode(StatusCodes.Status429TooManyRequests, new
+                    {
+                        success = false,
+                        blockedUntil = blockedUntil.Value,
+                        remainingSeconds,
+                        message = $"Bạn đã có 3 lần tạo mã không thanh toán thành công. Vui lòng thử lại sau {Math.Ceiling(remainingSeconds / 60d):0} phút."
+                    });
+                }
+
                 // Sinh orderCode bằng timestamp mili-giây (yêu cầu của payOS: số nguyên long)
                 long orderCode = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 var txCode = $"DEP_{orderCode}";
 
                 // Tạo bản ghi WalletTransaction trạng thái Pending (0) lưu vào DB
-                var walletTx = new WalletTransaction
+                walletTx = new WalletTransaction
                 {
                     UserId = user.Id,
                     OrderCode = orderCode,
@@ -272,6 +383,7 @@ namespace DonateWeb.Controllers
 
                 _context.WalletTransactions.Add(walletTx);
                 await _context.SaveChangesAsync();
+                await depositTransaction.CommitAsync();
 
                 // Cấu hình URL quay lại
                 var baseUrl = $"{Request.Scheme}://{Request.Host}";
@@ -289,15 +401,22 @@ namespace DonateWeb.Controllers
                     cancelUrl = cancelUrl,
                     returnUrl = returnUrl,
                     buyerName = user.FullName ?? user.Username,
-                    buyerEmail = user.Email
+                    buyerEmail = user.Email,
+                    expiredAt = (int)DateTimeOffset.UtcNow.AddMinutes(10).ToUnixTimeSeconds()
                 };
 
                 // Gọi PayOS SDK tạo Payment Link
                 var result = await _payOS.createPaymentLink(paymentData);
-
                 var (bankId, accountNo, accountName, bankName) = GetBankConfig();
                 if (!string.IsNullOrEmpty(result.accountNumber)) accountNo = result.accountNumber;
                 if (!string.IsNullOrEmpty(result.accountName)) accountName = result.accountName;
+                var fallbackQrUrl = $"https://img.vietqr.io/image/{bankId}-{accountNo}-compact2.png?amount={(long)depositAmount}&addInfo={Uri.EscapeDataString(description)}&accountName={Uri.EscapeDataString(accountName)}";
+                walletTx.PaymentQrCode = !string.IsNullOrWhiteSpace(result.qrCode) ? result.qrCode : fallbackQrUrl;
+                walletTx.PaymentCheckoutUrl = result.checkoutUrl;
+                walletTx.PaymentBankId = result.bin;
+                walletTx.PaymentAccountNo = result.accountNumber;
+                walletTx.PaymentAccountName = result.accountName;
+                await _context.SaveChangesAsync();
 
                 var paymentModel = new DepositPaymentViewModel
                 {
@@ -310,7 +429,7 @@ namespace DonateWeb.Controllers
                     BankName = bankName,
                     AccountNo = accountNo,
                     AccountName = accountName,
-                    QrUrl = !string.IsNullOrEmpty(result.qrCode) ? result.qrCode : $"https://img.vietqr.io/image/{bankId}-{accountNo}-compact2.png?amount={(long)depositAmount}&addInfo={Uri.EscapeDataString(description)}&accountName={Uri.EscapeDataString(accountName)}",
+                    QrUrl = !string.IsNullOrEmpty(result.qrCode) ? result.qrCode : fallbackQrUrl,
                     QrCode = result.qrCode,
                     CheckoutUrl = result.checkoutUrl,
                     CreatedAt = walletTx.CreatedAt,
@@ -334,6 +453,19 @@ namespace DonateWeb.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Lỗi khi gọi PayOS createPaymentLink cho UserId {UserId}", userId);
+                if (walletTx != null)
+                {
+                    walletTx.Status = WalletTransaction.StatusFailed;
+                    walletTx.FailedAt = DateTime.UtcNow;
+                    try
+                    {
+                        await _context.SaveChangesAsync();
+                    }
+                    catch (Exception updateException)
+                    {
+                        _logger.LogError(updateException, "Không thể đánh dấu giao dịch nạp {TransactionId} thất bại sau lỗi tạo link PayOS.", walletTx.Id);
+                    }
+                }
                 return Json(new
                 {
                     success = false,
@@ -342,18 +474,96 @@ namespace DonateWeb.Controllers
             }
         }
 
+        private DepositPaymentViewModel BuildDepositPaymentInfo(WalletTransaction transaction)
+        {
+            var (configuredBankId, configuredAccountNo, configuredAccountName, bankName) = GetBankConfig();
+            var remainingSeconds = Math.Max(0, (int)Math.Ceiling((transaction.CreatedAt.AddMinutes(10) - DateTime.UtcNow).TotalSeconds));
+            var memo = $"NAP {transaction.OrderCode}";
+            return new DepositPaymentViewModel
+            {
+                TransactionId = transaction.Id,
+                OrderCode = transaction.OrderCode ?? 0,
+                TransactionCode = transaction.TransactionCode,
+                Amount = transaction.Amount,
+                Memo = memo,
+                BankId = string.IsNullOrWhiteSpace(transaction.PaymentBankId) ? configuredBankId : transaction.PaymentBankId,
+                BankName = bankName,
+                AccountNo = string.IsNullOrWhiteSpace(transaction.PaymentAccountNo) ? configuredAccountNo : transaction.PaymentAccountNo,
+                AccountName = string.IsNullOrWhiteSpace(transaction.PaymentAccountName) ? configuredAccountName : transaction.PaymentAccountName,
+                QrUrl = transaction.PaymentQrCode ?? string.Empty,
+                QrCode = transaction.PaymentQrCode ?? string.Empty,
+                CheckoutUrl = transaction.PaymentCheckoutUrl ?? string.Empty,
+                CreatedAt = transaction.CreatedAt,
+                ExpireAt = transaction.CreatedAt.AddMinutes(10),
+                ExpireSeconds = remainingSeconds
+            };
+        }
+
+        private async Task<DateTime?> GetDepositBlockedUntilAsync(int userId, DateTime now)
+        {
+            var latestSuccessAt = await _context.WalletTransactions
+                .Where(wt => wt.UserId == userId && wt.TransactionType == "DEPOSIT"
+                    && wt.Status == WalletTransaction.StatusCompleted)
+                .MaxAsync(wt => (DateTime?)(wt.CompletedAt ?? wt.CreatedAt));
+
+            var failures = await _context.WalletTransactions
+                .Where(wt => wt.UserId == userId && wt.TransactionType == "DEPOSIT"
+                    && wt.Status == WalletTransaction.StatusFailed
+                    && wt.FailedAt.HasValue
+                    && (!latestSuccessAt.HasValue || wt.FailedAt.Value > latestSuccessAt.Value))
+                .OrderBy(wt => wt.FailedAt)
+                .Select(wt => wt.FailedAt!.Value)
+                .ToListAsync();
+
+            var consecutiveFailures = 0;
+            DateTime? blockedUntil = null;
+            foreach (var failedAt in failures)
+            {
+                if (blockedUntil.HasValue)
+                {
+                    if (failedAt < blockedUntil.Value)
+                    {
+                        continue;
+                    }
+
+                    blockedUntil = null;
+                    consecutiveFailures = 0;
+                }
+
+                consecutiveFailures++;
+                if (consecutiveFailures == 3)
+                {
+                    blockedUntil = failedAt.AddMinutes(10);
+                    consecutiveFailures = 0;
+                }
+            }
+
+            return blockedUntil > now ? blockedUntil : null;
+        }
+
         /// <summary>
         /// GET: /Wallet/CheckStatus?orderCode=...
         /// Action polling kiểm tra trạng thái đơn hàng PayOS theo orderCode
         /// Trả về JSON { isPaid = true/false }
         /// </summary>
         [HttpGet]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public async Task<IActionResult> CheckStatus(long orderCode)
         {
             if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
             {
                 return Unauthorized();
             }
+
+            var cutoff = DateTime.UtcNow.AddMinutes(-10);
+            await _context.WalletTransactions
+                .Where(wt => wt.OrderCode == orderCode && wt.UserId == userId
+                    && wt.TransactionType == "DEPOSIT"
+                    && wt.Status == WalletTransaction.StatusPending
+                    && wt.CreatedAt <= cutoff)
+                .ExecuteUpdateAsync(update => update
+                    .SetProperty(wt => wt.Status, WalletTransaction.StatusFailed)
+                    .SetProperty(wt => wt.FailedAt, DateTime.UtcNow));
 
             var tx = await _context.WalletTransactions
                 .Include(wt => wt.User)
@@ -382,6 +592,7 @@ namespace DonateWeb.Controllers
         /// Hỗ trợ cả transactionId và orderCode để tương thích ngược
         /// </summary>
         [HttpGet]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public async Task<IActionResult> CheckDepositStatus([FromQuery] long? transactionId, [FromQuery] long? orderCode)
         {
             if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
@@ -394,6 +605,16 @@ namespace DonateWeb.Controllers
             {
                 return BadRequest(new { success = false, isPaid = false, message = "Thiếu orderCode hoặc transactionId." });
             }
+
+            var cutoff = DateTime.UtcNow.AddMinutes(-10);
+            await _context.WalletTransactions
+                .Where(wt => wt.UserId == userId && wt.TransactionType == "DEPOSIT"
+                    && (wt.OrderCode == code.Value || (code.Value <= int.MaxValue && wt.Id == (int)code.Value))
+                    && wt.Status == WalletTransaction.StatusPending
+                    && wt.CreatedAt <= cutoff)
+                .ExecuteUpdateAsync(update => update
+                    .SetProperty(wt => wt.Status, WalletTransaction.StatusFailed)
+                    .SetProperty(wt => wt.FailedAt, DateTime.UtcNow));
 
             var tx = await _context.WalletTransactions
                 .Include(wt => wt.User)
@@ -416,7 +637,11 @@ namespace DonateWeb.Controllers
                 amount = tx.Amount,
                 transactionCode = tx.TransactionCode,
                 newBalance = isPaid ? tx.User?.WalletBalance : null,
-                message = isPaid ? "Giao dịch đã được thanh toán thành công!" : "Đang chờ thanh toán..."
+                message = isPaid
+                    ? "Giao dịch đã được thanh toán thành công!"
+                    : tx.Status == WalletTransaction.StatusFailed
+                        ? "Mã thanh toán đã hết hạn hoặc bị hủy. Vui lòng tạo mã mới nếu bạn vẫn muốn nạp tiền."
+                        : "Đang chờ thanh toán..."
             });
         }
 
@@ -501,6 +726,7 @@ namespace DonateWeb.Controllers
             user.WalletBalance += tx.Amount;
             tx.BalanceAfter = user.WalletBalance;
             tx.Status = 1;
+            tx.CompletedAt = DateTime.UtcNow;
             user.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();

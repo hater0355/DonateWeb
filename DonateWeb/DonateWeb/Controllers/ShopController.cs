@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Claims;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
@@ -309,6 +310,10 @@ namespace DonateWeb.Controllers
             }
 
             var paymentMethod = isWalletPayment ? "Wallet" : "PayOS";
+            var guestAccessToken = currentUserId.HasValue
+                ? null
+                : Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            var guestAccessTokenHash = guestAccessToken == null ? null : HashGuestAccessToken(guestAccessToken);
 
             // Mã giảm giá có thể thanh toán toàn bộ đơn mà không cần gọi cổng PayOS.
             if (totalAmount == 0)
@@ -324,6 +329,7 @@ namespace DonateWeb.Controllers
                 var freeOrder = new ShopOrder
                 {
                     OrderCode = freeOrderCode,
+                    GuestAccessTokenHash = guestAccessTokenHash,
                     StreamerProfileId = streamer.Id,
                     BuyerUserId = currentUserId,
                     BuyerName = model.BuyerName.Trim(),
@@ -354,6 +360,10 @@ namespace DonateWeb.Controllers
                 }
                 await _context.SaveChangesAsync();
                 await couponTransaction.CommitAsync();
+                if (guestAccessToken != null)
+                {
+                    SetGuestOrderAccessCookie(freeOrder.OrderCode, guestAccessToken);
+                }
 
                 return Json(new
                 {
@@ -523,6 +533,7 @@ namespace DonateWeb.Controllers
             var pendingOrder = new ShopOrder
             {
                 OrderCode = orderCode,
+                GuestAccessTokenHash = guestAccessTokenHash,
                 StreamerProfileId = streamer.Id,
                 BuyerUserId = currentUserId,
                 BuyerName = model.BuyerName.Trim(),
@@ -584,6 +595,11 @@ namespace DonateWeb.Controllers
                 if (string.IsNullOrWhiteSpace(payment.qrCode))
                 {
                     throw new InvalidOperationException("PayOS không trả về dữ liệu QR cho đơn hàng.");
+                }
+
+                if (guestAccessToken != null)
+                {
+                    SetGuestOrderAccessCookie(pendingOrder.OrderCode, guestAccessToken);
                 }
 
                 return Json(new
@@ -740,17 +756,16 @@ namespace DonateWeb.Controllers
         [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public async Task<IActionResult> CheckPaymentStatus(string orderCode)
         {
-            await ExpireStaleStockReservationsAsync();
-
             if (string.IsNullOrWhiteSpace(orderCode))
             {
                 return BadRequest(new { success = false, message = "Thiếu mã đơn hàng." });
             }
 
             var order = await _context.ShopOrders
+                .Include(o => o.StreamerProfile)
                 .AsNoTracking()
                 .Where(o => o.OrderCode == orderCode.Trim() && o.PaymentMethod == "PayOS")
-                .Select(o => new { o.OrderCode, o.PaymentStatus, o.PaidAt })
+                .Select(o => new { o.OrderCode, o.PaymentStatus, o.PaidAt, o.BuyerUserId, StreamerUserId = o.StreamerProfile.UserId, o.GuestAccessTokenHash })
                 .FirstOrDefaultAsync();
 
             if (order == null)
@@ -758,13 +773,30 @@ namespace DonateWeb.Controllers
                 return NotFound(new { success = false, message = "Không tìm thấy đơn hàng PayOS." });
             }
 
+            if (!CanAccessShopOrder(order.BuyerUserId, order.StreamerUserId, order.GuestAccessTokenHash, order.OrderCode))
+            {
+                return NotFound(new { success = false, message = "Không tìm thấy đơn hàng PayOS." });
+            }
+
+            await ExpireStaleStockReservationsAsync();
+            var paymentState = await _context.ShopOrders
+                .AsNoTracking()
+                .Where(o => o.OrderCode == order.OrderCode)
+                .Select(o => new { o.OrderCode, o.PaymentStatus, o.PaidAt })
+                .FirstOrDefaultAsync();
+
+            if (paymentState == null)
+            {
+                return NotFound(new { success = false, message = "Không tìm thấy đơn hàng PayOS." });
+            }
+
             return Json(new
             {
                 success = true,
-                orderCode = order.OrderCode,
-                status = order.PaymentStatus,
-                isPaid = order.PaymentStatus == "Paid",
-                paidAt = order.PaidAt
+                orderCode = paymentState.OrderCode,
+                status = paymentState.PaymentStatus,
+                isPaid = paymentState.PaymentStatus == "Paid",
+                paidAt = paymentState.PaidAt
             });
         }
 
@@ -777,11 +809,6 @@ namespace DonateWeb.Controllers
             if (string.IsNullOrWhiteSpace(orderCode))
             {
                 return RedirectToAction(nameof(Index));
-            }
-
-            if (string.Equals(payment, "cancelled", StringComparison.OrdinalIgnoreCase))
-            {
-                await CancelPendingPayOsOrderAsync(orderCode.Trim());
             }
 
             var order = await _context.ShopOrders
@@ -797,7 +824,68 @@ namespace DonateWeb.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
+            Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+            Response.Headers.Pragma = "no-cache";
+            Response.Headers["Referrer-Policy"] = "no-referrer";
+            if (!CanAccessShopOrder(order.BuyerUserId, order.StreamerProfile.UserId, order.GuestAccessTokenHash, order.OrderCode))
+            {
+                return NotFound();
+            }
+
+            if (string.Equals(payment, "cancelled", StringComparison.OrdinalIgnoreCase))
+            {
+                await CancelPendingPayOsOrderAsync(orderCode.Trim());
+                await _context.Entry(order).ReloadAsync();
+            }
+
             return View(order);
+        }
+
+        private bool CanAccessShopOrder(int? buyerUserId, int streamerUserId, string? guestAccessTokenHash, string orderCode)
+        {
+            if (int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+            {
+                if (User.IsInRole(UserRoles.Admin) || buyerUserId == userId ||
+                    (User.IsInRole(UserRoles.Streamer) && streamerUserId == userId))
+                {
+                    return true;
+                }
+            }
+
+            if (buyerUserId.HasValue || string.IsNullOrWhiteSpace(guestAccessTokenHash) ||
+                !Request.Cookies.TryGetValue(GetGuestOrderCookieName(orderCode), out var token) ||
+                string.IsNullOrWhiteSpace(token))
+            {
+                return false;
+            }
+
+            var actualHash = Convert.FromHexString(HashGuestAccessToken(token));
+            var expectedHash = Convert.FromHexString(guestAccessTokenHash);
+            return CryptographicOperations.FixedTimeEquals(actualHash, expectedHash);
+        }
+
+        private void SetGuestOrderAccessCookie(string orderCode, string token)
+        {
+            Response.Cookies.Append(GetGuestOrderCookieName(orderCode), token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = Request.IsHttps,
+                SameSite = SameSiteMode.Lax,
+                IsEssential = true,
+                Path = "/Shop",
+                Expires = DateTimeOffset.UtcNow.AddDays(30)
+            });
+        }
+
+        private static string GetGuestOrderCookieName(string orderCode)
+        {
+            var codeHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(orderCode)));
+            return $"shop_order_{codeHash[..24]}";
+        }
+
+        private static string HashGuestAccessToken(string token)
+        {
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
         }
 
         /// <summary>
