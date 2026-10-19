@@ -97,19 +97,14 @@ namespace DonateWeb.Controllers
         }
 
         [HttpGet]
-        public IActionResult Register(string? role = null)
+        public IActionResult Register()
         {
             if (User.Identity?.IsAuthenticated == true)
             {
                 return RedirectToAction("Index", "Home");
             }
 
-            var model = new RegisterViewModel
-            {
-                RoleType = role == "streamer" ? UserRoles.Streamer : UserRoles.Viewer
-            };
-
-            return View(model);
+            return View(new RegisterViewModel());
         }
 
         [HttpPost]

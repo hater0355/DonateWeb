@@ -106,11 +106,5 @@ namespace DonateWeb.ViewModels.Streamer
         [Display(Name = "Tên chủ tài khoản")]
         public string BankAccountName { get; set; } = string.Empty;
 
-        // Nếu chưa đăng nhập, cho phép nhập email & mật khẩu để tạo luôn tài khoản
-        [Display(Name = "Email")]
-        public string? Email { get; set; }
-
-        [Display(Name = "Mật khẩu")]
-        public string? Password { get; set; }
     }
 }

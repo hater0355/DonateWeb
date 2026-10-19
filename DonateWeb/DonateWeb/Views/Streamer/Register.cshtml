@@ -190,20 +190,6 @@
                                 <span asp-validation-for="CitizenId" class="text-danger small"></span>
                             </div>
 
-                            @if (!isAuthenticated)
-                            {
-                                <div class="p-2 bg-white rounded-3 border mt-2">
-                                    <div class="small fw-bold text-success mb-1"><i class="fa-solid fa-lock me-1"></i> Tài khoản đăng nhập mới:</div>
-                                    <div class="mb-2">
-                                        <label asp-for="Email" class="form-label small fw-semibold text-dark-green mb-0">Email *</label>
-                                        <input asp-for="Email" type="email" class="form-control form-control-sm" placeholder="example@email.com" required />
-                                    </div>
-                                    <div>
-                                        <label asp-for="Password" class="form-label small fw-semibold text-dark-green mb-0">Mật khẩu *</label>
-                                        <input asp-for="Password" type="password" class="form-control form-control-sm" placeholder="Tối thiểu 6 ký tự" required />
-                                    </div>
-                                </div>
-                            }
                         </div>
                     </div>
                 </div>
@@ -332,7 +318,7 @@
                 <div class="form-check d-flex align-items-center gap-2">
                     <input class="form-check-input" type="checkbox" id="check1" required style="background-color: var(--dark-green); border-color: var(--dark-green);">
                     <label class="form-check-label small" for="check1">
-                        Tôi đồng ý với <a href="#" class="text-dark-green fw-bold text-decoration-underline">điều khoản sử dụng</a> và <a href="#" class="text-dark-green fw-bold text-decoration-underline">chính sách bảo mật</a>
+                        Tôi đồng ý với <a href="/dieu-khoan-su-dung" class="text-dark-green fw-bold text-decoration-underline">điều khoản sử dụng</a> và <a href="/chinh-sach-bao-mat" class="text-dark-green fw-bold text-decoration-underline">chính sách bảo mật</a>
                     </label>
                 </div>
                 <div class="form-check d-flex align-items-center gap-2">

@@ -17,7 +17,10 @@
         <!-- Center Nav -->
         <ul class="navbar-nav header-nav mx-auto flex-row gap-4 d-none d-lg-flex">
             <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value == "/" ? "active-nav" : "text-muted")" href="/"><i class="fa-solid fa-home me-1"></i> Home</a></li>
-            <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value?.StartsWith("/Streamer/Register", StringComparison.OrdinalIgnoreCase) == true ? "active-nav" : "text-muted")" href="/Streamer/Register"><i class="fa-solid fa-video me-1"></i> New Streamer</a></li>
+            @if (User.Identity?.IsAuthenticated == true && !User.IsInRole(UserRoles.Streamer) && !User.IsInRole(UserRoles.Admin))
+            {
+                <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value?.StartsWith("/Streamer/Register", StringComparison.OrdinalIgnoreCase) == true ? "active-nav" : "text-muted")" href="/Streamer/Register"><i class="fa-solid fa-video me-1"></i> Gửi hồ sơ Streamer</a></li>
+            }
             <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value?.StartsWith("/Guides") == true ? "active-nav" : "text-muted")" href="/Guides"><i class="fa-solid fa-book me-1"></i> Guides</a></li>
             <li class="nav-item"><a class="nav-link fw-semibold @(Context.Request.Path.Value?.StartsWith("/Shop", StringComparison.OrdinalIgnoreCase) == true ? "active-nav" : "text-muted")" href="/Shop"><i class="fa-solid fa-store me-1"></i> Shop</a></li>
         </ul>
@@ -57,6 +60,7 @@
                 var isAdmin = User.IsInRole(UserRoles.Admin);
                 var isStreamer = User.IsInRole(UserRoles.Streamer);
                 var isViewer = User.IsInRole(UserRoles.Viewer);
+                var isSupportAgent = User.IsInRole(UserRoles.SupportAgent);
                 decimal? liveBalance = null;
                 decimal? liveEarningsBalance = null;
                 if (int.TryParse(userIdClaim, out var uid))
@@ -115,6 +119,10 @@
                         {
                             <span class="badge bg-success ms-1 small mobile-role-badge" style="font-size: 0.65rem;">Streamer</span>
                         }
+                        else if (isSupportAgent)
+                        {
+                            <span class="badge bg-info text-dark ms-1 small mobile-role-badge" style="font-size: 0.65rem;">Hỗ trợ</span>
+                        }
                         else
                         {
                             <span class="badge bg-secondary ms-1 small mobile-role-badge" style="font-size: 0.65rem;">Viewer</span>
@@ -143,6 +151,12 @@
                             <li class="mobile-admin-only"><hr class="dropdown-divider"></li>
                             <li class="mobile-admin-only"><h6 class="dropdown-header text-uppercase text-danger" style="font-size: 0.7rem;"><i class="fa-solid fa-shield-halved me-1"></i> Quản trị hệ thống</h6></li>
                             <li class="mobile-admin-only"><a class="dropdown-item text-danger fw-semibold" href="/Admin"><i class="fa-solid fa-gauge-high me-2"></i>Trang Quản trị (Admin Panel)</a></li>
+                            <li><a class="dropdown-item fw-semibold text-primary" href="/SupportChat/Inbox"><i class="fa-solid fa-headset me-2"></i>Hộp thư hỗ trợ</a></li>
+                            <li><a class="dropdown-item" href="/Admin/SupportAgents"><i class="fa-solid fa-user-shield me-2"></i>Quản lý Hỗ trợ viên</a></li>
+                        }
+                        else if (isSupportAgent)
+                        {
+                            <li><a class="dropdown-item fw-semibold text-primary" href="/SupportChat/Inbox"><i class="fa-solid fa-headset me-2"></i>Hộp thư hỗ trợ</a></li>
                         }
 
                         @if (isStreamer)
@@ -159,7 +173,7 @@
                             <li class="mobile-obs-only"><a class="dropdown-item" href="/Widgets/Config/Goals"><i class="fa-solid fa-bullseye me-2 text-success"></i>Mục tiêu Donate (Goal)</a></li>
                             <li class="mobile-obs-only"><a class="dropdown-item" href="/Widgets/Config/Leaderboard"><i class="fa-solid fa-trophy me-2 text-info"></i>Bảng xếp hạng OBS</a></li>
                         }
-                        else
+                        else if (!isAdmin)
                         {
                             @if (isViewer)
                             {
@@ -167,11 +181,11 @@
                             }
                             @if (DbContext.StreamerProfiles.Any(sp => sp.UserId == uid && sp.ApprovalStatus == DonateWeb.Models.Enums.StreamerApprovalStatus.Pending))
                             {
-                                <li><a class="dropdown-item text-warning fw-semibold" href="/Streamer/Register"><i class="fa-solid fa-clock me-2"></i>Đăng ký Streamer <span class="badge bg-warning text-dark ms-1 small">Chờ duyệt</span></a></li>
+                                <li><a class="dropdown-item text-warning fw-semibold" href="/Streamer/Register"><i class="fa-solid fa-clock me-2"></i>Hồ sơ Streamer <span class="badge bg-warning text-dark ms-1 small">Chờ duyệt</span></a></li>
                             }
                             else
                             {
-                                <li><a class="dropdown-item text-success" href="/Streamer/Register"><i class="fa-solid fa-video me-2"></i>Đăng ký làm Streamer</a></li>
+                                <li><a class="dropdown-item text-success" href="/Streamer/Register"><i class="fa-solid fa-video me-2"></i>Gửi hồ sơ Streamer</a></li>
                             }
                         }
 

@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using DonateWeb.Models.Enums;
 
 namespace DonateWeb.ViewModels.Auth
 {
@@ -35,20 +34,5 @@ namespace DonateWeb.ViewModels.Auth
         [Phone(ErrorMessage = "Số điện thoại không hợp lệ")]
         public string? PhoneNumber { get; set; }
 
-        /// <summary>
-        /// Vai trò khi đăng ký: Viewer hoặc Streamer
-        /// </summary>
-        [Display(Name = "Loại tài khoản")]
-        public string RoleType { get; set; } = UserRoles.Viewer;
-
-        /// <summary>
-        /// Slug cá nhân nếu đăng ký làm Streamer (ví dụ: domixi, pewpew)
-        /// </summary>
-        [Display(Name = "Slug cá nhân (dành cho Streamer)")]
-        [RegularExpression(@"^[a-zA-Z0-9_-]+$", ErrorMessage = "Slug chỉ chứa chữ cái không dấu, chữ số, gạch dưới và gạch ngang (ví dụ: ten-streamer)")]
-        public string? StreamerSlug { get; set; }
-
-        [Display(Name = "Tên hiển thị kênh (dành cho Streamer)")]
-        public string? StreamerDisplayName { get; set; }
     }
 }

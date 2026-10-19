@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using DonateWeb.Data;
 using DonateWeb.Models.Entities;
@@ -205,6 +206,23 @@ namespace DonateWeb.Controllers
                 _logger.LogError(ex, "Lỗi xảy ra khi truy vấn dữ liệu trang chủ từ database.");
                 return View("Index", new HomeViewModel { SearchKeyword = keyword?.Trim() });
             }
+        }
+
+        [AllowAnonymous]
+        [HttpGet("/dieu-khoan-su-dung")]
+        public IActionResult Terms()
+        {
+            ViewData["Title"] = "Điều khoản sử dụng";
+            return View();
+        }
+
+        [AllowAnonymous]
+        [HttpGet("/privacy")]
+        [HttpGet("/chinh-sach-bao-mat")]
+        public IActionResult Privacy()
+        {
+            ViewData["Title"] = "Chính sách bảo mật và quyền riêng tư";
+            return View();
         }
 
         [HttpGet]

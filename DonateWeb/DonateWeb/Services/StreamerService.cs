@@ -11,18 +11,15 @@ namespace DonateWeb.Services
     public class StreamerService : IStreamerService
     {
         private readonly AppDbContext _context;
-        private readonly IPasswordHasher _passwordHasher;
         private readonly IContentModerationService _moderationService;
         private readonly IAccountIdService _accountIdService;
 
         public StreamerService(
             AppDbContext context,
-            IPasswordHasher passwordHasher,
             IContentModerationService moderationService,
             IAccountIdService accountIdService)
         {
             _context = context;
-            _passwordHasher = passwordHasher;
             _moderationService = moderationService;
             _accountIdService = accountIdService;
         }
@@ -271,6 +268,11 @@ namespace DonateWeb.Services
             StreamerRegisterViewModel model,
             StreamerIdentitySubmission identitySubmission)
         {
+            if (!currentUserId.HasValue)
+            {
+                return (false, "Bạn cần đăng nhập tài khoản Viewer trước khi gửi hồ sơ Streamer.", null);
+            }
+
             var normalizedSlug = model.Slug.Trim().ToLower();
 
             // Kiểm tra Slug đã tồn tại chưa (loại trừ hồ sơ của chính người dùng nếu đang cập nhật lại đơn)
@@ -279,95 +281,49 @@ namespace DonateWeb.Services
                 return (false, $"Slug cá nhân '{normalizedSlug}' đã được sử dụng. Vui lòng chọn slug khác.", null);
             }
 
-            User? targetUser = null;
+            var targetUser = await _context.Users
+                .Include(u => u.UserRoles)
+                .Include(u => u.StreamerProfile)
+                .FirstOrDefaultAsync(u => u.Id == currentUserId.Value);
 
-            if (currentUserId.HasValue)
+            if (targetUser == null)
             {
-                targetUser = await _context.Users
-                    .Include(u => u.UserRoles)
-                    .Include(u => u.StreamerProfile)
-                    .FirstOrDefaultAsync(u => u.Id == currentUserId.Value);
-
-                if (targetUser == null)
-                {
-                    return (false, "Không tìm thấy thông tin tài khoản người dùng.", null);
-                }
-
-                if (targetUser.StreamerProfile != null)
-                {
-                    if (targetUser.StreamerProfile.ApprovalStatus == StreamerApprovalStatus.Pending)
-                    {
-                        return (false, "Hồ sơ đăng ký của bạn đang chờ Quản trị viên xét duyệt. Vui lòng chờ phản hồi từ hệ thống.", targetUser.StreamerProfile);
-                    }
-                    if (targetUser.StreamerProfile.ApprovalStatus == StreamerApprovalStatus.Approved)
-                    {
-                        return (false, "Tài khoản này đã là Streamer chính thức trên hệ thống.", targetUser.StreamerProfile);
-                    }
-
-                    // Nếu trước đó bị Rejected (từ chối), cho phép cập nhật lại thông tin và gửi lại yêu cầu duyệt
-                    var existingProfile = targetUser.StreamerProfile;
-                    targetUser.FullName = model.FullName.Trim();
-                    targetUser.PhoneNumber = model.PhoneNumber.Trim();
-                    existingProfile.Slug = normalizedSlug;
-                    existingProfile.DisplayName = string.IsNullOrWhiteSpace(model.DisplayName) ? targetUser.FullName : model.DisplayName.Trim();
-                    existingProfile.BankName = model.BankName.Trim();
-                    existingProfile.BankAccountNumber = model.BankAccountNumber.Trim();
-                    existingProfile.BankAccountName = model.BankAccountName.Trim().ToUpper();
-                    existingProfile.FacebookUrl = model.FacebookUrl?.Trim();
-                    existingProfile.YoutubeUrl = model.YoutubeUrl?.Trim();
-                    existingProfile.TiktokUrl = model.TiktokUrl?.Trim();
-                    existingProfile.IdentityDataProtected = identitySubmission.ProtectedData;
-                    existingProfile.CitizenIdFrontDocumentKey = identitySubmission.FrontDocumentKey;
-                    existingProfile.CitizenIdBackDocumentKey = identitySubmission.BackDocumentKey;
-                    existingProfile.IdentityDataConsentAt = identitySubmission.ConsentAtUtc;
-                    existingProfile.ApprovalStatus = StreamerApprovalStatus.Pending;
-                    existingProfile.RejectionReason = null;
-                    existingProfile.UpdatedAt = DateTime.UtcNow;
-
-                    await _context.SaveChangesAsync();
-                    return (true, string.Empty, existingProfile);
-                }
+                return (false, "Không tìm thấy thông tin tài khoản người dùng.", null);
             }
-            else
+
+            if (targetUser.StreamerProfile != null)
             {
-                // Người dùng chưa đăng nhập, cần Email & Mật khẩu
-                if (string.IsNullOrWhiteSpace(model.Email) || string.IsNullOrWhiteSpace(model.Password))
+                if (targetUser.StreamerProfile.ApprovalStatus == StreamerApprovalStatus.Pending)
                 {
-                    return (false, "Vui lòng đăng nhập hoặc nhập Email và Mật khẩu để tạo tài khoản Streamer.", null);
+                    return (false, "Hồ sơ đăng ký của bạn đang chờ Quản trị viên xét duyệt. Vui lòng chờ phản hồi từ hệ thống.", targetUser.StreamerProfile);
+                }
+                if (targetUser.StreamerProfile.ApprovalStatus == StreamerApprovalStatus.Approved)
+                {
+                    return (false, "Tài khoản này đã là Streamer chính thức trên hệ thống.", targetUser.StreamerProfile);
                 }
 
-                var normalizedEmail = model.Email.Trim().ToLower();
-                if (await _context.Users.AnyAsync(u => u.Email.ToLower() == normalizedEmail))
-                {
-                    return (false, "Email này đã được sử dụng. Vui lòng đăng nhập trước khi đăng ký Streamer.", null);
-                }
+                // Nếu trước đó bị từ chối, cho phép cập nhật hồ sơ và gửi lại để duyệt.
+                var existingProfile = targetUser.StreamerProfile;
+                targetUser.FullName = model.FullName.Trim();
+                targetUser.PhoneNumber = model.PhoneNumber.Trim();
+                existingProfile.Slug = normalizedSlug;
+                existingProfile.DisplayName = string.IsNullOrWhiteSpace(model.DisplayName) ? targetUser.FullName : model.DisplayName.Trim();
+                existingProfile.BankName = model.BankName.Trim();
+                existingProfile.BankAccountNumber = model.BankAccountNumber.Trim();
+                existingProfile.BankAccountName = model.BankAccountName.Trim().ToUpper();
+                existingProfile.FacebookUrl = model.FacebookUrl?.Trim();
+                existingProfile.YoutubeUrl = model.YoutubeUrl?.Trim();
+                existingProfile.TiktokUrl = model.TiktokUrl?.Trim();
+                existingProfile.IdentityDataProtected = identitySubmission.ProtectedData;
+                existingProfile.CitizenIdFrontDocumentKey = identitySubmission.FrontDocumentKey;
+                existingProfile.CitizenIdBackDocumentKey = identitySubmission.BackDocumentKey;
+                existingProfile.IdentityDataConsentAt = identitySubmission.ConsentAtUtc;
+                existingProfile.ApprovalStatus = StreamerApprovalStatus.Pending;
+                existingProfile.RejectionReason = null;
+                existingProfile.UpdatedAt = DateTime.UtcNow;
 
-                var username = normalizedSlug;
-                int counter = 1;
-                while (await _context.Users.AnyAsync(u => u.Username.ToLower() == username.ToLower()))
-                {
-                    username = $"{normalizedSlug}{counter++}";
-                }
-
-                // Ban đầu tạo tài khoản với vai trò Viewer (mã ID 10 số bắt đầu bằng 9), sau khi Admin duyệt mới đổi thành 1
-                var viewerAccountId = await _accountIdService.GenerateAccountIdAsync(isStreamer: false, DateTime.UtcNow.Year);
-
-                targetUser = new User
-                {
-                    AccountId = viewerAccountId,
-                    Username = username,
-                    Email = normalizedEmail,
-                    PasswordHash = _passwordHasher.HashPassword(model.Password),
-                    FullName = model.FullName.Trim(),
-                    PhoneNumber = model.PhoneNumber?.Trim(),
-                    AvatarUrl = "https://api.dicebear.com/7.x/adventurer/svg?seed=" + Uri.EscapeDataString(model.FullName),
-                    WalletBalance = 0,
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                _context.Users.Add(targetUser);
                 await _context.SaveChangesAsync();
+                return (true, string.Empty, existingProfile);
             }
 
             // Đảm bảo người dùng có vai trò Viewer trong lúc chờ Quản trị viên duyệt

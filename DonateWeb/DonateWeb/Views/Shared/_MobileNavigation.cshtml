@@ -3,6 +3,7 @@
     var currentPath = Context.Request.Path.Value?.ToLowerInvariant() ?? "/";
     var isAdmin = User.IsInRole(UserRoles.Admin);
     var isStreamer = User.IsInRole(UserRoles.Streamer) && !isAdmin;
+    var isSupportAgent = User.IsInRole(UserRoles.SupportAgent);
     var isAuthenticated = User.Identity?.IsAuthenticated == true;
     var profileUrl = User.FindFirst("StreamerSlug")?.Value;
     var isHome = currentPath == "/" || currentPath.StartsWith("/home");
@@ -43,6 +44,14 @@
     <div class="offcanvas-body d-flex flex-column">
         <h2 class="mobile-menu-heading" id="mobileQuickMenuLabel">Menu</h2>
         <div class="mobile-quick-links">
+            @if (isSupportAgent || isAdmin)
+            {
+                <a href="/SupportChat/Inbox"><i class="fa-solid fa-headset"></i><span>Hộp thư hỗ trợ</span></a>
+            }
+            @if (isAdmin)
+            {
+                <a href="/Admin/SupportAgents"><i class="fa-solid fa-user-shield"></i><span>Quản lý Hỗ trợ viên</span></a>
+            }
             <a href="/Shop"><i class="fa-solid fa-store"></i><span>Cửa hàng</span></a>
             <a href="/Guides"><i class="fa-solid fa-book-open"></i><span>Hướng dẫn</span></a>
             <a href="/Effects"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Hiệu ứng</span></a>
@@ -53,9 +62,9 @@
                 <a href="/Streamer/Config"><i class="fa-solid fa-sliders"></i><span>Cấu hình kênh</span></a>
                 <a href="/Shop/MyProducts"><i class="fa-solid fa-boxes-stacked"></i><span>Sản phẩm của tôi</span></a>
             }
-            else
+            else if (isAuthenticated && !isAdmin)
             {
-                <a href="/Streamer/Register"><i class="fa-solid fa-video"></i><span>Đăng ký Streamer</span></a>
+                <a href="/Streamer/Register"><i class="fa-solid fa-video"></i><span>Gửi hồ sơ Streamer</span></a>
             }
             @if (isAuthenticated)
             {

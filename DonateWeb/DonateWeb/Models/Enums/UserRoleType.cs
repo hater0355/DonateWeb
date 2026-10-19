@@ -5,12 +5,14 @@ namespace DonateWeb.Models.Enums
         public const string Admin = "Admin";
         public const string Streamer = "Streamer";
         public const string Viewer = "Viewer";
+        public const string SupportAgent = "SupportAgent";
     }
 
     public enum UserRoleType
     {
         Viewer = 1,
         Streamer = 2,
-        Admin = 3
+        Admin = 3,
+        SupportAgent = 4
     }
 }

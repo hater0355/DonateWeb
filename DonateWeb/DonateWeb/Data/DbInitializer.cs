@@ -253,6 +253,47 @@ namespace DonateWeb.Data
                             CONSTRAINT FK_StreamerStatuses_StreamerProfiles FOREIGN KEY (StreamerProfileId) REFERENCES dbo.StreamerProfiles(Id) ON DELETE CASCADE
                         );
                     END
+
+                    -- Hộp thư hỗ trợ trực tuyến (tạo có điều kiện để nâng cấp an toàn CSDL VPS hiện có).
+                    IF OBJECT_ID('dbo.SupportConversations', 'U') IS NULL AND OBJECT_ID('dbo.Users', 'U') IS NOT NULL
+                    BEGIN
+                        CREATE TABLE dbo.SupportConversations (
+                            Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                            UserId INT NULL,
+                            GuestTokenHash NVARCHAR(64) NULL,
+                            VisitorName NVARCHAR(100) NOT NULL,
+                            Status NVARCHAR(20) NOT NULL CONSTRAINT DF_SupportConversations_Status DEFAULT N'Open',
+                            CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_SupportConversations_CreatedAt DEFAULT SYSUTCDATETIME(),
+                            LastMessageAt DATETIME2 NOT NULL CONSTRAINT DF_SupportConversations_LastMessageAt DEFAULT SYSUTCDATETIME(),
+                            CONSTRAINT FK_SupportConversations_Users FOREIGN KEY (UserId) REFERENCES dbo.Users(Id) ON DELETE SET NULL
+                        );
+                    END
+                    IF OBJECT_ID('dbo.SupportConversations', 'U') IS NOT NULL
+                    BEGIN
+                        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SupportConversations_Status_LastMessageAt' AND object_id = OBJECT_ID('dbo.SupportConversations'))
+                            CREATE INDEX IX_SupportConversations_Status_LastMessageAt ON dbo.SupportConversations(Status, LastMessageAt DESC);
+                        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SupportConversations_UserId_Status' AND object_id = OBJECT_ID('dbo.SupportConversations'))
+                            CREATE INDEX IX_SupportConversations_UserId_Status ON dbo.SupportConversations(UserId, Status);
+                        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SupportConversations_GuestTokenHash' AND object_id = OBJECT_ID('dbo.SupportConversations'))
+                            CREATE INDEX IX_SupportConversations_GuestTokenHash ON dbo.SupportConversations(GuestTokenHash);
+                    END
+
+                    IF OBJECT_ID('dbo.SupportChatMessages', 'U') IS NULL AND OBJECT_ID('dbo.SupportConversations', 'U') IS NOT NULL
+                    BEGIN
+                        CREATE TABLE dbo.SupportChatMessages (
+                            Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                            ConversationId INT NOT NULL,
+                            SenderUserId INT NULL,
+                            SenderName NVARCHAR(100) NOT NULL,
+                            IsFromSupport BIT NOT NULL CONSTRAINT DF_SupportChatMessages_IsFromSupport DEFAULT 0,
+                            Content NVARCHAR(2000) NOT NULL,
+                            IsReadBySupport BIT NOT NULL CONSTRAINT DF_SupportChatMessages_IsReadBySupport DEFAULT 0,
+                            IsReadByVisitor BIT NOT NULL CONSTRAINT DF_SupportChatMessages_IsReadByVisitor DEFAULT 0,
+                            CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_SupportChatMessages_CreatedAt DEFAULT SYSUTCDATETIME(),
+                            CONSTRAINT FK_SupportChatMessages_SupportConversations FOREIGN KEY (ConversationId) REFERENCES dbo.SupportConversations(Id) ON DELETE CASCADE
+                        );
+                        CREATE INDEX IX_SupportChatMessages_ConversationId_Id ON dbo.SupportChatMessages(ConversationId, Id);
+                    END
                 ");
 
                 // Roles are required in every environment; demo accounts and content are development-only.
@@ -262,12 +303,20 @@ namespace DonateWeb.Data
                     {
                         new Role { Name = UserRoles.Admin, Description = "Quản trị viên toàn hệ thống" },
                         new Role { Name = UserRoles.Streamer, Description = "Nhà sáng tạo nội dung / Streamer nhận donate" },
-                        new Role { Name = UserRoles.Viewer, Description = "Người xem, ủng hộ và nạp ví" }
+                        new Role { Name = UserRoles.Viewer, Description = "Người xem, ủng hộ và nạp ví" },
+                        new Role { Name = UserRoles.SupportAgent, Description = "Nhân viên hỗ trợ người dùng qua hộp thư trực tuyến" }
                     };
 
                     await context.Roles.AddRangeAsync(roles);
                     await context.SaveChangesAsync();
                     logger.LogInformation("Seeded roles: Admin, Streamer, Viewer successfully.");
+                }
+
+                // CSDL production đã có roles từ trước: bổ sung role hỗ trợ mà không phụ thuộc seed demo.
+                if (!await context.Roles.AnyAsync(r => r.Name == UserRoles.SupportAgent))
+                {
+                    context.Roles.Add(new Role { Name = UserRoles.SupportAgent, Description = "Nhân viên hỗ trợ người dùng qua hộp thư trực tuyến" });
+                    await context.SaveChangesAsync();
                 }
 
                 if (!seedDemoData)

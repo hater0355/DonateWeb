@@ -9,9 +9,12 @@
     <link href="~/lib/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet" asp-append-version="true" />
     <link rel="stylesheet" href="~/lib/fontawesome/css/all.min.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/support-chat.css" asp-append-version="true" />
 </head>
 @{
     var isWidgetsArea = string.Equals(ViewContext.RouteData.Values["area"]?.ToString(), "Widgets", StringComparison.OrdinalIgnoreCase);
+    var isSupportChatVisitor = !isWidgetsArea && !User.IsInRole(DonateWeb.Models.Enums.UserRoles.Admin)
+        && !User.IsInRole(DonateWeb.Models.Enums.UserRoles.SupportAgent);
 }
 <body class="@(isWidgetsArea ? "desktop-widget-layout" : "")">
     <div class="animated-bg-container">
@@ -23,6 +26,10 @@
     @if (!isWidgetsArea)
     {
         @await Html.PartialAsync("_MobileNavigation")
+    }
+    @if (isSupportChatVisitor)
+    {
+        @await Html.PartialAsync("_SupportChatWidget")
     }
 
     <div class="d-flex main-wrapper">
@@ -36,6 +43,14 @@
 
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js" asp-append-version="true"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    @if (isSupportChatVisitor)
+    {
+        <script src="~/js/support-chat.js" asp-append-version="true"></script>
+    }
+    @if (User.IsInRole(DonateWeb.Models.Enums.UserRoles.Admin) || User.IsInRole(DonateWeb.Models.Enums.UserRoles.SupportAgent))
+    {
+        <script src="~/js/support-chat-inbox.js" asp-append-version="true"></script>
+    }
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

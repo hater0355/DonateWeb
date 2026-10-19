@@ -42,6 +42,10 @@ namespace DonateWeb.Data
         // Bài viết Status của Streamer
         public DbSet<StreamerStatus> StreamerStatuses => Set<StreamerStatus>();
 
+        // Hộp thư hỗ trợ trực tuyến và lịch sử hội thoại.
+        public DbSet<SupportConversation> SupportConversations => Set<SupportConversation>();
+        public DbSet<SupportChatMessage> SupportChatMessages => Set<SupportChatMessage>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -76,6 +80,26 @@ namespace DonateWeb.Data
                       .WithMany(r => r.UserRoles)
                       .HasForeignKey(ur => ur.RoleId)
                       .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<SupportConversation>(entity =>
+            {
+                entity.HasIndex(c => new { c.Status, c.LastMessageAt });
+                entity.HasIndex(c => new { c.UserId, c.Status });
+                entity.HasIndex(c => c.GuestTokenHash);
+                entity.HasOne(c => c.User)
+                    .WithMany()
+                    .HasForeignKey(c => c.UserId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<SupportChatMessage>(entity =>
+            {
+                entity.HasIndex(m => new { m.ConversationId, m.Id });
+                entity.HasOne(m => m.Conversation)
+                    .WithMany(c => c.Messages)
+                    .HasForeignKey(m => m.ConversationId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             // StreamerProfile - Unique Slug & 1-to-1 with User

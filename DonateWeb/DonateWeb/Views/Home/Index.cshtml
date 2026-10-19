@@ -339,10 +339,19 @@
                         else
                         {
                             <p class="text-muted mb-1 fw-medium">Chưa có KOL / Streamer nào trên hệ thống</p>
-                            <small class="text-muted mb-3">Các tài khoản streamer được tạo trong database sẽ tự động xuất hiện tại đây.</small>
-                            <div>
-                                <a href="/Streamer/Register" class="btn btn-sm btn-outline-success rounded-pill px-3">Đăng ký làm Streamer</a>
-                            </div>
+                            <small class="text-muted mb-3">Các kênh sẽ xuất hiện sau khi hồ sơ Streamer được Admin xét duyệt.</small>
+                            @if (User.Identity?.IsAuthenticated == true && !User.IsInRole(DonateWeb.Models.Enums.UserRoles.Streamer) && !User.IsInRole(DonateWeb.Models.Enums.UserRoles.Admin))
+                            {
+                                <div>
+                                    <a href="/Streamer/Register" class="btn btn-sm btn-outline-success rounded-pill px-3">Gửi hồ sơ Streamer</a>
+                                </div>
+                            }
+                            else if (User.Identity?.IsAuthenticated != true)
+                            {
+                                <div>
+                                    <a asp-controller="Auth" asp-action="Login" asp-route-returnUrl="/Streamer/Register" class="btn btn-sm btn-outline-success rounded-pill px-3">Đăng nhập để gửi hồ sơ Streamer</a>
+                                </div>
+                            }
                         }
                     </div>
                 </div>
@@ -429,7 +438,7 @@
                 ? DbContext.Users.Where(u => u.Id == uid).Select(u => (decimal?)u.WalletBalance).FirstOrDefault()
                 : null;
             var walletBalance = (liveBalance ?? 0m).ToString("N0");
-            var roleBadge = User.IsInRole(UserRoles.Admin) ? "Admin" : User.IsInRole(UserRoles.Streamer) ? "Streamer" : "Viewer";
+            var roleBadge = User.IsInRole(UserRoles.Admin) ? "Admin" : User.IsInRole(UserRoles.Streamer) ? "Streamer" : User.IsInRole(UserRoles.SupportAgent) ? "Hỗ trợ viên" : "Viewer";
 
             <div class="right-card-green d-flex align-items-center gap-3">
                 <img src="@avatarUrl" class="rounded-3 border border-light object-fit-cover flex-shrink-0" width="60" height="60" alt="Avatar" onerror="this.src='/images/default-avatar.png'" />

@@ -71,22 +71,9 @@ namespace DonateWeb.Services
                     return (false, "Địa chỉ Email này đã được đăng ký.", null);
                 }
 
-                // Nếu người dùng chọn làm Streamer, kiểm tra và chuẩn hóa Slug (nếu có nhập)
-                string? streamerSlug = null;
-                if (model.RoleType == UserRoles.Streamer && !string.IsNullOrWhiteSpace(model.StreamerSlug))
-                {
-                    var rawSlug = model.StreamerSlug.Trim().ToLower().Replace("_", "-");
-
-                    if (await _context.StreamerProfiles.AnyAsync(sp => sp.Slug.ToLower() == rawSlug))
-                    {
-                        return (false, $"Tên miền / Slug cá nhân '{rawSlug}' đã được streamer khác sử dụng. Vui lòng chọn tên khác.", null);
-                    }
-                    streamerSlug = rawSlug;
-                }
-
                 var passwordHash = _passwordHasher.HashPassword(model.Password);
-                var isStreamerRegister = model.RoleType == UserRoles.Streamer;
-                // Ban đầu tạo tài khoản với mã ID Viewer (bắt đầu bằng 9). Khi Admin duyệt mới nâng cấp sang 1
+                // Tài khoản tự đăng ký luôn bắt đầu ở vai trò Viewer. Quyền Streamer
+                // chỉ được cấp sau khi đã gửi hồ sơ riêng và Admin phê duyệt.
                 var accountId = await _accountIdService.GenerateAccountIdAsync(isStreamer: false, DateTime.UtcNow.Year);
 
                 var user = new User
@@ -120,28 +107,6 @@ namespace DonateWeb.Services
                     UserId = user.Id,
                     RoleId = viewerRole.Id
                 });
-
-                // Nếu đăng ký Streamer, tạo StreamerProfile với trạng thái Pending chờ Admin duyệt
-                if (isStreamerRegister)
-                {
-                    var finalSlug = !string.IsNullOrEmpty(streamerSlug) ? streamerSlug : accountId;
-                    var streamerProfile = new StreamerProfile
-                    {
-                        UserId = user.Id,
-                        Slug = finalSlug, // Tên miền trang cá nhân là mã ID của streamer
-                        DisplayName = string.IsNullOrWhiteSpace(model.StreamerDisplayName) ? user.FullName : model.StreamerDisplayName.Trim(),
-                        GreetingMessage = "Chào mừng bạn đến với kênh donate chính thức của mình! Cảm ơn bạn đã luôn ủng hộ ❤️",
-                        Bio = null,
-                        AvatarUrl = user.AvatarUrl,
-                        BannerUrl = "/images/default-banner.jpg",
-                        MinDonateAmount = 10000,
-                        IsVerified = false,
-                        ApprovalStatus = StreamerApprovalStatus.Pending, // Chờ duyệt
-                        IsActive = true,
-                        CreatedAt = DateTime.UtcNow
-                    };
-                    _context.StreamerProfiles.Add(streamerProfile);
-                }
 
                 await _context.SaveChangesAsync();
                 return (true, string.Empty, user);

@@ -1,0 +1,38 @@
+@{
+    ViewData["Title"] = "Hộp thư hỗ trợ";
+}
+<div class="support-inbox" id="supportInbox" data-list-url="/SupportChat/List" data-messages-url="/SupportChat/Messages" data-send-url="/SupportChat/Send" data-close-url="/SupportChat/Close">
+    <div class="support-inbox-heading">
+        <div><h1>Hộp thư hỗ trợ</h1><p>Trả lời câu hỏi của khách truy cập.</p></div>
+        @if (User.IsInRole(DonateWeb.Models.Enums.UserRoles.Admin))
+        {
+            <a class="btn btn-outline-secondary" href="/Admin/SupportAgents"><i class="fa-solid fa-user-shield me-1"></i>Quản lý Hỗ trợ viên</a>
+        }
+    </div>
+    <div class="support-inbox-layout">
+        <aside class="support-inbox-list-pane">
+            <div class="support-inbox-tabs">
+                <button type="button" class="active" data-status="Open">Đang mở</button>
+                <button type="button" data-status="Closed">Đã đóng</button>
+            </div>
+            <div class="support-inbox-list" id="supportInboxList"><p class="text-muted p-3 mb-0">Đang tải cuộc trò chuyện…</p></div>
+        </aside>
+        <section class="support-inbox-chat">
+            <div class="support-inbox-empty" id="supportInboxEmpty"><i class="fa-regular fa-comments"></i><span>Chọn một cuộc trò chuyện để xem tin nhắn.</span></div>
+            <div class="support-inbox-active" id="supportInboxActive" hidden>
+                <header class="support-inbox-chat-header">
+                    <div><strong id="supportInboxVisitor">Khách</strong><small id="supportInboxUser"></small></div>
+                    <button class="btn btn-sm btn-outline-danger" id="supportInboxCloseConversation" type="button">Đóng cuộc trò chuyện</button>
+                </header>
+                <div class="support-inbox-messages" id="supportInboxMessages" role="log" aria-live="polite"></div>
+                <form class="support-inbox-form" id="supportInboxForm">
+                    @Html.AntiForgeryToken()
+                    <label class="visually-hidden" for="supportInboxInput">Tin nhắn trả lời</label>
+                    <textarea id="supportInboxInput" rows="2" maxlength="2000" placeholder="Nhập câu trả lời…" required></textarea>
+                    <button class="btn btn-success" type="submit"><i class="fa-solid fa-paper-plane me-1"></i>Gửi</button>
+                </form>
+                <p class="support-inbox-note" id="supportInboxNote"></p>
+            </div>
+        </section>
+    </div>
+</div>

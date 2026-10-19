@@ -1048,6 +1048,7 @@ namespace DonateWeb.Controllers
         /// <summary>
         /// Mở form đăng ký Streamer
         /// </summary>
+        [Authorize(Roles = UserRoles.Viewer)]
         [HttpGet]
         public async Task<IActionResult> Register()
         {
@@ -1070,7 +1071,6 @@ namespace DonateWeb.Controllers
                         ViewBag.PendingProfile = user.StreamerProfile;
                         model.FullName = user.FullName;
                         model.PhoneNumber = user.PhoneNumber ?? "";
-                        model.Email = user.Email;
                         model.Slug = user.StreamerProfile.Slug;
                         model.DisplayName = user.StreamerProfile.DisplayName;
                         model.BankName = user.StreamerProfile.BankName ?? "";
@@ -1084,7 +1084,6 @@ namespace DonateWeb.Controllers
 
                     model.FullName = user.FullName;
                     model.PhoneNumber = user.PhoneNumber ?? "";
-                    model.Email = user.Email;
                     model.Slug = user.Username.ToLower();
                     model.DisplayName = user.FullName;
                 }
@@ -1096,6 +1095,7 @@ namespace DonateWeb.Controllers
         /// <summary>
         /// Xử lý đăng ký Streamer và gửi lệnh duyệt đến Quản trị viên
         /// </summary>
+        [Authorize(Roles = UserRoles.Viewer)]
         [HttpPost]
         [ValidateAntiForgeryToken]
         [RequestSizeLimit(12 * 1024 * 1024)]
