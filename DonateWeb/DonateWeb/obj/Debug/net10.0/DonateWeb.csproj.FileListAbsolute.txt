@@ -1207,4 +1207,8 @@ C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\bin\Debug\net10.0\
 C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\bin\Debug\net10.0\runtimes\win\lib\net10.0\System.Security.Cryptography.Pkcs.dll
 C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\p7wbltlq55-{0}-ywkkukpd6z-ywkkukpd6z.gz
 C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\3hxh1vd0ht-{0}-hlipzb8djn-hlipzb8djn.gz
-C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\u36njjr3f4-{0}-w9viaqf7cq-w9viaqf7cq.gz
+C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\43zjsoa5o4-{0}-8q4ynbpstx-8q4ynbpstx.gz
+C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\f9l6x3t2ok-{0}-qv7vgrdv47-qv7vgrdv47.gz
+C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\lsu4nim1k8-{0}-o4kum2qajz-o4kum2qajz.gz
+C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\bin\Debug\net10.0\Agreement\streamer-agreement-v1.json
+C:\Users\Admin\OneDrive\Desktop\DonateWeb\DonateWeb\DonateWeb\obj\Debug\net10.0\compressed\u36njjr3f4-{0}-kgc1pfngi6-kgc1pfngi6.gz

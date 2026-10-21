@@ -5,6 +5,7 @@ using DonateWeb.Data;
 using DonateWeb.Models.Entities;
 using DonateWeb.Models.Enums;
 using DonateWeb.ViewModels;
+using DonateWeb.Services;
 
 namespace DonateWeb.Controllers
 {
@@ -12,11 +13,13 @@ namespace DonateWeb.Controllers
     {
         private readonly AppDbContext _context;
         private readonly ILogger<HomeController> _logger;
+        private readonly IConfiguration _configuration;
 
-        public HomeController(AppDbContext context, ILogger<HomeController> logger)
+        public HomeController(AppDbContext context, ILogger<HomeController> logger, IConfiguration configuration)
         {
             _context = context;
             _logger = logger;
+            _configuration = configuration;
         }
 
         [HttpGet]
@@ -213,6 +216,7 @@ namespace DonateWeb.Controllers
         public IActionResult Terms()
         {
             ViewData["Title"] = "Điều khoản sử dụng";
+            PopulateLegalContact();
             return View();
         }
 
@@ -222,7 +226,19 @@ namespace DonateWeb.Controllers
         public IActionResult Privacy()
         {
             ViewData["Title"] = "Chính sách bảo mật và quyền riêng tư";
+            PopulateLegalContact();
             return View();
+        }
+
+        private void PopulateLegalContact()
+        {
+            ViewBag.PlatformLegal = _configuration.GetSection(PlatformContractOptions.SectionName)
+                .Get<PlatformContractOptions>() ?? new PlatformContractOptions();
+            var configuredUrl = _configuration["App:PublicBaseUrl"]?.Trim().TrimEnd('/');
+            ViewBag.PublicWebsite = Uri.TryCreate(configuredUrl, UriKind.Absolute, out var uri) &&
+                                    (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+                ? configuredUrl
+                : $"{Request.Scheme}://{Request.Host}";
         }
 
         [HttpGet]

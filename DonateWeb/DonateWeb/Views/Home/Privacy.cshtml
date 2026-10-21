@@ -1,21 +1,24 @@
 @{
     ViewData["Title"] = "Chính sách bảo mật và quyền riêng tư";
+    var legal = ViewBag.PlatformLegal as DonateWeb.Services.PlatformContractOptions ?? new DonateWeb.Services.PlatformContractOptions();
+    var publicWebsite = ViewBag.PublicWebsite as string ?? "";
 }
 <div class="terms-page container-fluid">
     <a class="terms-back-link" href="/Auth/Login"><i class="fa-solid fa-arrow-left me-2"></i>Quay lại đăng nhập</a>
     <div class="terms-related-links">
         <a href="/dieu-khoan-su-dung">Điều khoản sử dụng</a>
     </div>
-    <div class="alert alert-warning terms-draft-notice" role="note">
-        Địa chỉ liên hệ và mã số thuế/mã số doanh nghiệp vẫn cần được bổ sung. Thông tin về lưu trữ và nhà cung cấp được mô tả theo cấu hình mã nguồn hiện tại; hãy cập nhật nếu cấu hình vận hành thay đổi.
-    </div>
+    @if (!legal.IsComplete)
+    {
+        <div class="alert alert-warning terms-draft-notice" role="note">Thông tin pháp lý của đơn vị vận hành chưa đầy đủ; vui lòng hoàn tất địa chỉ, tư cách và mã số thuế/mã định danh phù hợp trước khi ký hợp đồng Streamer. Thông tin về lưu trữ và nhà cung cấp cũng cần được cập nhật nếu cấu hình vận hành thay đổi.</div>
+    }
     <article class="terms-document card border-0 shadow-sm">
 <h1>CHÍNH SÁCH BẢO MẬT VÀ QUYỀN RIÊNG TƯ</h1>
 <p><strong>Nền tảng:</strong> DonateWeb (thương hiệu hiển thị: ONLY FAN)</p>
-<p><strong>Website:</strong> https://plantsdonate.duckdns.org</p>
+<p><strong>Website:</strong> @publicWebsite</p>
 <p><strong>Ngày có hiệu lực:</strong> 19/10/2026</p>
 <p><strong>Ngày cập nhật gần nhất:</strong> 19/10/2026</p>
-<p><strong>Đơn vị vận hành:</strong> Nguyễn Anh Hiếu (cá nhân vận hành)</p>
+<p><strong>Đơn vị vận hành:</strong> @legal.OperatorLegalName (@legal.OperatorCapacity)</p>
 <hr />
 <h2>Điều 1. Giới thiệu và phạm vi áp dụng</h2>
 <p><strong>1.1.</strong> Chào mừng bạn đến với <strong>DonateWeb (thương hiệu hiển thị: ONLY FAN)</strong> (sau đây gọi là &quot;Nền tảng&quot;, &quot;Chúng tôi&quot;). Chúng tôi tôn trọng quyền riêng tư và cam kết bảo vệ dữ liệu cá nhân của người dùng trong quá trình truy cập, đăng ký tài khoản và sử dụng các dịch vụ được cung cấp.</p>
@@ -45,6 +48,7 @@
 <p>Để hỗ trợ hoạt động của tài khoản Streamer, chúng tôi có thể thu thập:</p>
 <ul><li>Tên hoặc biệt danh Streamer.</li><li>Tên kênh và liên kết đến các nền tảng phát sóng.</li><li>Ảnh đại diện, ảnh bìa và thông tin trang Donate.</li><li>Email và thông tin liên hệ.</li><li>Thông tin tài khoản nhận thanh toán.</li><li>Tên chủ tài khoản ngân hàng, số tài khoản và tên ngân hàng, nếu cần thiết cho phương thức thanh toán.</li><li>Lịch sử các khoản Donate và khoản thanh toán.</li><li>Thông tin xác minh danh tính hoặc thông tin thuế khi có căn cứ và yêu cầu phù hợp.</li></ul>
 <p>Chúng tôi chỉ thu thập những thông tin cần thiết để cung cấp dịch vụ, xác minh quyền sử dụng tài khoản và thực hiện nghĩa vụ pháp lý có liên quan.</p>
+<p>Khi ký hợp đồng điện tử Streamer, chúng tôi lưu phiên bản và bản nội dung hợp đồng đã chấp nhận (được mã hóa khi lưu), mã kiểm tra toàn vẹn, họ tên xác nhận, thời điểm, tài khoản đăng nhập, địa chỉ IP và thông tin trình duyệt để chứng minh nội dung đã giao kết, bảo vệ tài khoản và giải quyết tranh chấp. Bản hợp đồng hiển thị CCCD dưới dạng che bớt chữ số; địa chỉ thường trú lấy từ hồ sơ Streamer đã xác minh.</p>
 <h3>3.3. Thông tin của người Donate</h3>
 <p>Khi thực hiện Donate, thông tin có thể được thu thập bao gồm:</p>
 <ul><li>Tên hoặc biệt danh hiển thị.</li><li>Thông tin liên hệ nếu được cung cấp hoặc cần thiết cho giao dịch.</li><li>Số tiền Donate.</li><li>Thời gian và mã giao dịch.</li><li>Streamer nhận Donate.</li><li>Nội dung tin nhắn đính kèm.</li><li>Trạng thái thanh toán.</li><li>Thông tin tham chiếu do đơn vị thanh toán cung cấp.</li><li>Thông tin cần thiết để xử lý khiếu nại, đối soát hoặc hoàn tiền.</li></ul>
@@ -96,7 +100,7 @@
 <p><strong>6.5.</strong> Thông tin tài khoản ngân hàng đầy đủ, giấy tờ xác minh và những dữ liệu nhạy cảm khác không được tự động công khai trên trang Donate hoặc thông báo livestream.</p>
 <p><strong>6.6.</strong> Nội dung đã xuất hiện trong buổi phát sóng có thể được bên thứ ba xem, ghi lại, chụp màn hình hoặc chia sẻ. Nền tảng không thể bảo đảm thu hồi toàn bộ bản sao do bên thứ ba nắm giữ ngoài phạm vi kiểm soát của mình.</p>
 <p><strong>6.7.</strong> Người dùng không được đưa thông tin cá nhân của người khác vào tin nhắn Donate nếu không có quyền hoặc căn cứ hợp pháp.</p>
-<h2>Điều 7. Bảo mật dữ liệu TTS và AI Voice</h2>
+<h2>Điều 7. Bảo mật dữ liệu TTS, AI Voice và hỗ trợ tự động</h2>
 <p><strong>7.1.</strong> Nền tảng có thể cung cấp chức năng Text-to-Speech (TTS), cho phép chuyển đổi nội dung tin nhắn Donate thành giọng nói và phát trên livestream.</p>
 <p><strong>7.2.</strong> Để thực hiện tính năng này, hệ thống có thể xử lý:</p>
 <ul><li>Nội dung văn bản cần đọc.</li><li>Ngôn ngữ và giọng đọc được lựa chọn.</li><li>Tham số kỹ thuật phục vụ việc tạo âm thanh.</li><li>Mã yêu cầu và trạng thái xử lý.</li><li>Tệp âm thanh được tạo ra.</li><li>Nhật ký lỗi cần thiết cho việc vận hành.</li></ul>
@@ -107,6 +111,9 @@
 <p><strong>7.7.</strong> Những dữ liệu dùng để tạo hoặc xác thực giọng nói cá nhân, đặc biệt là dữ liệu nhận dạng sinh trắc học, chỉ được xử lý khi có căn cứ pháp lý và biện pháp bảo vệ tương ứng.</p>
 <p><strong>7.8.</strong> Người dùng không được sử dụng tính năng AI Voice để giả mạo giọng nói của cá nhân khác trái pháp luật.</p>
 <p><strong>7.9.</strong> Thời gian lưu giữ tệp âm thanh, nội dung đầu vào và dữ liệu xử lý phụ thuộc vào cấu hình vận hành thực tế, mục đích xử lý và thỏa thuận hợp lệ với nhà cung cấp dịch vụ.</p>
+<p><strong>7.10.</strong> Khi Trợ lý AI hỗ trợ được bật và cấu hình, tối đa 10 tin nhắn gần nhất trong cuộc chat (gồm vai trò người gửi và nội dung tin nhắn) được gửi tới OpenAI API để tạo câu trả lời. Ứng dụng không chủ động gửi tên hiển thị, email hoặc mã tài khoản trong yêu cầu AI; tuy nhiên người dùng có thể tự ghi thông tin cá nhân trong nội dung chat.</p>
+<p><strong>7.11.</strong> Tin nhắn AI và tổng số token sử dụng theo tháng được lưu trong cơ sở dữ liệu DonateWeb để hiển thị lịch sử chat và áp dụng hạn mức. Ứng dụng hiện chưa cấu hình tự động xóa lịch sử chat.</p>
+<p><strong>7.12.</strong> Trợ lý AI chỉ hỗ trợ thông tin chung, không truy cập hồ sơ riêng, ví, giao dịch hoặc đơn hàng và không thực hiện thay đổi tài khoản. Nếu không chắc, AI sẽ nhường cuộc trò chuyện cho Hỗ trợ viên. Nội dung chat được nhà cung cấp AI xử lý theo điều khoản và chính sách riêng của họ.</p>
 <h2>Điều 8. Chia sẻ dữ liệu với bên thứ ba</h2>
 <p><strong>8.1.</strong> Chúng tôi không bán dữ liệu cá nhân của người dùng cho bên thứ ba để họ tự do khai thác thương mại.</p>
 <p><strong>8.2.</strong> Trong phạm vi cần thiết và có căn cứ pháp lý, dữ liệu có thể được chia sẻ với các nhóm bên nhận sau:</p>
@@ -125,7 +132,7 @@
 <p><strong>8.3.</strong> Chúng tôi lựa chọn và quản lý đối tác xử lý dữ liệu trên cơ sở yêu cầu phù hợp về bảo vệ dữ liệu, bảo mật và phạm vi sử dụng thông tin.</p>
 <p><strong>8.4.</strong> Bên thứ ba chỉ được sử dụng dữ liệu theo mục đích và căn cứ hợp pháp tương ứng. Việc họ tự xử lý dữ liệu với vai trò độc lập, nếu có, sẽ chịu sự điều chỉnh của chính sách và nghĩa vụ riêng được thông báo cho người dùng.</p>
 <p><strong>8.5.</strong> Danh sách những đối tác quan trọng thực tế được sử dụng cần được công bố tại Chính sách này hoặc trang thông tin bổ sung:</p>
-<p>PayOS và SePay (thanh toán, webhook và đối soát); TDC Cloud (VPS, ứng dụng và cơ sở dữ liệu); Google và Meta/Facebook (đăng nhập khi người dùng lựa chọn); ElevenLabs (tạo giọng đọc khi TTS được bật và cấu hình); VietQR (tra cứu ngân hàng và tạo ảnh QR). Trang web cũng tải một số thư viện giao diện từ CDNJS, jsDelivr và Quill CDN. Hiện chưa thấy cấu hình dịch vụ phân tích truy cập hoặc quảng cáo trong mã nguồn.</p>
+<p>PayOS và SePay (thanh toán, webhook và đối soát); TDC Cloud (VPS, ứng dụng và cơ sở dữ liệu); Google và Meta/Facebook (đăng nhập khi người dùng lựa chọn); ElevenLabs (tạo giọng đọc khi TTS được bật và cấu hình); OpenAI API (tạo phản hồi cho chat hỗ trợ khi AI được bật và cấu hình); VietQR (tra cứu ngân hàng và tạo ảnh QR). Trang web cũng tải một số thư viện giao diện từ CDNJS, jsDelivr và Quill CDN. Hiện chưa thấy cấu hình dịch vụ phân tích truy cập hoặc quảng cáo trong mã nguồn.</p>
 <h2>Điều 9. Lưu trữ và bảo vệ dữ liệu</h2>
 <p><strong>9.1.</strong> Chúng tôi áp dụng các biện pháp bảo vệ dữ liệu phù hợp với mức độ rủi ro, tính chất thông tin được xử lý và khả năng kỹ thuật của hệ thống.</p>
 <p><strong>9.2.</strong> Tùy theo hạ tầng thực tế, các biện pháp có thể bao gồm:</p>
@@ -137,7 +144,9 @@
 <p><strong>10.1.</strong> Dữ liệu cá nhân được lưu trong khoảng thời gian cần thiết cho mục đích xử lý, nghĩa vụ pháp luật, bảo vệ quyền lợi hợp pháp hoặc giải quyết tranh chấp. Các thời hạn ở bảng dưới phản ánh cấu hình hiện tại; với một số nhóm, ứng dụng chưa cấu hình chức năng tự động xóa theo thời hạn.</p>
 <p><strong>10.2.</strong> Thời hạn cụ thể được xác định theo từng nhóm dữ liệu và quy định pháp luật áp dụng.</p>
 <p><strong>10.3.</strong> Nền tảng phải công bố hoặc cung cấp thông tin về thời hạn lưu trữ áp dụng, bao gồm tối thiểu các nhóm sau:</p>
+<p><strong>Thông tin bổ sung về chat hỗ trợ:</strong> Tin nhắn của người dùng, phản hồi AI và hỗ trợ viên được lưu trong hộp thư hỗ trợ DonateWeb. Khi AI đã nhường quyền cho Hỗ trợ viên hoặc cuộc trò chuyện đã đóng, nếu không có tin nhắn mới trong 10 phút thì ứng dụng tự đóng và xóa cuộc trò chuyện cùng các tin nhắn liên quan. Số token dùng cho AI được lưu theo tháng để thực thi hạn mức.</p>
 <div class="table-responsive"><table class="table table-sm table-bordered align-middle"><thead><tr><th scope="col">Loại dữ liệu</th><th scope="col">Thời hạn lưu trữ</th></tr></thead><tbody><tr><td>Thông tin tài khoản</td><td>Trong thời gian tài khoản hoạt động. Ứng dụng hiện chưa có lịch tự động xóa tài khoản; yêu cầu đóng/xóa được tiếp nhận qua email và xử lý trong phạm vi pháp luật cho phép.</td></tr><tr><td>Lịch sử Donate và thanh toán</td><td>Ứng dụng chưa cấu hình thời hạn tự động xóa. Dữ liệu được giữ để quản lý, đối soát, giải quyết khiếu nại và thực hiện nghĩa vụ pháp luật; một số khoản Donate có thể bị xóa khi hồ sơ Streamer tương ứng bị hủy.</td></tr><tr><td>Hồ sơ xác minh Streamer</td><td>Không có lịch tự động xóa cố định trong ứng dụng. Hồ sơ được giữ để xét duyệt/quản lý Streamer; ảnh CCCD và thông tin định danh được mã hóa, lưu riêng khỏi thư mục công khai. Yêu cầu xóa được xem xét sau khi xác minh và đối chiếu nghĩa vụ giao dịch/pháp luật.</td></tr><tr><td>Nội dung tin nhắn Donate</td><td>Lưu cùng bản ghi Donation; chưa cấu hình tự động xóa theo thời hạn. Nếu bản ghi Donation bị xóa theo quy trình hợp lệ, nội dung gắn với bản ghi đó cũng bị xóa.</td></tr><tr><td>Dữ liệu và âm thanh TTS</td><td>Âm thanh cache trong bộ nhớ máy chủ tối đa 12 giờ và tối đa 100 mục; có thể bị xóa sớm khi cache đầy hoặc ứng dụng khởi động lại. Nội dung văn bản vẫn lưu theo bản ghi Donation. ElevenLabs áp dụng chính sách lưu trữ riêng cho dữ liệu gửi tới dịch vụ.</td></tr><tr><td>Nhật ký truy cập và bảo mật</td><td>Thời hạn phụ thuộc cấu hình ghi log của Docker/VPS; ứng dụng hiện không đặt thời hạn tự động xóa riêng cho nhật ký.</td></tr><tr><td>Yêu cầu hỗ trợ và khiếu nại</td><td>Yêu cầu gửi qua email được giữ trong hộp thư phục vụ tiếp nhận/giải quyết; thời hạn xóa phụ thuộc cài đặt hộp thư và nghĩa vụ xử lý liên quan. Ứng dụng không lưu yêu cầu email trong cơ sở dữ liệu riêng.</td></tr><tr><td>Cookie và dữ liệu phân tích</td><td>Cookie đăng nhập chính: 7 ngày, có gia hạn khi tiếp tục sử dụng; cookie đăng nhập bên thứ ba: tối đa 10 phút. Mã hiện tại không cấu hình cookie phân tích/quảng cáo. Dữ liệu giỏ hàng và giao diện dùng localStorage trên thiết bị, không phải cookie.</td></tr></tbody></table></div>
+<p><strong>Hồ sơ hợp đồng điện tử:</strong> Bản hợp đồng đã chấp nhận và dữ liệu đối chiếu không có lịch tự động xóa trong ứng dụng hiện tại. Dữ liệu được lưu khi cần để thực hiện hợp đồng, chứng minh việc chấp nhận, xử lý yêu cầu hoặc khiếu nại, và đáp ứng nghĩa vụ pháp luật; các yêu cầu xóa được xem xét theo căn cứ và thời hạn lưu giữ bắt buộc.</p>
 <p><strong>10.4.</strong> Khi hết thời hạn lưu trữ và không còn căn cứ tiếp tục xử lý, dữ liệu sẽ được xóa, hủy hoặc xử lý theo phương thức phù hợp với pháp luật.</p>
 <p><strong>10.5.</strong> Một số dữ liệu có thể phải tiếp tục được lưu trữ sau khi người dùng đóng tài khoản do nghĩa vụ pháp lý hoặc giao dịch chưa hoàn tất.</p>
 <p><strong>10.6.</strong> Việc xóa dữ liệu khỏi hệ thống đang hoạt động, bản sao lưu và hệ thống của đối tác có thể tuân theo các quy trình kỹ thuật, thời hạn và ngoại lệ pháp luật khác nhau.</p>
@@ -191,7 +200,7 @@
 <p><strong>15.3.</strong> Chúng tôi có trách nhiệm đánh giá phạm vi xử lý, bên nhận, mục đích sử dụng và những biện pháp bảo vệ dữ liệu tương ứng.</p>
 <p><strong>15.4.</strong> Khi pháp luật yêu cầu thực hiện hồ sơ đánh giá tác động, thông báo hoặc thủ tục khác, Nền tảng có trách nhiệm thực hiện theo phạm vi nghĩa vụ của mình.</p>
 <p><strong>15.5.</strong> Những nhà cung cấp và quốc gia hoặc khu vực xử lý dữ liệu có liên quan sẽ được công bố phù hợp:</p>
-<p>Ứng dụng và cơ sở dữ liệu được lưu trên VPS TDC Cloud theo vùng máy chủ đã chọn trong tài khoản VPS. Dữ liệu thanh toán được gửi tới PayOS/SePay; thông tin ngân hàng cần thiết để tạo QR có thể được gửi tới VietQR; dữ liệu đăng nhập được xử lý bởi Google hoặc Meta/Facebook khi người dùng chọn; nội dung cần đọc được gửi tới ElevenLabs khi TTS được bật. Một số nhà cung cấp và CDN có thể xử lý yêu cầu ngoài Việt Nam theo hạ tầng của họ. Vị trí cụ thể phụ thuộc cấu hình và chính sách hiện hành của từng nhà cung cấp.</p>
+<p>Ứng dụng và cơ sở dữ liệu được lưu trên VPS TDC Cloud theo vùng máy chủ đã chọn trong tài khoản VPS. Dữ liệu thanh toán được gửi tới PayOS/SePay; thông tin ngân hàng cần thiết để tạo QR có thể được gửi tới VietQR; dữ liệu đăng nhập được xử lý bởi Google hoặc Meta/Facebook khi người dùng chọn; nội dung cần đọc được gửi tới ElevenLabs khi TTS được bật; nội dung chat hỗ trợ được gửi tới OpenAI API khi AI hỗ trợ được bật và cấu hình. Một số nhà cung cấp và CDN có thể xử lý yêu cầu ngoài Việt Nam theo hạ tầng của họ. Vị trí cụ thể phụ thuộc cấu hình và chính sách hiện hành của từng nhà cung cấp.</p>
 <h2>Điều 16. Bảo vệ dữ liệu của người chưa thành niên</h2>
 <p><strong>16.1.</strong> Theo Điều khoản sử dụng của Nền tảng, dịch vụ dành cho người đủ 18 tuổi trở lên và đáp ứng điều kiện sử dụng đã công bố.</p>
 <p><strong>16.2.</strong> Chúng tôi không chủ đích thu thập hoặc sử dụng dữ liệu cá nhân của người không đáp ứng điều kiện độ tuổi để đăng ký dịch vụ.</p>
@@ -221,10 +230,10 @@
 <h2>Điều 20. Thông tin liên hệ và giải quyết yêu cầu</h2>
 <p>Mọi câu hỏi, yêu cầu thực hiện quyền dữ liệu cá nhân, phản ánh về bảo mật hoặc khiếu nại có thể gửi qua các kênh chính thức:</p>
 <p><strong>Tên nền tảng:</strong> DonateWeb (thương hiệu hiển thị: ONLY FAN)</p>
-<p><strong>Đơn vị vận hành:</strong> Nguyễn Anh Hiếu</p>
-<p><strong>Mã số doanh nghiệp / mã số thuế:</strong> <span class="terms-placeholder">[Mã số thuế/mã số doanh nghiệp cần bổ sung nếu áp dụng]</span></p>
-<p><strong>Địa chỉ liên hệ:</strong> <span class="terms-placeholder">[Địa chỉ liên hệ cần bổ sung]</span></p>
-<p><strong>Website:</strong> https://plantsdonate.duckdns.org</p>
+<p><strong>Đơn vị vận hành:</strong> @legal.OperatorLegalName (@legal.OperatorCapacity)</p>
+<p><strong>Mã số doanh nghiệp / mã số thuế:</strong> @legal.OperatorRegistrationNumber</p>
+<p><strong>Địa chỉ liên hệ:</strong> @legal.OperatorAddress</p>
+<p><strong>Website:</strong> @publicWebsite</p>
 <p><strong>Email hỗ trợ:</strong> <a href="mailto:cupitcookies@gmail.com">cupitcookies@gmail.com</a></p>
 <p><strong>Email phụ trách quyền riêng tư:</strong> <a href="mailto:cupitcookies@gmail.com">cupitcookies@gmail.com</a></p>
 <p><strong>Đầu mối/bộ phận bảo vệ dữ liệu cá nhân:</strong> Nguyễn Anh Hiếu tiếp nhận yêu cầu qua &lt;a href=&quot;mailto:cupitcookies@gmail.com&quot;&gt;cupitcookies@gmail.com&lt;/a&gt;</p>
@@ -236,7 +245,7 @@
 <p><strong>21.2.</strong> Trường hợp một nội dung của Chính sách không phù hợp với quy định pháp luật bắt buộc, quy định pháp luật được ưu tiên áp dụng.</p>
 <p><strong>21.3.</strong> Nếu một điều khoản bị xác định không có hiệu lực, các điều khoản còn lại vẫn được áp dụng trong phạm vi có thể thực hiện độc lập.</p>
 <p><strong>21.4.</strong> Người dùng có thể truy cập phiên bản hiện hành tại:</p>
-<p>https://plantsdonate.duckdns.org/privacy</p>
+<p>@publicWebsite/privacy</p>
 <p><strong>Chúng tôi cam kết tôn trọng quyền riêng tư, bảo vệ dữ liệu cá nhân và xây dựng môi trường Donate minh bạch, an toàn cho cộng đồng Streamer và người ủng hộ.</strong></p>
 <p><strong>© 2026 DonateWeb (thương hiệu hiển thị: ONLY FAN). Bảo lưu các quyền hợp pháp.</strong></p>
     </article>

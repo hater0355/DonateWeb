@@ -11,6 +11,10 @@
     const empty = document.getElementById('supportChatEmpty');
     const note = document.getElementById('supportChatNote');
     const visitorName = document.getElementById('supportChatVisitorName');
+    const aiEnabled = root.dataset.aiEnabled === 'true';
+    const defaultNote = aiEnabled
+        ? 'Trợ lý AI có thể sai. Gõ “gặp hỗ trợ viên” để chuyển sang người thật; không gửi mật khẩu, OTP hoặc thông tin thẻ.'
+        : 'AI chưa được cấu hình; tin nhắn vẫn được gửi đến đội hỗ trợ. Không gửi mật khẩu, OTP hoặc thông tin thẻ.';
     const csrf = form.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
     let conversationId = null;
     let lastMessageId = 0;
@@ -21,16 +25,38 @@
     const setNote = text => { note.textContent = text; };
     const request = async (url, options = {}) => {
         const response = await fetch(url, { ...options, credentials: 'same-origin', headers: { 'Accept': 'application/json', ...(options.headers || {}) } });
-        if (!response.ok) throw new Error(response.status === 409 ? 'Cuộc trò chuyện đã đóng.' : 'Không thể kết nối hộp thư hỗ trợ.');
+        if (!response.ok) {
+            const error = new Error(response.status === 404
+                ? 'Phiên trò chuyện đã hết hạn.'
+                : response.status === 409 ? 'Cuộc trò chuyện đã đóng.' : 'Không thể kết nối hộp thư hỗ trợ.');
+            error.status = response.status;
+            throw error;
+        }
         return response.status === 204 ? null : response.json();
     };
+
+    function resetExpiredConversation(error) {
+        if (error?.status !== 404) return false;
+
+        // Phiên đã được máy chủ xóa sau thời gian không hoạt động; sẵn sàng tạo phiên mới.
+        conversationId = null;
+        lastMessageId = 0;
+        status = 'Open';
+        started = false;
+        messagesView.replaceChildren();
+        empty.hidden = false;
+        input.disabled = false;
+        form.querySelector('button[type="submit"]').disabled = false;
+        setNote('Phiên hỗ trợ đã hết hạn. Gửi tin nhắn mới để bắt đầu cuộc trò chuyện khác.');
+        return true;
+    }
 
     function appendMessage(message) {
         empty.hidden = true;
         const row = document.createElement('div');
-        row.className = `support-chat-message ${message.isFromSupport ? 'from-support' : 'from-visitor'}`;
+        row.className = `support-chat-message ${message.isFromSupport ? 'from-support' : 'from-visitor'}${message.isAi ? ' from-ai' : ''}`;
         const name = document.createElement('strong');
-        name.textContent = message.isFromSupport ? 'Hỗ trợ viên' : message.senderName;
+        name.textContent = message.isAi ? 'Trợ lý AI DonateWeb' : message.isFromSupport ? 'Hỗ trợ viên' : message.senderName;
         const text = document.createElement('div');
         text.className = 'support-chat-message-text';
         text.textContent = message.content;
@@ -68,16 +94,25 @@
     }
 
     async function refreshMessages() {
-        if (!conversationId || !panel.hidden) return;
-        const data = await request(`${root.dataset.messagesUrl}/${conversationId}?afterMessageId=${lastMessageId}`);
+        // Chỉ tải khi cửa sổ chat đang mở. Điều kiện cũ bị đảo, khiến widget
+        // bỏ qua cả tin vừa gửi lẫn câu trả lời từ Hỗ trợ viên.
+        if (!conversationId || panel.hidden) return;
+        let data;
+        try {
+            data = await request(`${root.dataset.messagesUrl}/${conversationId}?afterMessageId=${lastMessageId}`);
+        } catch (error) {
+            if (resetExpiredConversation(error)) return;
+            throw error;
+        }
         status = data.status;
+        if (data.aiPaused) setNote('Hỗ trợ viên sẽ tiếp quản cuộc trò chuyện.');
         data.messages.forEach(appendMessage);
         if (status !== 'Open') {
             input.disabled = true;
             form.querySelector('button[type="submit"]').disabled = true;
             setNote('Cuộc trò chuyện đã kết thúc. Hãy tải lại trang để gửi câu hỏi mới.');
         } else {
-            setNote('Không gửi mật khẩu hoặc thông tin thẻ ngân hàng qua chat.');
+            if (!data.aiPaused) setNote(defaultNote);
         }
     }
 
@@ -110,22 +145,28 @@
         try {
             await ensureConversation();
             const data = new URLSearchParams({ conversationId: String(conversationId), message, __RequestVerificationToken: csrf });
-            await request(root.dataset.sendUrl, {
+            const result = await request(root.dataset.sendUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': csrf },
                 body: data
             });
             input.value = '';
             await refreshMessages();
+            if (result.aiStatus === 'handoff') setNote('Đã chuyển cuộc trò chuyện cho Hỗ trợ viên.');
+            else if (result.aiStatus === 'outOfScope') setNote('Trợ lý AI chỉ hỗ trợ các vấn đề liên quan đến DonateWeb.');
+            else if (result.aiStatus === 'monthlyLimitReached') setNote('Trợ lý AI đã dùng hết hạn mức tháng; Hỗ trợ viên sẽ phản hồi bạn.');
+            else if (result.aiStatus === 'notConfigured') setNote('AI chưa được cấu hình; tin nhắn đã được chuyển đến đội hỗ trợ.');
+            else if (result.aiStatus === 'unavailable') setNote('Trợ lý AI hiện chưa trả lời được; tin nhắn đã được chuyển đến đội hỗ trợ.');
+            else if (result.aiStatus === 'paused') setNote('Hỗ trợ viên sẽ tiếp quản cuộc trò chuyện.');
         } catch (error) {
-            setNote(error.message);
+            if (!resetExpiredConversation(error)) setNote(error.message);
         } finally {
             submit.disabled = status !== 'Open';
         }
     });
 
     input.addEventListener('keydown', event => {
-        if (event.key === 'Enter' && !event.shiftKey) {
+        if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
             event.preventDefault();
             form.requestSubmit();
         }

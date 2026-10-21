@@ -50,6 +50,10 @@ namespace DonateWeb.Models.Entities
         [Column(TypeName = "decimal(18,2)")]
         public decimal DiscountAmount { get; set; }
 
+        /// <summary>Phí xem trước vận chuyển GHN được thu cùng đơn DonateWeb, không phải phí của một vận đơn đã tạo.</summary>
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal ShippingFee { get; set; }
+
         [MaxLength(50)]
         public string? CouponCode { get; set; }
 

@@ -12,15 +12,27 @@ services:
       PayOS__ClientId: ${PAYOS_CLIENT_ID:?Set PAYOS_CLIENT_ID in .env}
       PayOS__ApiKey: ${PAYOS_API_KEY:?Set PAYOS_API_KEY in .env}
       PayOS__ChecksumKey: ${PAYOS_CHECKSUM_KEY:?Set PAYOS_CHECKSUM_KEY in .env}
+      GHN__Token: ${GHN_TOKEN:-}
+      GHN__ShopId: ${GHN_SHOP_ID:-0}
       SePay__ApiKey: ${SEPAY_API_KEY:-}
       SePay__BankName: "${SEPAY_BANK_NAME:-MB Bank}"
       SePay__AccountNumber: ${SEPAY_ACCOUNT_NUMBER:-}
       SePay__AccountName: ${SEPAY_ACCOUNT_NAME:-}
       App__PublicBaseUrl: ${PUBLIC_BASE_URL:-}
+      PlatformContract__OperatorCapacity: ${PLATFORM_CONTRACT_OPERATOR_CAPACITY:-Cá nhân}
+      PlatformContract__OperatorLegalName: ${PLATFORM_CONTRACT_OPERATOR_LEGAL_NAME:-Nguyễn Anh Hiếu}
+      PlatformContract__OperatorAddress: "${PLATFORM_CONTRACT_OPERATOR_ADDRESS:-Thông tin minh họa (bài tập lớn)}"
+      PlatformContract__OperatorRegistrationNumber: "${PLATFORM_CONTRACT_OPERATOR_REGISTRATION_NUMBER:-Không áp dụng trong bản demo cá nhân}"
+      PlatformContract__ContactEmail: ${PLATFORM_CONTRACT_CONTACT_EMAIL:-cupitcookies@gmail.com}
       # ElevenLabs: chỉ truyền khóa bí mật vào container máy chủ, không đưa vào OBS/browser.
       ElevenLabs__ApiKey: ${ELEVENLABS_API_KEY:-}
       ElevenLabs__VoiceId: ${ELEVENLABS_VOICE_ID:-}
       ElevenLabs__ModelId: ${ELEVENLABS_MODEL_ID:-eleven_flash_v2_5}
+      # Khóa OpenAI chỉ nằm phía máy chủ; token AI được giới hạn theo tháng trong SQL Server.
+      SupportAi__ApiKey: ${SUPPORT_AI_API_KEY:-}
+      SupportAi__Model: ${SUPPORT_AI_MODEL:-gpt-5.4-mini}
+      SupportAi__MonthlyTokenLimit: ${SUPPORT_AI_MONTHLY_TOKEN_LIMIT:-100000}
+      SupportAi__MaxOutputTokens: ${SUPPORT_AI_MAX_OUTPUT_TOKENS:-500}
       Authentication__Google__ClientId: ${GOOGLE_CLIENT_ID:-}
       Authentication__Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
       Authentication__Facebook__AppId: ${FACEBOOK_APP_ID:-}

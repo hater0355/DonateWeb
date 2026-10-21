@@ -4,6 +4,10 @@
 }
 
 <div class="container py-4" style="max-width: 900px;">
+    <style>
+        .product-size-checkboxes label { cursor: pointer; }
+        .product-size-checkboxes label:has(input:checked) { background: #198754; border-color: #198754; color: #fff; }
+    </style>
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
         <div>
             <h2 class="fw-bold text-dark-green mb-1">Sửa sản phẩm</h2>
@@ -21,6 +25,7 @@
         <div class="card-body p-4">
             <div class="alert alert-info rounded-3 small">
                 Thay đổi tên, giá, mô tả hoặc ảnh sẽ chuyển sản phẩm về trạng thái <strong>Chờ Admin duyệt</strong>. Sản phẩm tạm ẩn khỏi gian hàng trong lúc xét duyệt.
+                Cập nhật cân nặng và kích thước kiện hàng không làm sản phẩm chờ duyệt lại.
             </div>
 
             <form asp-controller="Shop" asp-action="EditProduct" method="post" enctype="multipart/form-data">
@@ -36,14 +41,96 @@
                         <span asp-validation-for="Name" class="text-danger small"></span>
                     </div>
                     <div class="col-12 col-md-4">
+                        <label asp-for="Category" class="form-label fw-semibold">Danh mục</label>
+                        <select asp-for="Category" class="form-select product-category-select" required>
+                            @foreach (var category in DonateWeb.ViewModels.Shop.ShopProductCategories.All)
+                            {
+                                <option value="@category">@category</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12 product-size-options">
+                        <label class="form-label fw-semibold mb-1">Size có sẵn cho người mua chọn</label>
+                        <div class="product-size-checkboxes d-flex flex-wrap gap-2"></div>
+                        <div class="form-text">Các size này dùng chung giá và kho. Muốn giá/tồn kho riêng theo size, khai báo từng size trong bảng lựa chọn bên dưới.</div>
+                    </div>
+                    <div class="col-12">
+                        <div class="border rounded-3 p-3 bg-light-subtle">
+                            <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                                <div>
+                                    <label class="form-label fw-semibold mb-0">Lựa chọn bán hàng (không bắt buộc)</label>
+                                    <div class="form-text">Ví dụ: 1 hộp, 2 hộp, 3 hộp hoặc size S, M, L. Mỗi lựa chọn có giá và tồn kho riêng; số gói tính ship đặt tương ứng 1, 2, 3.</div>
+                                </div>
+                                <button type="button" id="addEditProductVariant" class="btn btn-sm btn-outline-success rounded-pill"><i class="fa-solid fa-plus me-1"></i> Thêm lựa chọn</button>
+                            </div>
+                            <div id="editProductVariants" class="variant-list d-grid gap-2 mt-3">
+                                @for (var i = 0; i < Model.Variants.Count; i++)
+                                {
+                                    <div class="row g-2 align-items-end border rounded-3 p-2 mx-0" data-product-variant-row="true">
+                                        <div class="col-12 col-md-3"><label class="form-label small mb-1">Tên lựa chọn</label><input name="Variants[@i].Name" data-variant-field="Name" value="@Model.Variants[i].Name" class="form-control form-control-sm" maxlength="50" required /></div>
+                                        <div class="col-6 col-md-3"><label class="form-label small mb-1">Giá (VNĐ)</label><input name="Variants[@i].Price" data-variant-field="Price" value="@Model.Variants[i].Price" type="number" class="form-control form-control-sm" min="1000" max="1000000000" step="1000" required /></div>
+                                        <div class="col-6 col-md-2"><label class="form-label small mb-1">Tồn kho</label><input name="Variants[@i].StockQuantity" data-variant-field="StockQuantity" value="@Model.Variants[i].StockQuantity" type="number" class="form-control form-control-sm" min="0" max="999999" required /></div>
+                                        <div class="col-6 col-md-2"><label class="form-label small mb-1">Số gói tính ship</label><input name="Variants[@i].ShippingUnits" data-variant-field="ShippingUnits" value="@Model.Variants[i].ShippingUnits" type="number" class="form-control form-control-sm" min="1" max="100" required /></div>
+                                        <div class="col-6 col-md-2 d-grid"><button type="button" class="btn btn-sm btn-outline-danger remove-product-variant"><i class="fa-solid fa-trash"></i> Bỏ</button></div>
+                                    </div>
+                                }
+                            </div>
+                            <div class="form-text mt-2">Khi có lựa chọn, người mua phải chọn một lựa chọn. Giá và tồn kho tổng được tính từ danh sách này.</div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
                         <label asp-for="Price" class="form-label fw-semibold">Giá bán (VNĐ)</label>
-                        <input asp-for="Price" type="number" min="1000" max="1000000000" step="1000" class="form-control" required />
+                        <input asp-for="Price" type="number" min="0" max="1000000000" step="1000" class="form-control" />
                         <span asp-validation-for="Price" class="text-danger small"></span>
+                        <div class="form-text">Dùng khi không có lựa chọn riêng.</div>
+                    </div>
+                    <div class="col-12">
+                        <div class="fw-semibold text-dark">Thông số kiện hàng cho một sản phẩm</div>
+                        <div class="form-text mb-2">Nhập cân nặng và kích thước sau khi đóng gói. GHN dùng gram và centimet để ước tính phí ship.</div>
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label asp-for="WeightGrams" class="form-label fw-semibold">Cân nặng (gram)</label>
+                        <input asp-for="WeightGrams" type="number" min="1" max="100000" step="1" class="form-control" required />
+                        <span asp-validation-for="WeightGrams" class="text-danger small"></span>
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label asp-for="LengthCm" class="form-label fw-semibold">Dài (cm)</label>
+                        <input asp-for="LengthCm" type="number" min="1" max="200" step="1" class="form-control" required />
+                        <span asp-validation-for="LengthCm" class="text-danger small"></span>
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label asp-for="WidthCm" class="form-label fw-semibold">Rộng (cm)</label>
+                        <input asp-for="WidthCm" type="number" min="1" max="200" step="1" class="form-control" required />
+                        <span asp-validation-for="WidthCm" class="text-danger small"></span>
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label asp-for="HeightCm" class="form-label fw-semibold">Cao (cm)</label>
+                        <input asp-for="HeightCm" type="number" min="1" max="200" step="1" class="form-control" required />
+                        <span asp-validation-for="HeightCm" class="text-danger small"></span>
                     </div>
                     <div class="col-12">
                         <label asp-for="Description" class="form-label fw-semibold">Mô tả sản phẩm</label>
                         <textarea asp-for="Description" class="form-control" rows="4" maxlength="2000"></textarea>
                         <span asp-validation-for="Description" class="text-danger small"></span>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Ảnh phụ nằm bên dưới phần mô tả</label>
+                        @if (Model.ExistingAdditionalImageUrls.Any())
+                        {
+                            <div class="d-flex flex-wrap gap-3 mb-2">
+                                @foreach (var imageUrl in Model.ExistingAdditionalImageUrls)
+                                {
+                                    <label class="border rounded-3 p-2 text-center" style="width: 130px">
+                                        <img src="@imageUrl" alt="Ảnh sản phẩm phụ" class="rounded mb-2" style="width: 100px; height: 100px; object-fit: cover" />
+                                        <span class="d-block small text-danger"><input type="checkbox" name="RemoveAdditionalImageUrls" value="@imageUrl" /> Gỡ ảnh này</span>
+                                    </label>
+                                }
+                            </div>
+                        }
+                        <input asp-for="AdditionalImageFiles" type="file" class="form-control additional-product-images" accept="image/jpeg,image/png,image/webp,image/gif" multiple />
+                        <div class="form-text">Có thể giữ ảnh hiện tại, gỡ ảnh đã chọn hoặc tải thêm tối đa 4 ảnh phụ (mỗi ảnh tối đa 8 MB).</div>
+                        <span asp-validation-for="AdditionalImageFiles" class="text-danger small"></span>
+                        <div class="additional-image-preview d-flex flex-wrap gap-2 mt-2"></div>
                     </div>
                     <div class="col-12 col-md-7">
                         <label asp-for="ImageUrl" class="form-label fw-semibold">Đường dẫn ảnh</label>
@@ -84,4 +171,77 @@
         const file = event.target.files?.[0];
         if (file) imagePreview.src = URL.createObjectURL(file);
     });
+
+    (() => {
+        const clothingSizes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(DonateWeb.ViewModels.Shop.ShopProductCategories.ClothingSizes));
+        const footwearSizes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(DonateWeb.ViewModels.Shop.ShopProductCategories.FootwearSizes));
+        const clothingCategory = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(DonateWeb.ViewModels.Shop.ShopProductCategories.Clothing));
+        const footwearCategory = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(DonateWeb.ViewModels.Shop.ShopProductCategories.Footwear));
+        const selectedSizes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AvailableSizes));
+        const categorySelect = document.querySelector('.product-category-select');
+        const sizePanel = document.querySelector('.product-size-options');
+        const checkboxContainer = sizePanel?.querySelector('.product-size-checkboxes');
+
+        function renderSizes(selected = []) {
+            const values = categorySelect.value === clothingCategory ? clothingSizes
+                : categorySelect.value === footwearCategory ? footwearSizes : [];
+            sizePanel.classList.toggle('d-none', values.length === 0);
+            checkboxContainer.innerHTML = values.map((size, index) => {
+                const id = `editProductSize${index}`;
+                return `<label class="btn btn-outline-secondary btn-sm rounded-pill" for="${id}">
+                    <input class="visually-hidden" type="checkbox" id="${id}" name="AvailableSizes" value="${size}" ${selected.includes(size) ? 'checked' : ''} />${size}</label>`;
+            }).join('');
+        }
+
+        categorySelect?.addEventListener('change', () => renderSizes());
+        renderSizes(selectedSizes);
+
+        const variantContainer = document.getElementById('editProductVariants');
+        checkboxContainer?.addEventListener('change', event => {
+            if (event.target.matches('input[type="checkbox"]') && event.target.checked
+                && variantContainer.querySelector('[data-product-variant-row]')) {
+                event.target.checked = false;
+                alert('Dùng size nhanh hoặc bảng giá/tồn kho riêng bên dưới; không chọn đồng thời hai kiểu.');
+            }
+        });
+        function reindexVariants() {
+            Array.from(variantContainer.querySelectorAll('[data-product-variant-row]')).forEach((row, index) => {
+                row.querySelectorAll('[data-variant-field]').forEach(input => {
+                    input.name = `Variants[${index}].${input.dataset.variantField}`;
+                });
+            });
+        }
+        document.getElementById('addEditProductVariant')?.addEventListener('click', () => {
+            sizePanel?.querySelectorAll('input[type="checkbox"]:checked').forEach(input => input.checked = false);
+            const row = document.createElement('div');
+            row.className = 'row g-2 align-items-end border rounded-3 p-2 mx-0';
+            row.dataset.productVariantRow = 'true';
+            row.innerHTML = `
+                <div class="col-12 col-md-3"><label class="form-label small mb-1">Tên lựa chọn</label><input data-variant-field="Name" class="form-control form-control-sm" maxlength="50" placeholder="Ví dụ: 2 hộp" required /></div>
+                <div class="col-6 col-md-3"><label class="form-label small mb-1">Giá (VNĐ)</label><input data-variant-field="Price" type="number" class="form-control form-control-sm" min="1000" max="1000000000" step="1000" value="@Model.Price" required /></div>
+                <div class="col-6 col-md-2"><label class="form-label small mb-1">Tồn kho</label><input data-variant-field="StockQuantity" type="number" class="form-control form-control-sm" min="0" max="999999" value="@Model.StockQuantity" required /></div>
+                <div class="col-6 col-md-2"><label class="form-label small mb-1">Số gói tính ship</label><input data-variant-field="ShippingUnits" type="number" class="form-control form-control-sm" min="1" max="100" value="1" required /></div>
+                <div class="col-6 col-md-2 d-grid"><button type="button" class="btn btn-sm btn-outline-danger remove-product-variant"><i class="fa-solid fa-trash"></i> Bỏ</button></div>`;
+            variantContainer.appendChild(row);
+            reindexVariants();
+        });
+        document.addEventListener('click', event => {
+            const remove = event.target.closest('#editProductVariants .remove-product-variant');
+            if (!remove) return;
+            remove.closest('[data-product-variant-row]')?.remove();
+            reindexVariants();
+        });
+
+        document.querySelector('.additional-product-images')?.addEventListener('change', event => {
+            const files = Array.from(event.target.files || []);
+            const preview = document.querySelector('.additional-image-preview');
+            if (files.length > 4) {
+                alert('Bạn chỉ có thể tải tối đa 4 ảnh phụ trong một lần.');
+                event.target.value = '';
+                preview.innerHTML = '';
+                return;
+            }
+            preview.innerHTML = files.map(file => `<img src="${URL.createObjectURL(file)}" alt="Ảnh xem trước" class="rounded border" style="width:76px;height:76px;object-fit:cover">`).join('');
+        });
+    })();
 </script>

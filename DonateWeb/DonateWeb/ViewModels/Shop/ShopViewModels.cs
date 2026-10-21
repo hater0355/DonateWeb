@@ -10,9 +10,11 @@ namespace DonateWeb.ViewModels.Shop
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }
+        public string Category { get; set; } = "Khác";
         public decimal Price { get; set; }
         public string? ImageUrl { get; set; }
         public int StockQuantity { get; set; }
+        public bool HasVariants { get; set; }
         public int StreamerProfileId { get; set; }
         public string StreamerName { get; set; } = string.Empty;
         public string StreamerSlug { get; set; } = string.Empty;
@@ -32,6 +34,7 @@ namespace DonateWeb.ViewModels.Shop
         public List<ShopProductCardViewModel> Products { get; set; } = new();
         public string? SearchKeyword { get; set; }
         public string? SelectedStreamerSlug { get; set; }
+        public string? SelectedCategory { get; set; }
         public string? SortBy { get; set; } // "newest", "price_asc", "price_desc"
         public List<StreamerSelectOptionViewModel> Streamers { get; set; } = new();
         public int TotalProducts { get; set; }
@@ -53,12 +56,16 @@ namespace DonateWeb.ViewModels.Shop
         public bool IsViewerAuthenticated { get; set; }
         public string? ViewerName { get; set; }
         public string? ViewerPhone { get; set; }
+        public bool GhnShippingConfigured { get; set; }
     }
 
     public class CartItemInputModel
     {
         public int ProductId { get; set; }
         public int Quantity { get; set; } = 1;
+
+        [MaxLength(50)]
+        public string? Size { get; set; }
     }
 
     public class CheckoutRequestViewModel
@@ -83,6 +90,12 @@ namespace DonateWeb.ViewModels.Shop
         [MaxLength(50)]
         public string? CouponCode { get; set; }
 
+        public int? GhnProvinceId { get; set; }
+        public int? GhnWardId { get; set; }
+
+        /// <summary>Phí đã hiển thị ở bước xem trước, chỉ dùng để phát hiện báo giá thay đổi.</summary>
+        public long? QuotedShippingFee { get; set; }
+
         [Required]
         public string PaymentMethod { get; set; } = "Wallet"; // "Wallet" | "VietQR"
     }
@@ -99,17 +112,66 @@ namespace DonateWeb.ViewModels.Shop
         public string CouponCode { get; set; } = string.Empty;
     }
 
+    public class GhnFeePreviewRequestViewModel
+    {
+        [Required]
+        public int StreamerProfileId { get; set; }
+
+        [Required]
+        public List<CartItemInputModel> Items { get; set; } = new();
+
+        [Required, MaxLength(200)]
+        public string BuyerName { get; set; } = string.Empty;
+
+        [Required, MaxLength(20)]
+        public string BuyerPhone { get; set; } = string.Empty;
+
+        [Required, MaxLength(500)]
+        public string BuyerStreet { get; set; } = string.Empty;
+
+        [Range(1, int.MaxValue)]
+        public int ProvinceId { get; set; }
+
+        [Range(1, int.MaxValue)]
+        public int WardId { get; set; }
+    }
+
     public class ProductInputModel
     {
+        public static IReadOnlyList<string> Categories => ShopProductCategories.All;
+        public static IReadOnlyList<string> ClothingSizes => ShopProductCategories.ClothingSizes;
+        public static IReadOnlyList<string> FootwearSizes => ShopProductCategories.FootwearSizes;
+
         public int? Id { get; set; }
 
         [Required(ErrorMessage = "Vui lòng nhập tên sản phẩm")]
         [MaxLength(200, ErrorMessage = "Tên sản phẩm tối đa 200 ký tự")]
         public string Name { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Vui lòng nhập giá sản phẩm")]
-        [Range(1000, 1000000000, ErrorMessage = "Giá sản phẩm từ 1,000 đến 1,000,000,000 VNĐ")]
+        [Required(ErrorMessage = "Vui lòng chọn danh mục sản phẩm")]
+        [MaxLength(80)]
+        public string Category { get; set; } = "Khác";
+
+        public List<string> AvailableSizes { get; set; } = new();
+
+        [Range(0, 1000000000, ErrorMessage = "Giá sản phẩm không được vượt quá 1.000.000.000 VNĐ")]
         public decimal Price { get; set; }
+
+        [Required(ErrorMessage = "Vui lòng nhập cân nặng sau khi đóng gói")]
+        [Range(1, 100000, ErrorMessage = "Cân nặng phải từ 1 đến 100.000 gram")]
+        public int? WeightGrams { get; set; }
+
+        [Required(ErrorMessage = "Vui lòng nhập chiều dài kiện hàng")]
+        [Range(1, 200, ErrorMessage = "Chiều dài phải từ 1 đến 200 cm")]
+        public int? LengthCm { get; set; }
+
+        [Required(ErrorMessage = "Vui lòng nhập chiều rộng kiện hàng")]
+        [Range(1, 200, ErrorMessage = "Chiều rộng phải từ 1 đến 200 cm")]
+        public int? WidthCm { get; set; }
+
+        [Required(ErrorMessage = "Vui lòng nhập chiều cao kiện hàng")]
+        [Range(1, 200, ErrorMessage = "Chiều cao phải từ 1 đến 200 cm")]
+        public int? HeightCm { get; set; }
 
         [MaxLength(2000, ErrorMessage = "Mô tả tối đa 2.000 ký tự")]
         public string? Description { get; set; }
@@ -117,9 +179,30 @@ namespace DonateWeb.ViewModels.Shop
         [MaxLength(500, ErrorMessage = "Đường dẫn ảnh tối đa 500 ký tự")]
         public string? ImageUrl { get; set; }
         public IFormFile? ImageFile { get; set; }
+
+        public List<IFormFile> AdditionalImageFiles { get; set; } = new();
+        public List<string> ExistingAdditionalImageUrls { get; set; } = new();
+        public List<string> RemoveAdditionalImageUrls { get; set; } = new();
         [Range(0, 999999, ErrorMessage = "Tồn kho phải nằm trong khoảng 0 đến 999.999 sản phẩm")]
         public int StockQuantity { get; set; } = 999;
         public bool IsActive { get; set; } = true;
+        public List<ProductVariantInputModel> Variants { get; set; } = new();
+    }
+
+    public class ProductVariantInputModel
+    {
+        [Required(ErrorMessage = "Vui lòng nhập tên lựa chọn")]
+        [MaxLength(50, ErrorMessage = "Tên lựa chọn tối đa 50 ký tự")]
+        public string Name { get; set; } = string.Empty;
+
+        [Range(1000, 1000000000, ErrorMessage = "Giá lựa chọn từ 1.000 đến 1.000.000.000 VNĐ")]
+        public decimal Price { get; set; }
+
+        [Range(0, 999999, ErrorMessage = "Tồn kho lựa chọn từ 0 đến 999.999")]
+        public int StockQuantity { get; set; }
+
+        [Range(1, 100, ErrorMessage = "Số lượng gói tính vận chuyển từ 1 đến 100")]
+        public int ShippingUnits { get; set; } = 1;
     }
 
     public class ProductManageViewModel

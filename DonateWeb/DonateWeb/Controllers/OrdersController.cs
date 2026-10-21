@@ -268,7 +268,7 @@ namespace DonateWeb.Controllers
                 BuyerName = o.BuyerName,
                 BuyerPhone = o.BuyerPhone,
                 BuyerAddress = o.BuyerAddress,
-                ItemsSummary = string.Join(", ", o.Items.Select(i => $"{i.ProductName} (x{i.Quantity})")),
+                ItemsSummary = string.Join(", ", o.Items.Select(i => string.IsNullOrWhiteSpace(i.VariantSelection) ? $"{i.ProductName} (x{i.Quantity})" : $"{i.ProductName} - {i.VariantSelection} (x{i.Quantity})")),
                 TotalAmount = o.TotalAmount,
                 PaymentMethod = o.PaymentMethod,
                 PaymentStatus = o.PaymentStatus,

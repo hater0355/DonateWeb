@@ -7,6 +7,7 @@
     const active = document.getElementById('supportInboxActive');
     const visitorLabel = document.getElementById('supportInboxVisitor');
     const userLabel = document.getElementById('supportInboxUser');
+    const aiModeLabel = document.getElementById('supportInboxAiMode');
     const messagesView = document.getElementById('supportInboxMessages');
     const form = document.getElementById('supportInboxForm');
     const input = document.getElementById('supportInboxInput');
@@ -26,9 +27,9 @@
 
     function appendMessage(message) {
         const row = document.createElement('article');
-        row.className = `support-inbox-message ${message.isFromSupport ? 'from-support' : 'from-visitor'}`;
+        row.className = `support-inbox-message ${message.isFromSupport ? 'from-support' : 'from-visitor'}${message.isAi ? ' from-ai' : ''}`;
         const heading = document.createElement('strong');
-        heading.textContent = message.isFromSupport ? 'Hỗ trợ viên' : message.senderName;
+        heading.textContent = message.isAi ? 'Trợ lý AI DonateWeb' : message.isFromSupport ? 'Hỗ trợ viên' : message.senderName;
         const text = document.createElement('div');
         text.textContent = message.content;
         const time = document.createElement('time');
@@ -76,6 +77,7 @@
         lastMessageId = 0;
         visitorLabel.textContent = conversation.visitorName;
         userLabel.textContent = conversation.userEmail || 'Khách chưa đăng nhập';
+        aiModeLabel.textContent = conversation.aiPaused ? 'AI đã nhường cho Hỗ trợ viên' : 'AI đang trả lời ban đầu';
         empty.hidden = true;
         active.hidden = false;
         messagesView.replaceChildren();
@@ -92,6 +94,7 @@
         const url = `${root.dataset.messagesUrl}/${selectedId}?afterMessageId=${initial ? 0 : lastMessageId}`;
         const data = await request(url);
         data.messages.forEach(appendMessage);
+        aiModeLabel.textContent = data.aiPaused ? 'AI đã nhường cho Hỗ trợ viên' : 'AI đang trả lời ban đầu';
         if (data.status !== 'Open') {
             input.disabled = true;
             form.querySelector('button[type="submit"]').disabled = true;
@@ -124,6 +127,8 @@
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': csrf },
                 body
             });
+            if (selectedConversation) selectedConversation.aiPaused = true;
+            aiModeLabel.textContent = 'AI đã nhường cho Hỗ trợ viên';
             input.value = '';
             await refreshMessages();
             await loadList();
@@ -131,6 +136,15 @@
             note.textContent = error.message;
         } finally {
             submit.disabled = !selectedConversation || selectedConversation.status !== 'Open';
+        }
+    });
+
+    input.addEventListener('keydown', event => {
+        if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
+            event.preventDefault();
+            if (!input.disabled && !form.querySelector('button[type="submit"]').disabled) {
+                form.requestSubmit();
+            }
         }
     });
 

@@ -98,7 +98,7 @@ namespace DonateWeb.ViewModels.Streamer
         public string? BankDonationTransferCode { get; set; }
 
         /// <summary>Ảnh VietQR tĩnh, không điền sẵn số tiền, dành cho livestream.</summary>
-        public string? BankDonationQrBase64 { get; set; }
+        public string? BankDonationQrDataUri { get; set; }
 
         /// <summary>Thông tin tài khoản trung tâm nhận mọi khoản donate qua SePay.</summary>
         public string? CentralBankName { get; set; }

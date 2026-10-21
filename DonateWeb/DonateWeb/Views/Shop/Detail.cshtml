@@ -110,6 +110,10 @@
                                 <td class="ps-3">
                                     <div class="fw-bold text-dark">@item.ProductName</div>
                                     <span class="small text-muted font-monospace">Mã SP: #@item.ShopProductId</span>
+                                    @if (!string.IsNullOrWhiteSpace(item.VariantSelection))
+                                    {
+                                        <div class="small text-muted">Lựa chọn: <strong>@item.VariantSelection</strong></div>
+                                    }
                                 </td>
                                 <td class="text-center font-monospace">@item.Price.ToString("N0") đ</td>
                                 <td class="text-center font-monospace fw-bold">@item.Quantity</td>
@@ -120,16 +124,26 @@
                         }
                     </tbody>
                     <tfoot class="bg-light">
-                        @if (Model.DiscountAmount > 0)
+                        @if (Model.DiscountAmount > 0 || Model.ShippingFee > 0)
                         {
                             <tr>
                                 <td colspan="3" class="text-end small py-2">Tạm tính:</td>
                                 <td class="pe-3 text-end font-monospace py-2">@Model.SubtotalAmount.ToString("N0") VNĐ</td>
                             </tr>
-                            <tr>
-                                <td colspan="3" class="text-end small text-success py-2">Giảm giá:</td>
-                                <td class="pe-3 text-end fw-semibold text-success font-monospace py-2">-@Model.DiscountAmount.ToString("N0") VNĐ</td>
-                            </tr>
+                            @if (Model.DiscountAmount > 0)
+                            {
+                                <tr>
+                                    <td colspan="3" class="text-end small text-success py-2">Giảm giá:</td>
+                                    <td class="pe-3 text-end fw-semibold text-success font-monospace py-2">-@Model.DiscountAmount.ToString("N0") VNĐ</td>
+                                </tr>
+                            }
+                            @if (Model.ShippingFee > 0)
+                            {
+                                <tr>
+                                    <td colspan="3" class="text-end small py-2">Phí vận chuyển (GHN báo giá test):</td>
+                                    <td class="pe-3 text-end font-monospace py-2">+@Model.ShippingFee.ToString("N0") VNĐ</td>
+                                </tr>
+                            }
                         }
                         <tr>
                             <td colspan="3" class="text-end fw-bold py-3">TỔNG THANH TOÁN:</td>

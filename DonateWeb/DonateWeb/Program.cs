@@ -49,10 +49,21 @@ builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IWidgetService, WidgetService>();
 builder.Services.AddScoped<IQrCodeService, QrCodeService>();
 builder.Services.AddHostedService<PendingWalletDepositExpirationService>();
+builder.Services.AddHostedService<SupportConversationCleanupService>();
 builder.Services.AddMemoryCache();
+builder.Services.Configure<GhnOptions>(builder.Configuration.GetSection("GHN"));
+builder.Services.AddHttpClient<IGhnShippingService, GhnShippingService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 builder.Services.AddHttpClient<IStreamerBankQrService, StreamerBankQrService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(8);
+});
+builder.Services.Configure<SupportAiOptions>(builder.Configuration.GetSection(SupportAiOptions.SectionName));
+builder.Services.AddHttpClient<ISupportAiService, OpenAiSupportService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(35);
 });
 builder.Services.Configure<DonateWeb.Areas.Widgets.Services.ElevenLabsOptions>(
     builder.Configuration.GetSection("ElevenLabs"));
@@ -181,7 +192,10 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
     builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
 }
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddSingleton<StreamerAgreementContentService>();
+builder.Services.AddScoped<DonateWeb.Security.StreamerContractGateFilter>();
+builder.Services.AddControllersWithViews(options =>
+    options.Filters.AddService<DonateWeb.Security.StreamerContractGateFilter>());
 
 var app = builder.Build();
 

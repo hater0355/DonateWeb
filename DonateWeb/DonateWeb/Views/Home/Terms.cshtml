@@ -1,20 +1,23 @@
 @{
     ViewData["Title"] = "Điều khoản sử dụng";
+    var legal = ViewBag.PlatformLegal as DonateWeb.Services.PlatformContractOptions ?? new DonateWeb.Services.PlatformContractOptions();
+    var publicWebsite = ViewBag.PublicWebsite as string ?? "";
 }
 <div class="terms-page container-fluid">
     <a class="terms-back-link" href="/Auth/Login"><i class="fa-solid fa-arrow-left me-2"></i>Quay lại đăng nhập</a>
     <div class="terms-related-links">
         <a href="/chinh-sach-bao-mat">Chính sách bảo mật và quyền riêng tư</a>
     </div>
-    <div class="alert alert-warning terms-draft-notice" role="note">
-        Văn bản còn địa chỉ liên hệ và mã số thuế/mã số doanh nghiệp cần được bổ sung trước khi công bố chính thức.
-    </div>
+    @if (!legal.IsComplete)
+    {
+        <div class="alert alert-warning terms-draft-notice" role="note">Thông tin pháp lý của đơn vị vận hành chưa đầy đủ; vui lòng hoàn tất địa chỉ, tư cách và mã số thuế/mã định danh phù hợp trước khi ký hợp đồng Streamer.</div>
+    }
     <article class="terms-document card border-0 shadow-sm">
 <h1>ĐIỀU KHOẢN SỬ DỤNG</h1>
 <p><strong>Nền tảng:</strong> DonateWeb (thương hiệu hiển thị: ONLY FAN)</p>
-<p><strong>Website:</strong> https://plantsdonate.duckdns.org</p>
+<p><strong>Website:</strong> @publicWebsite</p>
 <p><strong>Ng&#224;y c&#243; hiệu lực:</strong> 19/10/2026</p>
-<p><strong>Đơn vị vận h&#224;nh:</strong> Nguyễn Anh Hiếu (cá nhân vận hành)</p>
+<p><strong>Đơn vị vận h&#224;nh:</strong> @legal.OperatorLegalName (@legal.OperatorCapacity)</p>
 <hr />
 <h2>Điều 1. Giới thiệu v&#224; chấp thuận điều khoản</h2>
 <p><strong>1.1.</strong> Ch&#224;o mừng bạn đến với <strong>DonateWeb (thương hiệu hiển thị: ONLY FAN)</strong> (sau đ&#226;y gọi l&#224; &quot;Nền tảng&quot;, &quot;Ch&#250;ng t&#244;i&quot;). Đ&#226;y l&#224; nền tảng trực tuyến cung cấp c&#225;c c&#244;ng cụ hỗ trợ người d&#249;ng gửi tiền ủng hộ (Donate) đến nh&#224; s&#225;ng tạo nội dung, streamer v&#224; những c&#225; nh&#226;n đủ điều kiện tham gia hệ thống.</p>
@@ -24,7 +27,7 @@
 <p><strong>1.5.</strong> Điều khoản được &#225;p dụng c&#249;ng c&#225;c ch&#237;nh s&#225;ch li&#234;n quan, bao gồm Ch&#237;nh s&#225;ch quyền ri&#234;ng tư, Ch&#237;nh s&#225;ch thanh to&#225;n v&#224; ho&#224;n tiền, Ch&#237;nh s&#225;ch d&#224;nh cho Streamer c&#249;ng c&#225;c quy định kh&#225;c được c&#244;ng bố hợp lệ tr&#234;n Nền tảng.</p>
 <h2>Điều 2. Giải th&#237;ch thuật ngữ</h2>
 <p>Trong Điều khoản n&#224;y, c&#225;c thuật ngữ được hiểu như sau:</p>
-<p><strong>2.1. Nền tảng:</strong> Website, ứng dụng, hệ thống kỹ thuật v&#224; c&#225;c dịch vụ c&#243; li&#234;n quan do Nguyễn Anh Hiếu quản l&#253;.</p>
+<p><strong>2.1. Nền tảng:</strong> Website, ứng dụng, hệ thống kỹ thuật v&#224; c&#225;c dịch vụ c&#243; li&#234;n quan do @legal.OperatorLegalName quản l&#253;.</p>
 <p><strong>2.2. Người d&#249;ng:</strong> C&#225; nh&#226;n hoặc tổ chức truy cập, đăng k&#253; hoặc sử dụng bất kỳ chức năng n&#224;o của Nền tảng.</p>
 <p><strong>2.3. Người Donate (Donor):</strong> C&#225; nh&#226;n hoặc tổ chức thực hiện giao dịch gửi tiền ủng hộ th&#244;ng qua c&#225;c chức năng được cung cấp.</p>
 <p><strong>2.4. Streamer (Creator):</strong> C&#225; nh&#226;n hoặc tổ chức s&#225;ng tạo nội dung, ph&#225;t s&#243;ng trực tiếp hoặc cung cấp nội dung trực tuyến v&#224; đăng k&#253; nhận Donate tr&#234;n Nền tảng.</p>
@@ -183,10 +186,10 @@
 <h2>Điều 22. Th&#244;ng tin li&#234;n hệ</h2>
 <p>Mọi y&#234;u cầu hỗ trợ, c&#226;u hỏi v&#224; khiếu nại li&#234;n quan đến dịch vụ c&#243; thể được gửi tới:</p>
 <p><strong>T&#234;n nền tảng:</strong> DonateWeb (thương hiệu hiển thị: ONLY FAN)</p>
-<p><strong>Đơn vị vận h&#224;nh:</strong> Nguyễn Anh Hiếu</p>
-<p><strong>M&#227; số doanh nghiệp / m&#227; số thuế:</strong> <span class="terms-placeholder">[M&#227; số thuế/m&#227; số doanh nghiệp cần bổ sung nếu &#225;p dụng]</span></p>
-<p><strong>Địa chỉ:</strong> <span class="terms-placeholder">[Địa chỉ li&#234;n hệ cần bổ sung]</span></p>
-<p><strong>Website:</strong> https://plantsdonate.duckdns.org</p>
+<p><strong>Đơn vị vận h&#224;nh:</strong> @legal.OperatorLegalName (@legal.OperatorCapacity)</p>
+<p><strong>M&#227; số doanh nghiệp / m&#227; số thuế:</strong> @legal.OperatorRegistrationNumber</p>
+<p><strong>Địa chỉ:</strong> @legal.OperatorAddress</p>
+<p><strong>Website:</strong> @publicWebsite</p>
 <p><strong>Email hỗ trợ:</strong> <a href="mailto:cupitcookies@gmail.com">cupitcookies@gmail.com</a></p>
 <p><strong>K&#234;nh hỗ trợ:</strong> <a href="mailto:cupitcookies@gmail.com">cupitcookies@gmail.com</a></p>
 <p><strong>Thời gian hỗ trợ:</strong> Tiếp nhận qua email; thời gian phản hồi phụ thuộc nội dung và khối lượng yêu cầu.</p>

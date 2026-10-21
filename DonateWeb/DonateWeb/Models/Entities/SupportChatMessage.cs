@@ -14,6 +14,9 @@ public sealed class SupportChatMessage
 
     public bool IsFromSupport { get; set; }
 
+    // Phân biệt câu trả lời tự động của AI với tin nhắn do Hỗ trợ viên gửi.
+    public bool IsAi { get; set; }
+
     [Required, MaxLength(2000)]
     public string Content { get; set; } = string.Empty;
 

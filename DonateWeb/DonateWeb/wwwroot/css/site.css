@@ -1045,6 +1045,122 @@ body.dark-theme .accordion-body {
     }
 }
 
+.streamer-contract-page {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding-bottom: 2rem;
+}
+
+.streamer-contract-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin: 0.5rem 0 1.25rem;
+}
+
+.streamer-contract-heading h1 {
+    margin: 0.25rem 0 0.5rem;
+    color: #244e3a;
+    font-size: clamp(1.45rem, 2.4vw, 2rem);
+}
+
+.streamer-contract-heading p,
+.streamer-contract-sign-note {
+    color: #64748b;
+}
+
+.streamer-contract-kicker {
+    color: #178154;
+    font-size: 0.78rem;
+    font-weight: 750;
+    letter-spacing: 0.08em;
+}
+
+.streamer-contract-status {
+    flex: 0 0 auto;
+    padding: 0.5rem 0.75rem;
+    border-radius: 999px;
+    color: #126a43;
+    background: #e6f6ed;
+    font-weight: 700;
+}
+
+.streamer-contract-parties {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.streamer-contract-party,
+.streamer-contract-body,
+.streamer-contract-sign,
+.streamer-contract-receipt {
+    padding: 1.25rem;
+    background: #fff;
+}
+
+.streamer-contract-party h2,
+.streamer-contract-sign h2,
+.streamer-contract-receipt h2 {
+    margin: 0 0 1rem;
+    color: #244e3a;
+    font-size: 1.1rem;
+}
+
+.streamer-contract-party dl {
+    display: grid;
+    grid-template-columns: minmax(135px, 0.7fr) minmax(0, 1.3fr);
+    gap: 0.4rem 0.8rem;
+    margin: 0;
+}
+
+.streamer-contract-party dt { color: #64748b; font-weight: 600; }
+.streamer-contract-party dd { margin: 0; overflow-wrap: anywhere; }
+
+.streamer-contract-body { margin: 1rem 0; }
+.streamer-contract-section + .streamer-contract-section { margin-top: 1.5rem; }
+.streamer-contract-section h2 { color: #244e3a; font-size: 1.08rem; }
+.streamer-contract-section p { line-height: 1.7; margin-bottom: 0.8rem; }
+.streamer-contract-sign { display: grid; gap: 0.75rem; }
+.streamer-contract-check { display: flex; align-items: flex-start; gap: 0.65rem; line-height: 1.5; }
+.streamer-contract-check input { flex: 0 0 auto; margin-top: 0.3rem; }
+.streamer-contract-sign-note { margin: 0; font-size: 0.9rem; line-height: 1.55; }
+.streamer-contract-hash { display: block; overflow-wrap: anywhere; }
+.streamer-contract-snapshot { white-space: pre-wrap; overflow-wrap: anywhere; margin: 1.25rem 0 0; padding: 1rem; background: #f8fafc; border-radius: 0.5rem; color: #1f2937; font: inherit; font-size: 0.92rem; }
+
+body.dark-theme .streamer-contract-party,
+body.dark-theme .streamer-contract-body,
+body.dark-theme .streamer-contract-sign,
+body.dark-theme .streamer-contract-receipt {
+    background: #1f2937;
+    color: #e5e7eb;
+}
+
+@media (max-width: 767.98px) {
+    .streamer-contract-parties { grid-template-columns: 1fr; }
+    .streamer-contract-party,
+    .streamer-contract-body,
+    .streamer-contract-sign,
+    .streamer-contract-receipt { padding: 1rem; }
+    .streamer-contract-party dl { grid-template-columns: 1fr; gap: 0.1rem; }
+    .streamer-contract-party dd { margin-bottom: 0.55rem; }
+}
+
+@media print {
+    .animated-bg-container,
+    header,
+    nav,
+    .sidebar,
+    .mobile-bottom-nav,
+    .streamer-contract-sign,
+    .streamer-contract-heading .streamer-contract-status,
+    .streamer-contract-receipt > button { display: none !important; }
+    .streamer-contract-page { max-width: none; }
+    .streamer-contract-snapshot { border: 0; background: #fff; }
+}
+
 /* Widget/OBS pages keep their existing small-screen shell. */
 @media (max-width: 991.98px) {
     body.desktop-widget-layout .mobile-menu-trigger,

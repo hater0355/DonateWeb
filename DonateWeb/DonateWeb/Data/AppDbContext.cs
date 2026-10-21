@@ -15,6 +15,7 @@ namespace DonateWeb.Data
         public DbSet<UserRole> UserRoles => Set<UserRole>();
         public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
         public DbSet<StreamerProfile> StreamerProfiles => Set<StreamerProfile>();
+        public DbSet<StreamerContractAcceptance> StreamerContractAcceptances => Set<StreamerContractAcceptance>();
         public DbSet<Donation> Donations => Set<Donation>();
         public DbSet<TransactionAuditLog> TransactionAuditLogs => Set<TransactionAuditLog>();
         public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
@@ -45,6 +46,7 @@ namespace DonateWeb.Data
         // Hộp thư hỗ trợ trực tuyến và lịch sử hội thoại.
         public DbSet<SupportConversation> SupportConversations => Set<SupportConversation>();
         public DbSet<SupportChatMessage> SupportChatMessages => Set<SupportChatMessage>();
+        public DbSet<SupportAiMonthlyUsage> SupportAiMonthlyUsages => Set<SupportAiMonthlyUsage>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -102,6 +104,12 @@ namespace DonateWeb.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
+            modelBuilder.Entity<SupportAiMonthlyUsage>(entity =>
+            {
+                entity.HasKey(usage => usage.Period);
+                entity.Property(usage => usage.Period).HasMaxLength(7);
+            });
+
             // StreamerProfile - Unique Slug & 1-to-1 with User
             modelBuilder.Entity<StreamerProfile>(entity =>
             {
@@ -112,6 +120,20 @@ namespace DonateWeb.Data
                       .WithOne(u => u.StreamerProfile)
                       .HasForeignKey<StreamerProfile>(sp => sp.UserId)
                       .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<StreamerContractAcceptance>(entity =>
+            {
+                entity.HasIndex(a => new { a.StreamerProfileId, a.ContractVersion }).IsUnique();
+                entity.HasIndex(a => new { a.UserId, a.SignedAtUtc });
+                entity.HasOne<StreamerProfile>()
+                    .WithMany()
+                    .HasForeignKey(a => a.StreamerProfileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne<User>()
+                    .WithMany()
+                    .HasForeignKey(a => a.UserId)
+                    .OnDelete(DeleteBehavior.NoAction);
             });
 
             // ExternalLogin - Foreign key & Index
@@ -242,6 +264,7 @@ namespace DonateWeb.Data
             // ShopProduct
             modelBuilder.Entity<ShopProduct>(entity =>
             {
+                entity.Property(product => product.VariantsJson).HasColumnType("nvarchar(max)").IsRequired();
                 entity.HasOne(p => p.StreamerProfile)
                       .WithMany(s => s.ShopProducts)
                       .HasForeignKey(p => p.StreamerProfileId)

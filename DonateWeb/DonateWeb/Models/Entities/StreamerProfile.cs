@@ -115,6 +115,10 @@ namespace DonateWeb.Models.Entities
         /// </summary>
         public DateTime? ApprovedAt { get; set; }
 
+        /// <summary>Phiên bản hợp đồng bắt buộc sau lần duyệt streamer gần nhất.</summary>
+        [MaxLength(40)]
+        public string? RequiredContractVersion { get; set; }
+
         /// <summary>JSON thông tin CCCD đã mã hóa bằng ASP.NET Core Data Protection.</summary>
         public string? IdentityDataProtected { get; set; }
 

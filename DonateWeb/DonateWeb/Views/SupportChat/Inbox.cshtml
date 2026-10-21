@@ -21,14 +21,14 @@
             <div class="support-inbox-empty" id="supportInboxEmpty"><i class="fa-regular fa-comments"></i><span>Chọn một cuộc trò chuyện để xem tin nhắn.</span></div>
             <div class="support-inbox-active" id="supportInboxActive" hidden>
                 <header class="support-inbox-chat-header">
-                    <div><strong id="supportInboxVisitor">Khách</strong><small id="supportInboxUser"></small></div>
+                    <div><strong id="supportInboxVisitor">Khách</strong><small id="supportInboxUser"></small><small id="supportInboxAiMode"></small></div>
                     <button class="btn btn-sm btn-outline-danger" id="supportInboxCloseConversation" type="button">Đóng cuộc trò chuyện</button>
                 </header>
                 <div class="support-inbox-messages" id="supportInboxMessages" role="log" aria-live="polite"></div>
                 <form class="support-inbox-form" id="supportInboxForm">
                     @Html.AntiForgeryToken()
                     <label class="visually-hidden" for="supportInboxInput">Tin nhắn trả lời</label>
-                    <textarea id="supportInboxInput" rows="2" maxlength="2000" placeholder="Nhập câu trả lời…" required></textarea>
+                    <textarea id="supportInboxInput" rows="2" maxlength="2000" placeholder="Nhập câu trả lời… (Enter gửi, Shift+Enter xuống dòng)" required></textarea>
                     <button class="btn btn-success" type="submit"><i class="fa-solid fa-paper-plane me-1"></i>Gửi</button>
                 </form>
                 <p class="support-inbox-note" id="supportInboxNote"></p>

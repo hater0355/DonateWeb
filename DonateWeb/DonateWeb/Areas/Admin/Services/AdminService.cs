@@ -68,7 +68,7 @@ namespace DonateWeb.Areas.Admin.Services
             // Phí sàn gồm 10% donate thành công và 30% đơn Shop đã thanh toán.
             var paidShopOrders = await _context.ShopOrders
                 .Where(o => o.PaymentStatus == "Paid")
-                .Select(o => o.TotalAmount)
+                .Select(o => o.TotalAmount - o.ShippingFee)
                 .ToListAsync();
             var platformRevenue = successfulDonations.Sum(d => DonationCommission.PlatformFee(d.Amount))
                 + paidShopOrders.Sum(ShopCommission.PlatformFee);
@@ -314,7 +314,8 @@ namespace DonateWeb.Areas.Admin.Services
             // Cập nhật trạng thái duyệt và kích hoạt
             streamer.ApprovalStatus = StreamerApprovalStatus.Approved;
             streamer.ApprovedAt = DateTime.UtcNow;
-            streamer.IsActive = true;
+            streamer.IsActive = false;
+            streamer.RequiredContractVersion = DonateWeb.Services.StreamerAgreementContentService.CurrentVersion;
             streamer.RejectionReason = null;
             streamer.UpdatedAt = DateTime.UtcNow;
 
@@ -350,7 +351,7 @@ namespace DonateWeb.Areas.Admin.Services
 
             _logger.LogInformation("Admin {Admin} đã phê duyệt hồ sơ streamer {DisplayName} (Tên miền ID: {Slug}, Mã ID: {AccountId})", adminUsername, streamer.DisplayName, streamer.Slug, user?.AccountId);
 
-            return (true, $"Đã phê duyệt hồ sơ Streamer '{streamer.DisplayName}' (Tên miền: /{streamer.Slug}) thành công! Đã cấp quyền Streamer và đổi mã ID thành {user?.AccountId}.");
+            return (true, $"Đã duyệt hồ sơ Streamer '{streamer.DisplayName}'. Hồ sơ sẽ được kích hoạt sau khi người dùng đăng nhập và ký hợp đồng điện tử phiên bản {streamer.RequiredContractVersion}.");
         }
 
         public async Task<(bool Success, string Message)> RejectStreamerAsync(int streamerId, string reason, string adminUsername)
@@ -898,6 +899,7 @@ namespace DonateWeb.Areas.Admin.Services
                 {
                     Id = p.Id,
                     Name = p.Name,
+                    Category = p.Category,
                     Description = p.Description,
                     Price = p.Price,
                     ImageUrl = p.ImageUrl,

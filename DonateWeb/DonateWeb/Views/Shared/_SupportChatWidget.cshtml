@@ -1,27 +1,41 @@
-<div class="support-chat" id="supportChat" data-current-url="/SupportChat/Current" data-start-url="/SupportChat/Start" data-messages-url="/SupportChat/Messages" data-send-url="/SupportChat/Send">
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@{
+    var supportAiConfigured = !string.IsNullOrWhiteSpace(Configuration["SupportAi:ApiKey"]);
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var returnUrl = Context.Request.Path.ToString() + Context.Request.QueryString.ToString();
+    var loginUrl = Url.Action("Login", "Auth", new { returnUrl });
+}
+@if (!isAuthenticated)
+{
+    <div class="support-chat">
+        <a class="support-chat-launcher" href="@loginUrl" aria-label="Đăng nhập để được hỗ trợ">
+            <i class="fa-solid fa-headset" aria-hidden="true"></i>
+            <span class="support-chat-launcher-label">Đăng nhập để hỗ trợ</span>
+        </a>
+    </div>
+}
+else
+{
+<div class="support-chat" id="supportChat" data-ai-enabled="@(supportAiConfigured ? "true" : "false")" data-current-url="/SupportChat/Current" data-start-url="/SupportChat/Start" data-messages-url="/SupportChat/Messages" data-send-url="/SupportChat/Send">
     <button class="support-chat-launcher" id="supportChatLauncher" type="button" aria-label="Mở trò chuyện với Hỗ trợ viên" aria-expanded="false">
         <i class="fa-solid fa-headset" aria-hidden="true"></i>
         <span class="support-chat-launcher-label">Hỗ trợ</span>
     </button>
     <section class="support-chat-panel" id="supportChatPanel" aria-label="Trò chuyện hỗ trợ" hidden>
         <header class="support-chat-header">
-            <div><strong>Hỗ trợ trực tuyến</strong><small>Gửi câu hỏi cho đội ngũ hỗ trợ</small></div>
+            <div><strong>Hỗ trợ DonateWeb</strong><small>@(supportAiConfigured ? "AI chỉ hỗ trợ về DonateWeb · gõ ‘gặp hỗ trợ viên’ để gặp người thật" : "Tin nhắn sẽ được chuyển đến đội ngũ hỗ trợ")</small></div>
             <button type="button" class="support-chat-close" id="supportChatClose" aria-label="Đóng cửa sổ chat"><i class="fa-solid fa-xmark"></i></button>
         </header>
-        @if (User.Identity?.IsAuthenticated != true)
-        {
-            <label class="visually-hidden" for="supportChatVisitorName">Tên hiển thị</label>
-            <input class="support-chat-name" id="supportChatVisitorName" maxlength="100" placeholder="Tên của bạn (không bắt buộc)" />
-        }
         <div class="support-chat-messages" id="supportChatMessages" role="log" aria-live="polite">
             <p class="support-chat-empty" id="supportChatEmpty">Xin chào! Bạn cần chúng tôi hỗ trợ điều gì?</p>
         </div>
         <form class="support-chat-form" id="supportChatForm">
             @Html.AntiForgeryToken()
             <label class="visually-hidden" for="supportChatInput">Tin nhắn của bạn</label>
-            <textarea id="supportChatInput" name="message" rows="2" maxlength="2000" placeholder="Nhập câu hỏi..." required></textarea>
+            <textarea id="supportChatInput" name="message" rows="2" maxlength="2000" placeholder="Nhập câu hỏi... (Enter gửi, Shift+Enter xuống dòng)" required></textarea>
             <button type="submit" aria-label="Gửi tin nhắn"><i class="fa-solid fa-paper-plane"></i></button>
         </form>
-        <div class="support-chat-note" id="supportChatNote">Không gửi mật khẩu hoặc thông tin thẻ ngân hàng qua chat.</div>
+        <div class="support-chat-note" id="supportChatNote">@(supportAiConfigured ? "Tin nhắn có thể được xử lý bởi AI. Không gửi mật khẩu, OTP hoặc thông tin thẻ ngân hàng." : "Không gửi mật khẩu, OTP hoặc thông tin thẻ ngân hàng qua chat.")</div>
     </section>
 </div>
+}

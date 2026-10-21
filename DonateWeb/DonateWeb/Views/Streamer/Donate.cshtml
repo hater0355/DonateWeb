@@ -567,7 +567,7 @@
             }
         </div>
 
-        <!-- Cột phải: Khung Mã QR Donate Streamer (Đã xóa thông tin ngân hàng, chỉ giữ lại mã QR) -->
+        <!-- Cột phải: QR chuyển khoản cố định để người xem quét trực tiếp trên livestream -->
         <div class="col-12 col-lg-5">
             <div class="card card-custom p-4 bg-white border-0 shadow-sm h-100 d-flex flex-column">
                 <div class="d-flex align-items-center justify-content-between mb-3">
@@ -583,11 +583,11 @@
                 <div class="text-center p-3 bg-light rounded-3 border mb-3">
                     <div class="bg-white p-2 rounded-3 border shadow-sm d-inline-block position-relative">
                         @{
-                            var qrSource = Model.DonatePageQrBase64;
+                            var qrSource = Model.BankDonationQrDataUri;
                         }
                         <img id="sideGeneratedQrImg"
                              src="@qrSource"
-                             alt="Mã QR nhận donate @Model.DisplayName"
+                             alt="Mã VietQR donate trực tiếp cho @Model.DisplayName"
                              class="img-fluid rounded-2 @(string.IsNullOrEmpty(qrSource) ? "d-none" : "")"
                              style="max-height: 220px; min-width: 180px; object-fit: contain;" />
                         
@@ -595,21 +595,41 @@
                             <div class="p-3 rounded-circle bg-light-green mb-2">
                                 <i class="fa-solid fa-qrcode text-success display-4"></i>
                             </div>
-                            <span class="fw-bold text-dark-green small">Mã QR Streamer</span>
-                            <span class="text-muted small mt-1" style="font-size: 0.75rem;">QR mở trang donate</span>
+                            <span class="fw-bold text-dark-green small">QR donate livestream</span>
+                            <span class="text-muted small mt-1" style="font-size: 0.75rem;">Quét bằng ứng dụng ngân hàng</span>
                         </div>
                     </div>
                     <div class="small text-dark-green fw-semibold mt-2">
-                        <i class="fa-solid fa-camera text-success me-1"></i> Quét để mở trang donate
+                        <i class="fa-solid fa-camera text-success me-1"></i> Quét để chuyển khoản donate
                     </div>
                     <div class="small text-muted" style="font-size: 0.75rem;">
-                        Nhập khoản ủng hộ rồi thanh toán qua PayOS
+                        Tự nhập số tiền trong ứng dụng ngân hàng
                     </div>
                 </div>
 
-                <!-- Hướng dẫn quy trình thanh toán PayOS -->
+                <!-- Hướng dẫn dùng mã chuyển khoản livestream; mã DW là bắt buộc để định tuyến donate -->
                 <div class="bg-light-green p-3 rounded-3 border flex-grow-1 d-flex flex-column justify-content-between">
-                    <div class="small text-dark-green"><strong>Cách ủng hộ:</strong><ol class="mt-2 mb-0 ps-3"><li>Điền tên, số tiền và lời nhắn.</li><li>Bấm <strong>Ủng hộ</strong> để tạo QR PayOS.</li><li>Quét QR hoặc mở liên kết thanh toán. Webhook sẽ tự xác nhận khi tiền về.</li></ol></div>
+                    @if (!string.IsNullOrWhiteSpace(Model.BankDonationQrDataUri))
+                    {
+                        <div class="small text-dark-green">
+                            <strong>Cách donate trên livestream:</strong>
+                            <ol class="mt-2 mb-2 ps-3">
+                                <li>Quét mã bằng ứng dụng ngân hàng và tự nhập số tiền.</li>
+                                <li>Giữ nguyên mã <code>@Model.BankDonationTransferCode</code> trong nội dung; có thể thêm lời nhắn phía sau.</li>
+                                <li>Khi SePay báo tiền về, DonateWeb tự ghi nhận donate và gửi alert cho streamer.</li>
+                            </ol>
+                            <span class="text-muted">Người donate qua chuyển khoản được hiển thị ẩn danh.</span>
+                        </div>
+                        <div class="small text-muted border-top pt-2 mt-2">
+                            @Model.CentralBankName · STK @Model.CentralBankAccountNumber · @Model.CentralBankAccountName
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="small text-warning-emphasis">
+                            QR donate livestream chưa khả dụng. Quản trị viên cần cấu hình tài khoản trung tâm SePay và streamer cần được duyệt, đang hoạt động.
+                        </div>
+                    }
                 </div>
             </div>
         </div>

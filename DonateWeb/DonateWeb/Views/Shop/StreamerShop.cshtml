@@ -191,9 +191,12 @@
                                 </div>
                                 <div class="p-3 d-flex flex-column flex-grow-1">
                                     <div class="d-flex align-items-center justify-content-between mb-1">
-                                        <span class="badge @(prod.StockQuantity > 0 ? "bg-light-green text-dark-green" : "bg-danger-subtle text-danger") small font-monospace">
-                                            @(prod.StockQuantity > 0 ? $"Kho: {prod.StockQuantity}" : "Hết hàng")
-                                        </span>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            <span class="badge bg-light text-dark border small">@prod.Category</span>
+                                            <span class="badge @(prod.StockQuantity > 0 ? "bg-light-green text-dark-green" : "bg-danger-subtle text-danger") small font-monospace">
+                                                @(prod.StockQuantity > 0 ? $"Kho: {prod.StockQuantity}" : "Hết hàng")
+                                            </span>
+                                        </div>
                                         <span class="small text-muted" style="font-size: 0.75rem;">Mã SP: #@prod.Id</span>
                                     </div>
                                     <h6 class="fw-bold text-dark mb-1 text-truncate-2" style="min-height: 40px; line-height: 1.35;" title="@prod.Name">
@@ -202,10 +205,43 @@
                                     <p class="text-muted small mb-3 text-truncate-2" style="font-size: 0.8rem; min-height: 36px; line-height: 1.35;">
                                         @(string.IsNullOrWhiteSpace(prod.Description) ? "Sản phẩm chính thức do Idol phát hành." : prod.Description)
                                     </p>
+                                    @if (prod.AdditionalImageUrls.Any())
+                                    {
+                                        <div class="d-flex flex-wrap gap-2 mb-3" aria-label="Ảnh phụ của @prod.Name">
+                                            @foreach (var imageUrl in prod.AdditionalImageUrls)
+                                            {
+                                                <img src="@imageUrl" alt="Ảnh phụ: @prod.Name" loading="lazy" class="rounded border" style="width: 58px; height: 58px; object-fit: cover" onerror="this.style.display='none';" />
+                                            }
+                                        </div>
+                                    }
+                                    @if (prod.Variants.Any())
+                                    {
+                                        <label class="small fw-semibold mb-1" for="productVariant-@prod.Id">Chọn lựa chọn</label>
+                                        <select id="productVariant-@prod.Id" class="form-select form-select-sm product-variant-select mb-3" aria-label="Chọn lựa chọn cho @prod.Name">
+                                            <option value="">-- Chọn lựa chọn --</option>
+                                            @foreach (var variant in prod.Variants)
+                                            {
+                                                <option value="@variant.Name" data-price="@variant.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-stock="@variant.StockQuantity" disabled="@(variant.StockQuantity <= 0)">
+                                                    @variant.Name · @variant.Price.ToString("N0") đ · kho @variant.StockQuantity
+                                                </option>
+                                            }
+                                        </select>
+                                    }
+                                    else if (prod.AvailableSizes.Any())
+                                    {
+                                        <label class="small fw-semibold mb-1" for="productSize-@prod.Id">Chọn size</label>
+                                        <select id="productSize-@prod.Id" class="form-select form-select-sm product-size-select mb-3" aria-label="Chọn size cho @prod.Name">
+                                            <option value="">-- Chọn size --</option>
+                                            @foreach (var size in prod.AvailableSizes)
+                                            {
+                                                <option value="@size">@size</option>
+                                            }
+                                        </select>
+                                    }
                                     <div class="mt-auto pt-2 border-top d-flex align-items-center justify-content-between">
                                         <div>
                                             <div class="small text-muted" style="font-size: 0.72rem;">GIÁ</div>
-                                            <div class="fw-bold text-dark-green fs-5">@prod.Price.ToString("N0") <span style="font-size: 0.85rem;">đ</span></div>
+                                            <div class="fw-bold text-dark-green fs-5 current-product-price">@(prod.Variants.Any() ? $"Từ {prod.Price:N0}" : prod.Price.ToString("N0")) <span style="font-size: 0.85rem;">đ</span></div>
                                         </div>
                                         <button type="button" 
                                                 class="btn btn-dark-green rounded-pill px-3 py-1 fw-semibold small shadow-sm btn-add-to-cart"
@@ -261,8 +297,8 @@
                         <span class="fw-semibold text-dark font-monospace" id="subtotalDisplay">0 đ</span>
                     </div>
                     <div class="d-flex align-items-center justify-content-between mb-1">
-                        <span class="text-muted small">Phí vận chuyển:</span>
-                        <span class="fw-semibold text-success small">Miễn phí (Toàn quốc)</span>
+                        <span class="text-muted small">Phí vận chuyển GHN:</span>
+                        <span class="fw-semibold text-success small" id="shippingCostDisplay">Chưa tính</span>
                     </div>
                     <div id="discountRow" class="d-flex align-items-center justify-content-between mb-1 d-none">
                         <span class="text-success small">Mã giảm giá:</span>
@@ -304,6 +340,33 @@
                         <input type="text" id="buyerAddress" class="form-control form-control-sm rounded-3" 
                                placeholder="Địa chỉ nhận hàng (Số nhà, đường, phường, quận...) *" required />
                     </div>
+                    @if (Model.GhnShippingConfigured)
+                    {
+                        <div class="rounded-3 border bg-light p-3 mb-3">
+                            <div class="fw-bold small mb-1"><i class="fa-solid fa-truck-fast text-success me-1"></i> Xem trước phí GHN</div>
+                            <div class="small text-muted mb-2">Phí được cộng vào tổng thanh toán thử trên DonateWeb. GHN chỉ báo phí, không tạo đơn vận chuyển hay mã vận đơn.</div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-12">
+                                    <select id="ghnProvince" class="form-select form-select-sm" aria-label="Tỉnh/thành nhận hàng">
+                                        <option value="">Đang tải tỉnh/thành...</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <select id="ghnWard" class="form-select form-select-sm" aria-label="Phường/xã nhận hàng" disabled>
+                                        <option value="">Chọn tỉnh/thành trước</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="button" id="btnPreviewGhnFee" class="btn btn-outline-success btn-sm w-100">
+                                <i class="fa-solid fa-calculator me-1"></i> Tính phí vận chuyển thử
+                            </button>
+                            <div id="ghnFeeFeedback" class="small mt-2 text-muted" aria-live="polite"></div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="small text-muted mb-3">Phí GHN staging sẽ xuất hiện sau khi quản trị viên cấu hình Token và ShopId.</div>
+                    }
                     <div class="mb-2">
                         <input type="text" id="orderNote" class="form-control form-control-sm rounded-3" 
                                placeholder="Ghi chú thêm (Size áo, lời nhắn...)" />
@@ -465,6 +528,7 @@
     const cartStorageKey = `onlyfan_cart_streamer_${streamerId}`;
     const userWalletBalance = @Model.ViewerWalletBalance;
     const isAuthenticated = @(Model.IsViewerAuthenticated ? "true" : "false");
+    const ghnShippingEnabled = @(Model.GhnShippingConfigured ? "true" : "false");
 
     let cart = [];
     let paymentStatusTimer = null;
@@ -474,9 +538,28 @@
     let couponPreviewDiscount = 0;
     let couponPreviewSubtotal = null;
     let couponPreviewCartKey = "";
+    let ghnFeeRequestInFlight = false;
+    let quotedShippingFee = null;
+    let shippingQuoteKey = "";
 
     function getCartKey() {
-        return JSON.stringify(cart.map(item => ({ id: item.id, quantity: item.quantity })));
+        return JSON.stringify(cart.map(item => ({ id: item.id, size: item.size || "", quantity: item.quantity })));
+    }
+
+    function getShippingQuoteKey() {
+        if (!ghnShippingEnabled) return "";
+        return JSON.stringify({
+            cart: getCartKey(),
+            name: document.getElementById("buyerName").value.trim(),
+            phone: document.getElementById("buyerPhone").value.trim(),
+            address: document.getElementById("buyerAddress").value.trim(),
+            provinceId: document.getElementById("ghnProvince").value,
+            wardId: document.getElementById("ghnWard").value
+        });
+    }
+
+    function hasCurrentShippingQuote() {
+        return ghnShippingEnabled && quotedShippingFee !== null && shippingQuoteKey === getShippingQuoteKey();
     }
 
     // Tải giỏ hàng từ localStorage cho riêng Streamer này
@@ -484,7 +567,7 @@
         try {
             const raw = localStorage.getItem(cartStorageKey);
             if (raw) {
-                cart = JSON.parse(raw);
+                cart = JSON.parse(raw).map(item => ({ ...item, size: item.size || "" }));
             } else {
                 cart = [];
             }
@@ -497,6 +580,7 @@
     // Lưu giỏ hàng vào localStorage của riêng Streamer này
     function saveCart() {
         localStorage.setItem(cartStorageKey, JSON.stringify(cart));
+        resetGhnFeePreview();
         if (appliedCouponCode) {
             appliedCouponCode = "";
             couponPreviewDiscount = 0;
@@ -508,6 +592,165 @@
         renderCart();
     }
 
+    function resetGhnFeePreview() {
+        quotedShippingFee = null;
+        shippingQuoteKey = "";
+        const feeDisplay = document.getElementById("shippingCostDisplay");
+        const feedback = document.getElementById("ghnFeeFeedback");
+        if (feeDisplay) feeDisplay.innerText = "Chưa tính";
+        if (feedback) {
+            feedback.className = "small mt-2 text-muted";
+            feedback.innerText = "";
+        }
+    }
+
+    async function loadGhnProvinces() {
+        if (!ghnShippingEnabled) return;
+        const provinceSelect = document.getElementById("ghnProvince");
+        try {
+            const response = await fetch("/Shop/GhnProvinces", { cache: "no-store", headers: { "X-Requested-With": "XMLHttpRequest" } });
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.message || "Không tải được tỉnh/thành GHN.");
+
+            provinceSelect.innerHTML = '<option value="">Chọn tỉnh/thành nhận hàng</option>';
+            result.items.forEach(item => {
+                const option = document.createElement("option");
+                option.value = item.id;
+                option.textContent = item.name;
+                provinceSelect.appendChild(option);
+            });
+        } catch (error) {
+            provinceSelect.innerHTML = '<option value="">Không tải được tỉnh/thành</option>';
+            const feedback = document.getElementById("ghnFeeFeedback");
+            feedback.className = "small mt-2 text-danger";
+            feedback.innerText = error.message || "Không tải được địa chỉ GHN.";
+        }
+    }
+
+    async function loadGhnWards(provinceId) {
+        const wardSelect = document.getElementById("ghnWard");
+        wardSelect.disabled = true;
+        wardSelect.innerHTML = '<option value="">Đang tải phường/xã...</option>';
+        if (!provinceId) {
+            wardSelect.innerHTML = '<option value="">Chọn tỉnh/thành trước</option>';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/Shop/GhnWards?provinceId=${encodeURIComponent(provinceId)}`, {
+                cache: "no-store", headers: { "X-Requested-With": "XMLHttpRequest" }
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.message || "Không tải được phường/xã GHN.");
+
+            wardSelect.innerHTML = '<option value="">Chọn phường/xã nhận hàng</option>';
+            result.items.forEach(item => {
+                const option = document.createElement("option");
+                option.value = item.id;
+                option.textContent = item.name;
+                wardSelect.appendChild(option);
+            });
+            wardSelect.disabled = false;
+        } catch (error) {
+            wardSelect.innerHTML = '<option value="">Không tải được phường/xã</option>';
+            const feedback = document.getElementById("ghnFeeFeedback");
+            feedback.className = "small mt-2 text-danger";
+            feedback.innerText = error.message || "Không tải được phường/xã GHN.";
+        }
+    }
+
+    async function previewGhnShippingFee() {
+        if (!ghnShippingEnabled || ghnFeeRequestInFlight) return;
+        const button = document.getElementById("btnPreviewGhnFee");
+        const feedback = document.getElementById("ghnFeeFeedback");
+        const provinceId = Number(document.getElementById("ghnProvince").value);
+        const wardId = Number(document.getElementById("ghnWard").value);
+        const buyerName = document.getElementById("buyerName").value.trim();
+        const buyerPhone = document.getElementById("buyerPhone").value.trim();
+        const buyerAddress = document.getElementById("buyerAddress").value.trim();
+        const submittedCartKey = getCartKey();
+
+        if (!cart.length) {
+            feedback.className = "small mt-2 text-danger";
+            feedback.innerText = "Hãy thêm sản phẩm vào giỏ trước khi tính phí.";
+            return;
+        }
+        if (!buyerName || !buyerPhone || !buyerAddress || !provinceId || !wardId) {
+            feedback.className = "small mt-2 text-danger";
+            feedback.innerText = "Nhập tên, số điện thoại, địa chỉ và chọn tỉnh/thành, phường/xã nhận hàng.";
+            return;
+        }
+
+        ghnFeeRequestInFlight = true;
+        quotedShippingFee = null;
+        shippingQuoteKey = "";
+        button.disabled = true;
+        renderCart();
+        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Đang hỏi GHN staging...';
+        feedback.className = "small mt-2 text-muted";
+        feedback.innerText = "Đang xem trước phí và thời gian giao dự kiến...";
+
+        try {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || "";
+            const response = await fetch("/Shop/PreviewGhnShippingFee", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "RequestVerificationToken": token,
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: JSON.stringify({
+                    streamerProfileId: streamerId,
+                    items: cart.map(item => ({ productId: item.id, size: item.size || null, quantity: item.quantity })),
+                    buyerName,
+                    buyerPhone,
+                    buyerStreet: buyerAddress,
+                    provinceId,
+                    wardId
+                })
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.message || "GHN chưa thể tính phí lúc này.");
+            const currentRecipient = [
+                document.getElementById("buyerName").value.trim(),
+                document.getElementById("buyerPhone").value.trim(),
+                document.getElementById("buyerAddress").value.trim(),
+                document.getElementById("ghnProvince").value,
+                document.getElementById("ghnWard").value
+            ].join("|");
+            const submittedRecipient = [buyerName, buyerPhone, buyerAddress, provinceId, wardId].join("|");
+            if (getCartKey() !== submittedCartKey || currentRecipient !== submittedRecipient) {
+                throw new Error("Giỏ hàng hoặc địa chỉ đã thay đổi. Hãy tính lại phí vận chuyển.");
+            }
+
+            quotedShippingFee = Number(result.totalFee);
+            if (!Number.isSafeInteger(quotedShippingFee) || quotedShippingFee < 0) {
+                quotedShippingFee = null;
+                throw new Error("GHN trả về mức phí không hợp lệ. Hãy thử tính lại.");
+            }
+            shippingQuoteKey = getShippingQuoteKey();
+            document.getElementById("shippingCostDisplay").innerText = quotedShippingFee.toLocaleString("vi-VN") + " đ";
+            const eta = result.expectedDeliveryTime
+                ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(result.expectedDeliveryTime))
+                : "GHN chưa trả thời gian dự kiến";
+            const box = result.packageEstimate;
+            feedback.className = "small mt-2 text-success";
+            feedback.innerText = `${result.message} Kiện ước lượng: ${box.weightGrams.toLocaleString("vi-VN")} g, ${box.lengthCm} × ${box.widthCm} × ${box.heightCm} cm. Dự kiến: ${eta}.`;
+            renderCart();
+        } catch (error) {
+            quotedShippingFee = null;
+            shippingQuoteKey = "";
+            document.getElementById("shippingCostDisplay").innerText = "Chưa tính";
+            feedback.className = "small mt-2 text-danger";
+            feedback.innerText = error.message || "Không nhận được báo phí từ GHN.";
+        } finally {
+            ghnFeeRequestInFlight = false;
+            button.disabled = false;
+            button.innerHTML = '<i class="fa-solid fa-calculator me-1"></i> Tính phí vận chuyển thử';
+            renderCart();
+        }
+    }
+
     // Mã hóa chuỗi trước khi ghép vào HTML của giỏ để dữ liệu localStorage không thể chèn markup.
     function escapeHtml(value) {
         const element = document.createElement("span");
@@ -515,22 +758,60 @@
         return element.innerHTML;
     }
 
+    document.addEventListener("change", event => {
+        const select = event.target.closest(".product-variant-select");
+        if (!select) return;
+        const option = select.selectedOptions[0];
+        const card = select.closest(".product-shop-card");
+        const price = card?.querySelector(".current-product-price");
+        if (price && option?.dataset.price) {
+            price.innerHTML = `${Number(option.dataset.price).toLocaleString("vi-VN")} <span style="font-size:0.85rem">đ</span>`;
+        }
+    });
+
     // Nút thêm sản phẩm dùng data-* đã được Razor mã hóa theo HTML attribute.
     document.addEventListener("click", function(event) {
         const button = event.target.closest(".btn-add-to-cart");
-        if (!button) return;
-        addToCart(Number(button.dataset.productId), button.dataset.productName,
-            Number(button.dataset.productPrice), button.dataset.productImage,
-            Number(button.dataset.productStock));
+        if (button) {
+            const productCard = button.closest(".product-shop-card");
+            const choiceSelect = productCard?.querySelector(".product-variant-select, .product-size-select");
+            const selectedChoice = choiceSelect?.value || "";
+            if (choiceSelect && !selectedChoice) {
+                alert("Vui lòng chọn lựa chọn trước khi thêm sản phẩm vào giỏ.");
+                choiceSelect.focus();
+                return;
+            }
+            const selectedOption = choiceSelect?.selectedOptions?.[0];
+            addToCart(Number(button.dataset.productId), button.dataset.productName,
+                Number(selectedOption?.dataset.price ?? button.dataset.productPrice), button.dataset.productImage,
+                Number(selectedOption?.dataset.stock ?? button.dataset.productStock), selectedChoice,
+                Boolean(productCard?.querySelector(".product-variant-select")));
+            return;
+        }
+
+        const quantityButton = event.target.closest("[data-cart-action]");
+        if (!quantityButton) return;
+        const productId = Number(quantityButton.dataset.productId);
+        const size = quantityButton.dataset.size || "";
+        if (quantityButton.dataset.cartAction === "increase") changeQuantity(productId, size, 1);
+        else if (quantityButton.dataset.cartAction === "decrease") changeQuantity(productId, size, -1);
+        else if (quantityButton.dataset.cartAction === "remove") removeFromCart(productId, size);
     });
 
     // Thêm sản phẩm vào giỏ
-    function addToCart(id, name, price, imageUrl, maxStock) {
+    function addToCart(id, name, price, imageUrl, maxStock, size = "", stockPerVariant = false) {
         if (maxStock <= 0) {
             alert("Sản phẩm này hiện đã hết hàng.");
             return;
         }
-        const existing = cart.find(i => i.id === id);
+        const existing = cart.find(i => i.id === id && (i.size || "") === size);
+        const quantityForThisStock = stockPerVariant
+            ? (existing?.quantity || 0)
+            : cart.filter(item => item.id === id).reduce((sum, item) => sum + item.quantity, 0);
+        if (quantityForThisStock >= maxStock) {
+            alert(`Lựa chọn này chỉ còn tối đa ${maxStock} trong kho.`);
+            return;
+        }
         if (existing) {
             if (existing.quantity < maxStock) {
                 existing.quantity += 1;
@@ -541,34 +822,38 @@
         } else {
             cart.push({
                 id: id,
+                size: size,
                 name: name,
                 price: price,
                 imageUrl: imageUrl,
                 quantity: 1,
-                maxStock: maxStock
+                maxStock: maxStock,
+                stockPerVariant: stockPerVariant
             });
         }
         saveCart();
     }
 
     // Thay đổi số lượng sản phẩm (+1 / -1)
-    function changeQuantity(id, delta) {
-        const item = cart.find(i => i.id === id);
+    function changeQuantity(id, size, delta) {
+        const item = cart.find(i => i.id === id && (i.size || "") === size);
         if (!item) return;
 
         item.quantity += delta;
         if (item.quantity <= 0) {
-            cart = cart.filter(i => i.id !== id);
-        } else if (item.quantity > item.maxStock) {
-            item.quantity = item.maxStock;
+            cart = cart.filter(i => !(i.id === id && (i.size || "") === size));
+        } else if (item.stockPerVariant
+            ? cart.filter(row => row.id === id && (row.size || "") === size).reduce((sum, row) => sum + row.quantity, 0) > item.maxStock
+            : cart.filter(row => row.id === id).reduce((sum, row) => sum + row.quantity, 0) > item.maxStock) {
+            item.quantity -= delta;
             alert(`Sản phẩm này chỉ còn tối đa ${item.maxStock} chiếc.`);
         }
         saveCart();
     }
 
     // Xóa sản phẩm khỏi giỏ
-    function removeFromCart(id) {
-        cart = cart.filter(i => i.id !== id);
+    function removeFromCart(id, size) {
+        cart = cart.filter(i => !(i.id === id && (i.size || "") === size));
         saveCart();
     }
 
@@ -603,6 +888,7 @@
             subtotalEl.innerText = "0 đ";
             totalEl.innerText = "0 đ";
             btnCheckoutText.innerText = "Tiến hành đặt hàng (0 đ)";
+            document.getElementById("btnSubmitCheckout").disabled = true;
             discountRow.classList.add("d-none");
             discountEl.innerText = "-0 đ";
             if (insufficientAlert) insufficientAlert.classList.add("d-none");
@@ -621,13 +907,14 @@
                     <img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}" class="rounded-2 border" style="width: 44px; height: 44px; object-fit: cover;" onerror="this.src='/images/default-banner.jpg';" />
                     <div class="flex-grow-1" style="min-width: 0;">
                         <div class="fw-semibold text-dark text-truncate small" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+                        ${item.size ? `<div class="small text-muted">Lựa chọn: ${escapeHtml(item.size)}</div>` : ""}
                         <div class="small text-success fw-bold font-monospace">${item.price.toLocaleString("vi-VN")} đ</div>
                     </div>
                     <div class="d-flex align-items-center gap-1">
-                        <button type="button" class="btn btn-sm btn-outline-secondary qty-btn" onclick="changeQuantity(${item.id}, -1)">-</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary qty-btn" data-cart-action="decrease" data-product-id="${item.id}" data-size="${escapeHtml(item.size || "")}">-</button>
                         <span class="small font-monospace px-1 fw-bold">${item.quantity}</span>
-                        <button type="button" class="btn btn-sm btn-outline-secondary qty-btn" onclick="changeQuantity(${item.id}, 1)">+</button>
-                        <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-1" onclick="removeFromCart(${item.id})" title="Xóa">
+                        <button type="button" class="btn btn-sm btn-outline-secondary qty-btn" data-cart-action="increase" data-product-id="${item.id}" data-size="${escapeHtml(item.size || "")}">+</button>
+                        <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-1" data-cart-action="remove" data-product-id="${item.id}" data-size="${escapeHtml(item.size || "")}" title="Xóa">
                             <i class="fa-regular fa-trash-can"></i>
                         </button>
                     </div>
@@ -640,12 +927,23 @@
             && couponPreviewCartKey === getCartKey();
         const discount = previewIsCurrent ? couponPreviewDiscount : 0;
         const displayedSubtotal = previewIsCurrent ? couponPreviewSubtotal : total;
-        const payableTotal = Math.max(0, displayedSubtotal - discount);
+        const shippingQuoteIsCurrent = hasCurrentShippingQuote();
+        const shippingFee = shippingQuoteIsCurrent ? Number(quotedShippingFee) : 0;
+        const payableTotal = Math.max(0, displayedSubtotal - discount) + shippingFee;
         subtotalEl.innerText = displayedSubtotal.toLocaleString("vi-VN") + " đ";
         totalEl.innerText = payableTotal.toLocaleString("vi-VN") + " đ";
+        document.getElementById("shippingCostDisplay").innerText = shippingQuoteIsCurrent
+            ? shippingFee.toLocaleString("vi-VN") + " đ"
+            : "Chưa tính";
         discountEl.innerText = "-" + discount.toLocaleString("vi-VN") + " đ";
         discountRow.classList.toggle("d-none", !previewIsCurrent);
-        btnCheckoutText.innerText = `Tiến hành đặt hàng (${payableTotal.toLocaleString("vi-VN")} đ)`;
+        const checkoutButton = document.getElementById("btnSubmitCheckout");
+        checkoutButton.disabled = ghnFeeRequestInFlight || !shippingQuoteIsCurrent;
+        btnCheckoutText.innerText = !ghnShippingEnabled
+            ? "Cần cấu hình GHN để tính phí"
+            : !shippingQuoteIsCurrent
+                ? "Tính phí GHN trước khi đặt hàng"
+                : `Tiến hành đặt hàng (${payableTotal.toLocaleString("vi-VN")} đ)`;
 
         // Kiểm tra số dư ví
         const isWalletSelected = document.getElementById("payWallet") && document.getElementById("payWallet").checked;
@@ -675,6 +973,24 @@
         renderCart();
     });
 
+    if (ghnShippingEnabled) {
+        document.getElementById("ghnProvince").addEventListener("change", function() {
+            resetGhnFeePreview();
+            renderCart();
+            loadGhnWards(this.value);
+        });
+        document.getElementById("ghnWard").addEventListener("change", function() {
+            resetGhnFeePreview();
+            renderCart();
+        });
+        document.getElementById("btnPreviewGhnFee").addEventListener("click", previewGhnShippingFee);
+        ["buyerName", "buyerPhone", "buyerAddress"].forEach(id =>
+            document.getElementById(id).addEventListener("input", function() {
+                resetGhnFeePreview();
+                renderCart();
+            }));
+    }
+
     async function applyCoupon() {
         if (!cart || cart.length === 0) {
             alert("Hãy thêm sản phẩm vào giỏ trước khi áp dụng mã.");
@@ -700,7 +1016,7 @@
                 headers: { "Content-Type": "application/json", "RequestVerificationToken": token },
                 body: JSON.stringify({
                     streamerProfileId: streamerId,
-                    items: cart.map(item => ({ productId: item.id, quantity: item.quantity })),
+                    items: cart.map(item => ({ productId: item.id, size: item.size || null, quantity: item.quantity })),
                     couponCode
                 })
             });
@@ -762,13 +1078,21 @@
             return;
         }
 
+        if (!ghnShippingEnabled || !hasCurrentShippingQuote()) {
+            alert(ghnShippingEnabled
+                ? "Hãy tính phí GHN sau khi kiểm tra lại địa chỉ nhận hàng trước khi đặt hàng."
+                : "GHN chưa được cấu hình. Hiện chưa thể tính phí vận chuyển cho đơn hàng.");
+            document.getElementById("btnPreviewGhnFee")?.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+        }
+
         const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
         const couponCode = document.getElementById("couponCodeInput").value.trim();
         const previewIsCurrent = appliedCouponCode && couponPreviewSubtotal !== null
             && couponPreviewCartKey === getCartKey();
-        const estimatedTotal = previewIsCurrent
+        const estimatedTotal = (previewIsCurrent
             ? Math.max(0, couponPreviewSubtotal - couponPreviewDiscount)
-            : subtotal;
+            : subtotal) + Number(quotedShippingFee);
 
         if (paymentMethod === "Wallet") {
             if (!isAuthenticated) {
@@ -783,18 +1107,20 @@
         }
 
         const btn = document.getElementById("btnSubmitCheckout");
-        const originalBtnContent = btn.innerHTML;
         btn.disabled = true;
-        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-2"></i> Đang xử lý đặt hàng...`;
+        document.getElementById("btnCheckoutText").innerText = "Đang xử lý đặt hàng...";
 
         const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || "";
 
         const payload = {
             streamerProfileId: streamerId,
-            items: cart.map(i => ({ productId: i.id, quantity: i.quantity })),
+            items: cart.map(i => ({ productId: i.id, size: i.size || null, quantity: i.quantity })),
             buyerName: buyerName,
             buyerPhone: buyerPhone,
             buyerAddress: buyerAddress,
+            ghnProvinceId: Number(document.getElementById("ghnProvince").value),
+            ghnWardId: Number(document.getElementById("ghnWard").value),
+            quotedShippingFee: Number(quotedShippingFee),
             note: orderNote,
             couponCode: couponCode,
             paymentMethod: paymentMethod
@@ -813,9 +1139,16 @@
             const res = await resp.json();
 
             if (!res.success) {
+                if (res.shippingFeeChanged && Number.isFinite(Number(res.shippingFee))) {
+                    quotedShippingFee = Number(res.shippingFee);
+                    shippingQuoteKey = getShippingQuoteKey();
+                    document.getElementById("shippingCostDisplay").innerText = quotedShippingFee.toLocaleString("vi-VN") + " đ";
+                    const feedback = document.getElementById("ghnFeeFeedback");
+                    feedback.className = "small mt-2 text-warning";
+                    feedback.innerText = "Phí GHN vừa thay đổi. Tổng tiền đã cập nhật; kiểm tra lại rồi bấm đặt hàng lần nữa.";
+                }
+                renderCart();
                 alert(res.message || "Đã xảy ra lỗi khi tạo đơn hàng. Vui lòng thử lại!");
-                btn.disabled = false;
-                btn.innerHTML = originalBtnContent;
                 return;
             }
 
@@ -842,14 +1175,12 @@
 
                 const qrModal = new bootstrap.Modal(document.getElementById("vietQrModal"));
                 qrModal.show();
-                btn.disabled = false;
-                btn.innerHTML = originalBtnContent;
+                renderCart();
             }
         } catch (err) {
             console.error(err);
             alert("Lỗi kết nối máy chủ khi thanh toán. Vui lòng thử lại!");
-            btn.disabled = false;
-            btn.innerHTML = originalBtnContent;
+            renderCart();
         }
     }
 
@@ -915,5 +1246,8 @@
     }
 
     // Khởi tạo giỏ hàng khi tải xong DOM
-    document.addEventListener("DOMContentLoaded", loadCart);
+    document.addEventListener("DOMContentLoaded", function() {
+        loadCart();
+        loadGhnProvinces();
+    });
 </script>

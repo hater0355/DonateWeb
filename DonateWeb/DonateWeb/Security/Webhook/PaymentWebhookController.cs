@@ -243,7 +243,8 @@ namespace DonateWeb.Security.Webhook
                         }
 
                         var balanceBefore = streamerUser.StreamerEarningsBalance;
-                        var streamerNet = ShopCommission.StreamerNet(shopOrder.TotalAmount);
+                        var merchandisePaid = Math.Max(0, shopOrder.TotalAmount - shopOrder.ShippingFee);
+                        var streamerNet = ShopCommission.StreamerNet(merchandisePaid);
                         streamerUser.StreamerEarningsBalance += streamerNet;
                         streamerUser.UpdatedAt = DateTime.UtcNow;
                         shopOrder.PaymentStatus = "Paid";
@@ -266,7 +267,7 @@ namespace DonateWeb.Security.Webhook
                             BalanceAfter = streamerUser.StreamerEarningsBalance,
                             PaymentMethodName = "PayOS QR (Shop)",
                             Status = WalletTransaction.StatusCompleted,
-                            Note = $"Doanh thu PayOS đơn hàng Shop #{shopOrder.OrderCode}. Phí nền tảng: {ShopCommission.PlatformFee(shopOrder.TotalAmount):N0} VNĐ; streamer nhận: {streamerNet:N0} VNĐ.",
+                            Note = $"Doanh thu PayOS đơn hàng Shop #{shopOrder.OrderCode}. Phí vận chuyển: {shopOrder.ShippingFee:N0} VNĐ; phí nền tảng hàng hóa: {ShopCommission.PlatformFee(merchandisePaid):N0} VNĐ; streamer nhận: {streamerNet:N0} VNĐ.",
                             CreatedAt = DateTime.UtcNow
                         });
 

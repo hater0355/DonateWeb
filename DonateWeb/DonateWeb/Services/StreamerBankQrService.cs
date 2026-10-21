@@ -2,6 +2,8 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using System.Xml;
+using System.Xml.Linq;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace DonateWeb.Services;
@@ -27,7 +29,7 @@ public sealed class StreamerBankQrService : IStreamerBankQrService
         _logger = logger;
     }
 
-    public async Task<string?> CreateStaticQrPngDataUriAsync(
+    public async Task<string?> CreateStaticQrImageDataUriAsync(
         string? bankName,
         string? accountNumber,
         string? accountName,
@@ -75,13 +77,16 @@ public sealed class StreamerBankQrService : IStreamerBankQrService
             }
 
             var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
-            if (!IsPng(bytes))
+            var dataUri = CreateImageDataUri(bytes);
+            if (dataUri == null)
             {
-                _logger.LogWarning("Dịch vụ VietQR trả về nội dung không phải ảnh PNG.");
+                _logger.LogWarning(
+                    "Dịch vụ VietQR trả về định dạng ảnh không hỗ trợ {ContentType}.",
+                    response.Content.Headers.ContentType?.MediaType ?? "không rõ");
                 return null;
             }
 
-            var dataUri = "data:image/png;base64," + Convert.ToBase64String(bytes);
+            // Giữ nguyên SVG vì lớp ngoài chứa các nét QR; ảnh PNG bên trong chỉ là nền/khung.
             _memoryCache.Set(cacheKey, dataUri, TimeSpan.FromHours(12));
             return dataUri;
         }
@@ -217,6 +222,64 @@ public sealed class StreamerBankQrService : IStreamerBankQrService
     private static bool IsPng(byte[] bytes) =>
         bytes.Length >= 8 && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 &&
         bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A;
+
+    private static string? CreateImageDataUri(byte[] bytes)
+    {
+        if (bytes.Length == 0 || bytes.Length > 2_000_000)
+            return null;
+
+        if (IsPng(bytes))
+            return "data:image/png;base64," + Convert.ToBase64String(bytes);
+
+        if (IsJpeg(bytes))
+            return "data:image/jpeg;base64," + Convert.ToBase64String(bytes);
+
+        return IsSafeVietQrSvg(bytes)
+            ? "data:image/svg+xml;base64," + Convert.ToBase64String(bytes)
+            : null;
+    }
+
+    private static bool IsSafeVietQrSvg(byte[] bytes)
+    {
+        try
+        {
+            using var input = new MemoryStream(bytes);
+            using var reader = XmlReader.Create(input, new XmlReaderSettings
+            {
+                DtdProcessing = DtdProcessing.Prohibit,
+                XmlResolver = null,
+                MaxCharactersInDocument = 2_000_000
+            });
+
+            var document = XDocument.Load(reader);
+            var root = document.Root;
+            if (!string.Equals(root?.Name.LocalName, "svg", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var elements = root!.DescendantsAndSelf().ToArray();
+            if (elements.Any(element =>
+                    string.Equals(element.Name.LocalName, "script", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(element.Name.LocalName, "foreignObject", StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            var attributes = elements.SelectMany(element => element.Attributes()).ToArray();
+            if (attributes.Any(attribute => attribute.Name.LocalName.StartsWith("on", StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            // QR SVG chỉ được nhận tài nguyên nhúng dạng data URI hoặc tham chiếu nội bộ.
+            return attributes
+                .Where(attribute => string.Equals(attribute.Name.LocalName, "href", StringComparison.OrdinalIgnoreCase))
+                .All(attribute => attribute.Value.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase) ||
+                                  attribute.Value.StartsWith('#'));
+        }
+        catch (Exception ex) when (ex is XmlException or InvalidOperationException or ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsJpeg(byte[] bytes) =>
+        bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF;
 
     private sealed class VietQrBankList
     {

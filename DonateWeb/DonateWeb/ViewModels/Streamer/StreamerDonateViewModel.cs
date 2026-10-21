@@ -84,9 +84,12 @@ namespace DonateWeb.ViewModels.Streamer
         /// </summary>
         public string? GeneratedQrBase64 { get; set; }
 
-        /// <summary>Mã QR cố định mở trang donate; mã thanh toán PayOS được tạo cho từng đơn.</summary>
-        public string DonatePageUrl { get; set; } = string.Empty;
-        public string? DonatePageQrBase64 { get; set; }
+        /// <summary>QR VietQR không khóa số tiền, chuyển vào tài khoản trung tâm với mã SePay riêng của streamer.</summary>
+        public string? BankDonationQrDataUri { get; set; }
+        public string? BankDonationTransferCode { get; set; }
+        public string? CentralBankName { get; set; }
+        public string? CentralBankAccountNumber { get; set; }
+        public string? CentralBankAccountName { get; set; }
 
         // Trạng thái / Thông báo kết quả gửi donate
         public string? SuccessMessage { get; set; }

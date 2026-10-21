@@ -19,6 +19,9 @@ public sealed class SupportConversation
     [Required, MaxLength(20)]
     public string Status { get; set; } = "Open";
 
+    // Sau khi người dùng xin gặp người thật hoặc nhân viên trả lời, AI sẽ nhường cuộc trò chuyện.
+    public bool AiPaused { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime LastMessageAt { get; set; } = DateTime.UtcNow;
 

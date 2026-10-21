@@ -1,0 +1,116 @@
+{
+  "version": "DW-STREAMER-2026-10-v1",
+  "title": "Hợp đồng sử dụng nền tảng DonateWeb dành cho Streamer",
+  "sections": [
+    {
+      "title": "Điều 1. Phạm vi và cách giao kết",
+      "paragraphs": [
+        "Bên A cung cấp cho Bên B tài khoản Streamer và các công cụ DonateWeb đang có, gồm trang cá nhân, nhận ủng hộ, thông báo donate và widget OBS, giọng đọc/thông báo, mục tiêu và hiệu ứng đặc biệt, nội dung cộng đồng, chat hỗ trợ và trợ lý tự động trong phạm vi DonateWeb, gian hàng, quản lý sản phẩm, đơn hàng, mã giảm giá, số dư doanh thu và yêu cầu rút tiền. Tính năng thực tế phụ thuộc phiên bản đang được công bố trên nền tảng.",
+        "Bên A cung cấp văn bản này dưới dạng hợp đồng điện tử. Bên B chấp nhận bằng tài khoản đã xác thực, xác nhận các ô bắt buộc và nhập lại họ tên trùng với thông tin định danh. Hệ thống ghi nhận phiên bản, nội dung, mã kiểm tra toàn vẹn, thời điểm, tài khoản và thông tin kỹ thuật cần thiết để chứng minh việc giao kết. Đây là phương thức giao kết điện tử của nền tảng, không phải chữ ký số được chứng thực bằng chứng thư số.",
+        "Hợp đồng có hiệu lực từ thời điểm hệ thống ghi nhận việc chấp nhận thành công. Nếu một điều khoản trái quy định bắt buộc của pháp luật thì áp dụng quy định bắt buộc đó; phần còn lại tiếp tục được thực hiện trong phạm vi pháp luật cho phép."
+      ]
+    },
+    {
+      "title": "Điều 2. Điều kiện tham gia và hồ sơ",
+      "paragraphs": [
+        "Bên B cam kết đủ 18 tuổi, có năng lực giao kết và thực hiện hợp đồng, sử dụng tài khoản của chính mình, cung cấp thông tin trung thực và cập nhật khi thay đổi. Người chưa đủ 18 tuổi không thể ký theo quy trình hiện tại của DonateWeb.",
+        "Bên B hoàn tất hồ sơ streamer, cung cấp thông tin CCCD và ảnh hai mặt theo quy trình xác minh, đồng ý xử lý dữ liệu cho mục đích đã thông báo, đồng thời cung cấp thông tin tài khoản nhận tiền chính chủ khi cần rút doanh thu. Việc Admin duyệt hồ sơ không thay thế nghĩa vụ pháp lý của Bên B hoặc việc kiểm tra hồ sơ hàng hóa.",
+        "Bên B không được cho mượn, bán, chuyển nhượng hoặc chia sẻ thông tin đăng nhập. Bên B phải bảo vệ mật khẩu, mã xác thực và thiết bị; cần báo ngay cho Bên A khi nghi ngờ tài khoản bị chiếm quyền."
+      ]
+    },
+    {
+      "title": "Điều 3. Ủng hộ và dịch vụ donate",
+      "paragraphs": [
+        "Khoản ủng hộ là giao dịch do người xem tự nguyện khởi tạo để hỗ trợ Bên B. Bên B chịu trách nhiệm về lời hứa, thử thách, nội dung hoặc quyền lợi mà mình tự cam kết để đổi lấy khoản ủng hộ. DonateWeb cung cấp công cụ kỹ thuật, ghi nhận và hiển thị giao dịch theo trạng thái nhận được từ ví, ngân hàng hoặc cổng thanh toán; DonateWeb không bảo đảm giao dịch của bên thứ ba luôn tức thời hoặc không bị tra soát.",
+        "Mức phí dịch vụ hiện hành của DonateWeb là 10% trên số tiền donate được ghi nhận thành công; phần doanh thu của Bên B là 90%. Phí được tính theo quy tắc làm tròn đang áp dụng cho từng giao dịch. Nền tảng không tự ý thu thêm khoản phí khác ngoài khoản được nêu rõ trong giao dịch hoặc trong thông báo phí áp dụng trước khi giao dịch phát sinh.",
+        "Với chuyển khoản QR ngân hàng, người donate chuyển tới tài khoản trung tâm do DonateWeb cấu hình; mã nội dung chuyển khoản dùng để đối chiếu và ghi nhận cho Streamer. Nếu người donate nhập sai mã hoặc nội dung, giao dịch chưa được tự động đối chiếu thì cần gửi mã giao dịch cho hỗ trợ. PayOS và ví DonateWeb được xử lý theo phương thức hiển thị tại bước thanh toán.",
+        "Người donate có thể chọn hiển thị ẩn danh nếu tính năng được cung cấp. Tên và lời nhắn có thể được kiểm duyệt trước khi hiển thị hoặc đọc bằng giọng nói. Bên B phải cấu hình widget, âm lượng và bộ lọc phù hợp; không được dùng thông báo để phát nội dung trái pháp luật, xâm phạm quyền người khác hoặc gây nguy hiểm."
+      ]
+    },
+    {
+      "title": "Điều 4. Gian hàng, đơn hàng và phí bán hàng",
+      "paragraphs": [
+        "Bên B là người bán đối với sản phẩm do mình đăng bán. Bên B chịu trách nhiệm về nguồn gốc, quyền sở hữu, mô tả, hình ảnh, giá, số lượng, biến thể, chất lượng, an toàn, giấy phép và việc đáp ứng điều kiện kinh doanh của sản phẩm. Bên B phải cung cấp tài liệu hợp lệ khi Bên A hoặc cơ quan có thẩm quyền yêu cầu.",
+        "Mỗi đơn hàng được tính theo giá hàng hóa sau khi áp dụng mã giảm giá hợp lệ. Phí nền tảng hiện hành là 30% giá trị hàng hóa phải trả sau giảm giá; phần doanh thu hàng hóa của Bên B là 70%. Phí vận chuyển không nằm trong cơ sở tính phí nền tảng hàng hóa. Nếu giao diện giao dịch hiển thị một cách tính khác do chương trình hoặc cấu hình riêng, thông tin được hiển thị trước lúc đặt hàng sẽ áp dụng cho đơn đó.",
+        "Bên B phải duy trì tồn kho và thông tin biến thể chính xác, xác nhận và thực hiện đơn, đóng gói, giao hàng, bảo hành, đổi trả và giải quyết khiếu nại theo pháp luật và thông tin đã công bố. Công cụ báo giá vận chuyển hiện có chỉ phục vụ ước tính phí; nó không đồng nghĩa DonateWeb đã đặt dịch vụ với hãng vận chuyển, tạo vận đơn hoặc cử nhân viên đến lấy hàng. Bên B tự thu xếp việc giao hàng với người mua.",
+        "Bên B không đăng hàng cấm, hàng giả, hàng xâm phạm quyền sở hữu trí tuệ, hàng không rõ nguồn gốc hoặc hàng kinh doanh có điều kiện khi chưa đáp ứng điều kiện. Bên B phải cung cấp tài liệu chất lượng, an toàn, quảng cáo hoặc giấy phép cần thiết trước khi đăng bán hay giới thiệu sản phẩm."
+      ]
+    },
+    {
+      "title": "Điều 5. Đối soát, số dư và rút tiền",
+      "paragraphs": [
+        "Số dư doanh thu của Bên B được xác định từ giao dịch đã ghi nhận thành công sau khi trừ phí nền tảng, khoản hoàn tiền, giao dịch bị đảo hoặc điều chỉnh có căn cứ. Bên B có thể xem lịch sử và gửi yêu cầu hỗ trợ/tra soát theo các công cụ đang có.",
+        "Việc rút tiền thực hiện theo quy trình trên DonateWeb, đến tài khoản ngân hàng do Bên B khai báo. Yêu cầu có thể cần kiểm tra danh tính, thông tin thụ hưởng và trạng thái giao dịch. Thời hạn, hạn mức tối thiểu hoặc phí xử lý (nếu có) phải được thông báo trên giao diện trước khi Bên B gửi yêu cầu; không hình thành một lịch thanh toán cố định nếu giao diện không công bố lịch đó.",
+        "Khi có căn cứ cụ thể về giao dịch gian lận, tra soát, hoàn tiền, yêu cầu của cơ quan có thẩm quyền hoặc rủi ro an toàn thanh toán, Bên A có thể tạm hạn chế đúng phần giao dịch liên quan trong thời gian cần thiết để xác minh. Bên A sẽ thông báo lý do và cập nhật kết quả trong phạm vi pháp luật cho phép. Không điều khoản nào cho phép tịch thu số dư hợp pháp hoặc miễn trừ nghĩa vụ thanh toán không tranh chấp của Bên A.",
+        "Số dư hiển thị trên DonateWeb là dữ liệu đối soát giao dịch nội bộ theo trạng thái hệ thống nhận được. Việc nhận, hoàn hoặc chi trả tiền còn phụ thuộc vào ngân hàng, cổng thanh toán và quy trình được công bố; số dư trên DonateWeb không thay thế sao kê ngân hàng hoặc chứng từ mà pháp luật yêu cầu."
+      ]
+    },
+    {
+      "title": "Điều 6. Nghĩa vụ khi livestream, quảng cáo và tạo nội dung",
+      "paragraphs": [
+        "Bên B chịu trách nhiệm về nội dung livestream, bài viết, hình ảnh, âm thanh, đường dẫn, phát ngôn quảng cáo, quyền sử dụng nhạc/hình ảnh và các cam kết với người xem. Không được đưa thông tin sai lệch hoặc gây nhầm lẫn về công dụng, xuất xứ, chất lượng, giá, khuyến mại, bảo hành hay điều kiện nhận quyền lợi.",
+        "Khi giới thiệu hoặc livestream bán hàng, Bên B phải kiểm tra người bán, giấy tờ hàng hóa, điều kiện kinh doanh và tài liệu quảng cáo áp dụng; từ chối hoặc dừng giới thiệu khi hồ sơ thiếu, thông tin không đáng tin cậy hoặc phát hiện vi phạm. Bên B phải tuân thủ quy chế livestream, quy tắc cộng đồng, quy định quảng cáo, bảo vệ người tiêu dùng và các quy định chuyên ngành.",
+        "Bên B cho phép DonateWeb lưu trữ, sao lưu, xử lý và hiển thị nội dung Bên B cung cấp trong phạm vi cần thiết để vận hành, bảo mật, kiểm duyệt và quảng bá trang Streamer trên nền tảng. Bên B giữ quyền đối với nội dung của mình và bảo đảm mình có quyền cấp phép này. Việc sử dụng ngoài phạm vi nền tảng cần căn cứ pháp lý hoặc thỏa thuận riêng."
+      ]
+    },
+    {
+      "title": "Điều 7. Quyền và nghĩa vụ của DonateWeb",
+      "paragraphs": [
+        "DonateWeb cung cấp các chức năng theo tình trạng thực tế, hiển thị thông tin giao dịch mà hệ thống nhận được, tiếp nhận yêu cầu hỗ trợ và áp dụng biện pháp hợp lý để bảo vệ tài khoản, người dùng và nền tảng.",
+        "DonateWeb có thể bảo trì, sửa lỗi, thay đổi hoặc ngừng một tính năng vì an toàn, yêu cầu pháp luật hoặc nhu cầu kỹ thuật. Nền tảng không cam kết mức thời gian hoạt động, thời gian phản hồi hay tính liên tục của dịch vụ của bên thứ ba nếu chưa công bố riêng bằng văn bản.",
+        "DonateWeb có thể ẩn nội dung, tạm khóa tính năng, tạm dừng giao dịch hoặc yêu cầu bổ sung hồ sơ khi có dấu hiệu vi phạm, rủi ro cho người dùng, dữ liệu không chính xác hoặc yêu cầu của cơ quan có thẩm quyền. Trừ trường hợp cần xử lý ngay để ngăn thiệt hại hoặc pháp luật yêu cầu giữ bí mật, Bên A sẽ thông báo lý do và cách gửi giải trình/khiếu nại."
+      ]
+    },
+    {
+      "title": "Điều 8. Thuế, hóa đơn và nghĩa vụ tài chính",
+      "paragraphs": [
+        "Mỗi bên tự thực hiện nghĩa vụ thuế, hóa đơn, đăng ký kinh doanh và báo cáo thuộc trách nhiệm của mình theo tư cách pháp lý, loại thu nhập, quy mô và quy định đang có hiệu lực. Bên A có thể khấu trừ, kê khai hoặc cung cấp dữ liệu cho cơ quan nhà nước khi pháp luật yêu cầu; việc này không làm phát sinh nghĩa vụ thuế vượt quá quy định.",
+        "Bên B cung cấp thông tin định danh và mã số thuế chính xác khi cần để đối soát, lập chứng từ, kê khai hoặc thực hiện khấu trừ theo quy định. Tỷ lệ phí nền tảng nêu tại Điều 3 và Điều 4 là phí dịch vụ theo cách tính được nêu ở đó; không tự suy diễn thành kết luận về VAT, thuế thu nhập hay hóa đơn."
+      ]
+    },
+    {
+      "title": "Điều 9. Dữ liệu cá nhân và bảo mật",
+      "paragraphs": [
+        "Bên A xử lý dữ liệu định danh, liên hệ, hồ sơ CCCD, thông tin tài khoản nhận tiền, nhật ký chấp nhận hợp đồng và dữ liệu giao dịch cho các mục đích xác minh hồ sơ, cung cấp dịch vụ, bảo mật, thanh toán, giải quyết tranh chấp và thực hiện nghĩa vụ pháp lý. Việc xử lý tuân theo Chính sách bảo mật và quyền riêng tư của DonateWeb và pháp luật bảo vệ dữ liệu cá nhân.",
+        "Bên A chỉ chia sẻ dữ liệu cần thiết với nhà cung cấp hạ tầng, ngân hàng/cổng thanh toán, đơn vị hỗ trợ vận hành hoặc cơ quan có thẩm quyền theo căn cứ phù hợp. Bên A áp dụng biện pháp bảo vệ hợp lý; không cam kết rằng rủi ro an ninh mạng có thể bị loại bỏ tuyệt đối.",
+        "Bên B có thể yêu cầu truy cập, cập nhật hoặc xử lý quyền dữ liệu theo chính sách và pháp luật. Một số dữ liệu có thể được lưu giữ trong thời hạn cần thiết để thực hiện hợp đồng, giải quyết tra soát/khiếu nại hoặc đáp ứng nghĩa vụ lưu trữ của pháp luật; việc xóa tài khoản không đồng nghĩa xóa ngay dữ liệu phải tiếp tục lưu giữ hợp pháp."
+      ]
+    },
+    {
+      "title": "Điều 10. Sở hữu trí tuệ và thương hiệu",
+      "paragraphs": [
+        "Mỗi bên giữ quyền đối với nhãn hiệu, phần mềm, tài liệu và tài sản trí tuệ do mình sở hữu. Bên B không được sao chép trái phép mã nguồn, thiết kế, dữ liệu hoặc thương hiệu của DonateWeb; Bên A không nhận chuyển nhượng quyền sở hữu nội dung do Bên B tạo ra.",
+        "Trong thời gian Bên B sử dụng dịch vụ, Bên B cấp cho Bên A quyền không độc quyền, miễn phí, trong phạm vi cần thiết để lưu trữ, sao lưu, chuyển mã, hiển thị và phân phối nội dung trên các tính năng mà Bên B chủ động sử dụng. Quyền này chấm dứt khi nội dung được gỡ, trừ bản lưu trữ cần thiết cho giao dịch, tranh chấp hoặc nghĩa vụ pháp luật."
+      ]
+    },
+    {
+      "title": "Điều 11. Tạm ngừng và chấm dứt",
+      "paragraphs": [
+        "Bên B có thể yêu cầu chấm dứt sử dụng tài khoản theo quy trình DonateWeb. Bên A có thể chấm dứt hoặc tạm ngừng một phần dịch vụ khi Bên B vi phạm hợp đồng/pháp luật, cung cấp thông tin sai, gây nguy cơ cho người dùng, hoặc khi cơ quan có thẩm quyền yêu cầu.",
+        "Khi phù hợp, Bên A thông báo vi phạm, cho Bên B cơ hội giải trình hoặc khắc phục trong thời hạn hợp lý. Biện pháp khẩn cấp có thể áp dụng ngay để ngăn rủi ro; Bên B có thể gửi khiếu nại. Việc chấm dứt không làm mất quyền yêu cầu xử lý giao dịch, hoàn tiền, thuế, dữ liệu hoặc nghĩa vụ đã phát sinh trước ngày chấm dứt.",
+        "Số dư hợp pháp không tranh chấp được đối soát và xử lý theo quy trình rút tiền, sau khi trừ các khoản điều chỉnh có căn cứ. Các khoản bị tra soát được xử lý riêng và không làm mất quyền đối với phần số dư còn lại."
+      ]
+    },
+    {
+      "title": "Điều 12. Sự kiện ngoài khả năng kiểm soát và trách nhiệm",
+      "paragraphs": [
+        "Không bên nào chịu trách nhiệm đối với việc chậm thực hiện nghĩa vụ do sự kiện bất khả kháng theo pháp luật, với điều kiện bên bị ảnh hưởng áp dụng biện pháp hợp lý để hạn chế hậu quả và thông báo khi có thể. Nghĩa vụ đối soát khoản đã nhận và các nghĩa vụ bắt buộc theo pháp luật vẫn được thực hiện.",
+        "Mỗi bên chịu trách nhiệm đối với hành vi và nghĩa vụ do mình kiểm soát. Hợp đồng không loại trừ trách nhiệm mà pháp luật không cho phép loại trừ, không hạn chế quyền bắt buộc của người tiêu dùng và không miễn trách nhiệm do cố ý vi phạm, vi phạm dữ liệu cá nhân hoặc hành vi trái pháp luật."
+      ]
+    },
+    {
+      "title": "Điều 13. Khiếu nại và giải quyết tranh chấp",
+      "paragraphs": [
+        "Bên B gửi yêu cầu hỗ trợ hoặc khiếu nại qua kênh hỗ trợ được công bố trên DonateWeb, kèm mã giao dịch và tài liệu liên quan. Hai bên ưu tiên trao đổi thiện chí, xác minh dữ liệu và thống nhất biện pháp xử lý.",
+        "Nếu không giải quyết được bằng thương lượng, tranh chấp được đưa đến cơ quan giải quyết có thẩm quyền tại Việt Nam theo pháp luật Việt Nam. Không điều khoản nào hạn chế quyền khiếu nại, khởi kiện hoặc quyền lựa chọn cơ quan giải quyết tranh chấp mà pháp luật dành cho một bên."
+      ]
+    },
+    {
+      "title": "Điều 14. Phiên bản và thay đổi hợp đồng",
+      "paragraphs": [
+        "Phiên bản hợp đồng được ghi trong bản điện tử và bản ghi chấp nhận. Bên A thông báo trước những thay đổi trọng yếu ảnh hưởng đến phí hoặc quyền, nghĩa vụ của Bên B và yêu cầu chấp nhận phiên bản mới khi pháp luật hoặc tính chất thay đổi cần sự đồng ý. Thay đổi không được áp dụng hồi tố cho giao dịch đã hoàn tất, trừ trường hợp pháp luật yêu cầu hoặc các bên cùng thỏa thuận.",
+        "Hợp đồng cùng các chính sách được dẫn chiếu tạo thành thỏa thuận về việc sử dụng dịch vụ Streamer. Nếu nội dung giới thiệu, giao diện hoặc chính sách khác mâu thuẫn với quy định bắt buộc của pháp luật, quy định pháp luật được ưu tiên. Bản chấp nhận điện tử lưu trong DonateWeb là bản đối chiếu của phiên bản Bên B đã chấp nhận."
+      ]
+    }
+  ]
+}

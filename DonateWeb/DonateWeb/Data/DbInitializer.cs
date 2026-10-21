@@ -41,6 +41,8 @@ namespace DonateWeb.Data
 
                     IF OBJECT_ID('dbo.StreamerProfiles', 'U') IS NOT NULL
                     BEGIN
+                        IF COL_LENGTH('dbo.StreamerProfiles', 'RequiredContractVersion') IS NULL
+                            ALTER TABLE dbo.StreamerProfiles ADD RequiredContractVersion NVARCHAR(40) NULL;
                         IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.StreamerProfiles') AND name = 'Bio')
                         BEGIN
                             ALTER TABLE dbo.StreamerProfiles ADD Bio NVARCHAR(MAX) NULL;
@@ -67,6 +69,26 @@ namespace DonateWeb.Data
                             ALTER TABLE dbo.StreamerProfiles ADD CitizenIdBackDocumentKey NVARCHAR(80) NULL;
                         IF COL_LENGTH('dbo.StreamerProfiles', 'IdentityDataConsentAt') IS NULL
                             ALTER TABLE dbo.StreamerProfiles ADD IdentityDataConsentAt DATETIME2 NULL;
+                    END
+
+                    IF OBJECT_ID('dbo.StreamerContractAcceptances', 'U') IS NULL
+                    BEGIN
+                        CREATE TABLE dbo.StreamerContractAcceptances (
+                            Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StreamerContractAcceptances PRIMARY KEY,
+                            StreamerProfileId INT NOT NULL,
+                            UserId INT NOT NULL,
+                            ContractVersion NVARCHAR(40) NOT NULL,
+                            ContractSnapshotProtected NVARCHAR(MAX) NOT NULL,
+                            ContractSnapshotSha256 NVARCHAR(64) NOT NULL,
+                            SignerFullName NVARCHAR(100) NOT NULL,
+                            SignedAtUtc DATETIME2 NOT NULL,
+                            ClientIpAddress NVARCHAR(45) NULL,
+                            UserAgent NVARCHAR(500) NULL,
+                            CONSTRAINT FK_StreamerContractAcceptances_StreamerProfiles FOREIGN KEY (StreamerProfileId) REFERENCES dbo.StreamerProfiles(Id) ON DELETE CASCADE,
+                            CONSTRAINT FK_StreamerContractAcceptances_Users FOREIGN KEY (UserId) REFERENCES dbo.Users(Id) ON DELETE NO ACTION
+                        );
+                        CREATE UNIQUE INDEX IX_StreamerContractAcceptances_Profile_Version ON dbo.StreamerContractAcceptances(StreamerProfileId, ContractVersion);
+                        CREATE INDEX IX_StreamerContractAcceptances_User_SignedAt ON dbo.StreamerContractAcceptances(UserId, SignedAtUtc);
                     END
 
                     IF OBJECT_ID('dbo.Users', 'U') IS NOT NULL
@@ -96,7 +118,15 @@ namespace DonateWeb.Data
                             StreamerProfileId INT NOT NULL,
                             Name NVARCHAR(200) NOT NULL,
                             Description NVARCHAR(MAX) NULL,
+                            Category NVARCHAR(80) NOT NULL CONSTRAINT DF_ShopProducts_Category DEFAULT N'Khác',
+                            AvailableSizesJson NVARCHAR(1000) NOT NULL CONSTRAINT DF_ShopProducts_AvailableSizesJson DEFAULT N'[]',
+                            AdditionalImageUrlsJson NVARCHAR(MAX) NULL,
+                            VariantsJson NVARCHAR(MAX) NOT NULL CONSTRAINT DF_ShopProducts_VariantsJson DEFAULT N'[]',
                             Price DECIMAL(18,2) NOT NULL,
+                            WeightGrams INT NULL,
+                            LengthCm INT NULL,
+                            WidthCm INT NULL,
+                            HeightCm INT NULL,
                             ImageUrl NVARCHAR(500) NULL,
                             StockQuantity INT NOT NULL DEFAULT 999,
                             IsActive BIT NOT NULL DEFAULT 1,
@@ -118,6 +148,27 @@ namespace DonateWeb.Data
                             ALTER TABLE dbo.ShopProducts ADD ApprovedAt DATETIME2 NULL;
                             ALTER TABLE dbo.ShopProducts ADD ApprovedBy NVARCHAR(100) NULL;
                         END
+                    END
+
+                    IF OBJECT_ID('dbo.ShopProducts', 'U') IS NOT NULL
+                    BEGIN
+                        -- Sản phẩm cũ được để NULL để Streamer bổ sung thông số kiện hàng khi sửa sản phẩm.
+                        IF COL_LENGTH('dbo.ShopProducts', 'WeightGrams') IS NULL
+                            ALTER TABLE dbo.ShopProducts ADD WeightGrams INT NULL;
+                        IF COL_LENGTH('dbo.ShopProducts', 'LengthCm') IS NULL
+                            ALTER TABLE dbo.ShopProducts ADD LengthCm INT NULL;
+                        IF COL_LENGTH('dbo.ShopProducts', 'WidthCm') IS NULL
+                            ALTER TABLE dbo.ShopProducts ADD WidthCm INT NULL;
+                        IF COL_LENGTH('dbo.ShopProducts', 'HeightCm') IS NULL
+                            ALTER TABLE dbo.ShopProducts ADD HeightCm INT NULL;
+                        IF COL_LENGTH('dbo.ShopProducts', 'Category') IS NULL
+                            ALTER TABLE dbo.ShopProducts ADD Category NVARCHAR(80) NOT NULL CONSTRAINT DF_ShopProducts_Category DEFAULT N'Khác';
+                        IF COL_LENGTH('dbo.ShopProducts', 'AvailableSizesJson') IS NULL
+                            ALTER TABLE dbo.ShopProducts ADD AvailableSizesJson NVARCHAR(1000) NOT NULL CONSTRAINT DF_ShopProducts_AvailableSizesJson DEFAULT N'[]';
+                        IF COL_LENGTH('dbo.ShopProducts', 'AdditionalImageUrlsJson') IS NULL
+                            ALTER TABLE dbo.ShopProducts ADD AdditionalImageUrlsJson NVARCHAR(MAX) NULL;
+                        IF COL_LENGTH('dbo.ShopProducts', 'VariantsJson') IS NULL
+                            ALTER TABLE dbo.ShopProducts ADD VariantsJson NVARCHAR(MAX) NOT NULL CONSTRAINT DF_ShopProducts_VariantsJson DEFAULT N'[]';
                     END
 
                     -- Bảng mã giảm giá do Admin quản lý
@@ -160,6 +211,7 @@ namespace DonateWeb.Data
                             Note NVARCHAR(500) NULL,
                             SubtotalAmount DECIMAL(18,2) NOT NULL DEFAULT 0,
                             DiscountAmount DECIMAL(18,2) NOT NULL DEFAULT 0,
+                            ShippingFee DECIMAL(18,2) NOT NULL DEFAULT 0,
                             TotalAmount DECIMAL(18,2) NOT NULL,
                             CouponCode NVARCHAR(50) NULL,
                             DiscountCouponId INT NULL,
@@ -187,6 +239,8 @@ namespace DonateWeb.Data
                         EXEC sys.sp_executesql N'UPDATE dbo.ShopOrders SET SubtotalAmount = TotalAmount WHERE SubtotalAmount = 0 AND TotalAmount > 0;';
                         IF COL_LENGTH('dbo.ShopOrders', 'DiscountAmount') IS NULL
                             ALTER TABLE dbo.ShopOrders ADD DiscountAmount DECIMAL(18,2) NOT NULL CONSTRAINT DF_ShopOrders_DiscountAmount DEFAULT 0;
+                        IF COL_LENGTH('dbo.ShopOrders', 'ShippingFee') IS NULL
+                            ALTER TABLE dbo.ShopOrders ADD ShippingFee DECIMAL(18,2) NOT NULL CONSTRAINT DF_ShopOrders_ShippingFee DEFAULT 0;
                         IF COL_LENGTH('dbo.ShopOrders', 'CouponCode') IS NULL
                             ALTER TABLE dbo.ShopOrders ADD CouponCode NVARCHAR(50) NULL;
                         IF COL_LENGTH('dbo.ShopOrders', 'DiscountCouponId') IS NULL
@@ -208,12 +262,22 @@ namespace DonateWeb.Data
                             ShopOrderId INT NOT NULL,
                             ShopProductId INT NOT NULL,
                             ProductName NVARCHAR(200) NOT NULL,
+                            VariantSelection NVARCHAR(50) NULL,
+                            UsesVariantStock BIT NOT NULL DEFAULT 0,
                             Price DECIMAL(18,2) NOT NULL,
                             Quantity INT NOT NULL DEFAULT 1,
                             CONSTRAINT FK_ShopOrderItems_ShopOrders FOREIGN KEY (ShopOrderId) REFERENCES dbo.ShopOrders(Id) ON DELETE CASCADE,
                             CONSTRAINT FK_ShopOrderItems_ShopProducts FOREIGN KEY (ShopProductId) REFERENCES dbo.ShopProducts(Id) ON DELETE NO ACTION
                         );
                     END
+
+                    IF OBJECT_ID('dbo.ShopOrderItems', 'U') IS NOT NULL
+                        AND COL_LENGTH('dbo.ShopOrderItems', 'VariantSelection') IS NULL
+                        ALTER TABLE dbo.ShopOrderItems ADD VariantSelection NVARCHAR(50) NULL;
+
+                    IF OBJECT_ID('dbo.ShopOrderItems', 'U') IS NOT NULL
+                        AND COL_LENGTH('dbo.ShopOrderItems', 'UsesVariantStock') IS NULL
+                        ALTER TABLE dbo.ShopOrderItems ADD UsesVariantStock BIT NOT NULL CONSTRAINT DF_ShopOrderItems_UsesVariantStock DEFAULT 0;
 
                     -- Bảng Breaking News
                     IF OBJECT_ID('dbo.BreakingNews', 'U') IS NULL
@@ -266,6 +330,7 @@ namespace DonateWeb.Data
                             GuestTokenHash NVARCHAR(64) NULL,
                             VisitorName NVARCHAR(100) NOT NULL,
                             Status NVARCHAR(20) NOT NULL CONSTRAINT DF_SupportConversations_Status DEFAULT N'Open',
+                            AiPaused BIT NOT NULL CONSTRAINT DF_SupportConversations_AiPaused DEFAULT 0,
                             CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_SupportConversations_CreatedAt DEFAULT SYSUTCDATETIME(),
                             LastMessageAt DATETIME2 NOT NULL CONSTRAINT DF_SupportConversations_LastMessageAt DEFAULT SYSUTCDATETIME(),
                             CONSTRAINT FK_SupportConversations_Users FOREIGN KEY (UserId) REFERENCES dbo.Users(Id) ON DELETE SET NULL
@@ -273,6 +338,8 @@ namespace DonateWeb.Data
                     END
                     IF OBJECT_ID('dbo.SupportConversations', 'U') IS NOT NULL
                     BEGIN
+                        IF COL_LENGTH('dbo.SupportConversations', 'AiPaused') IS NULL
+                            ALTER TABLE dbo.SupportConversations ADD AiPaused BIT NOT NULL CONSTRAINT DF_SupportConversations_AiPaused DEFAULT 0;
                         IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SupportConversations_Status_LastMessageAt' AND object_id = OBJECT_ID('dbo.SupportConversations'))
                             CREATE INDEX IX_SupportConversations_Status_LastMessageAt ON dbo.SupportConversations(Status, LastMessageAt DESC);
                         IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SupportConversations_UserId_Status' AND object_id = OBJECT_ID('dbo.SupportConversations'))
@@ -289,6 +356,7 @@ namespace DonateWeb.Data
                             SenderUserId INT NULL,
                             SenderName NVARCHAR(100) NOT NULL,
                             IsFromSupport BIT NOT NULL CONSTRAINT DF_SupportChatMessages_IsFromSupport DEFAULT 0,
+                            IsAi BIT NOT NULL CONSTRAINT DF_SupportChatMessages_IsAi DEFAULT 0,
                             Content NVARCHAR(2000) NOT NULL,
                             IsReadBySupport BIT NOT NULL CONSTRAINT DF_SupportChatMessages_IsReadBySupport DEFAULT 0,
                             IsReadByVisitor BIT NOT NULL CONSTRAINT DF_SupportChatMessages_IsReadByVisitor DEFAULT 0,
@@ -296,6 +364,20 @@ namespace DonateWeb.Data
                             CONSTRAINT FK_SupportChatMessages_SupportConversations FOREIGN KEY (ConversationId) REFERENCES dbo.SupportConversations(Id) ON DELETE CASCADE
                         );
                         CREATE INDEX IX_SupportChatMessages_ConversationId_Id ON dbo.SupportChatMessages(ConversationId, Id);
+                    END
+                    IF OBJECT_ID('dbo.SupportChatMessages', 'U') IS NOT NULL
+                        AND COL_LENGTH('dbo.SupportChatMessages', 'IsAi') IS NULL
+                        ALTER TABLE dbo.SupportChatMessages ADD IsAi BIT NOT NULL CONSTRAINT DF_SupportChatMessages_IsAi DEFAULT 0;
+
+                    IF OBJECT_ID('dbo.SupportAiMonthlyUsages', 'U') IS NULL
+                    BEGIN
+                        CREATE TABLE dbo.SupportAiMonthlyUsages (
+                            Period NVARCHAR(7) NOT NULL,
+                            TotalTokens BIGINT NOT NULL CONSTRAINT DF_SupportAiMonthlyUsages_TotalTokens DEFAULT 0,
+                            ReservedTokens BIGINT NOT NULL CONSTRAINT DF_SupportAiMonthlyUsages_ReservedTokens DEFAULT 0,
+                            UpdatedAtUtc DATETIME2 NOT NULL CONSTRAINT DF_SupportAiMonthlyUsages_UpdatedAtUtc DEFAULT SYSUTCDATETIME(),
+                            CONSTRAINT PK_SupportAiMonthlyUsages PRIMARY KEY CLUSTERED (Period)
+                        );
                     END
                 ");
 
@@ -1019,7 +1101,7 @@ namespace DonateWeb.Data
                             SELECT
                                 COALESCE((SELECT SUM(ROUND(d.Amount * 0.90, 0)) FROM dbo.Donations AS d
                                     WHERE d.StreamerProfileId = sp.Id AND d.[Status] = 1), 0)
-                                + COALESCE((SELECT SUM(ROUND(o.TotalAmount * 0.70, 0)) FROM dbo.ShopOrders AS o
+                                + COALESCE((SELECT SUM(ROUND((o.TotalAmount - COALESCE(o.ShippingFee, 0)) * 0.70, 0)) FROM dbo.ShopOrders AS o
                                     WHERE o.StreamerProfileId = sp.Id AND o.PaymentStatus = N'Paid'), 0)
                                 - COALESCE((SELECT SUM(wr.Amount) FROM dbo.WithdrawalRequests AS wr
                                     WHERE wr.UserId = u.Id AND wr.[Status] IN (0, 1)), 0)

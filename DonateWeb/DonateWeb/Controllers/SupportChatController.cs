@@ -1,9 +1,10 @@
-using System.Security.Cryptography;
 using System.Security.Claims;
+using System.Globalization;
 using System.Text;
 using DonateWeb.Data;
 using DonateWeb.Models.Entities;
 using DonateWeb.Models.Enums;
+using DonateWeb.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,16 +13,20 @@ using DonateWeb.Security.RateLimiting;
 namespace DonateWeb.Controllers;
 
 [Route("SupportChat")]
+[Authorize]
 public sealed class SupportChatController : Controller
 {
-    private const string GuestCookieName = "DonateWeb.SupportGuest";
     private const int MaximumMessageLength = 2000;
     private readonly AppDbContext _db;
+    private readonly ISupportAiService _supportAiService;
 
-    public SupportChatController(AppDbContext db) => _db = db;
+    public SupportChatController(AppDbContext db, ISupportAiService supportAiService)
+    {
+        _db = db;
+        _supportAiService = supportAiService;
+    }
 
     [HttpGet("Current")]
-    [AllowAnonymous]
     public async Task<IActionResult> Current(CancellationToken cancellationToken)
     {
         var conversation = await FindCurrentConversationAsync(cancellationToken);
@@ -29,18 +34,15 @@ public sealed class SupportChatController : Controller
     }
 
     [HttpPost("Start")]
-    [AllowAnonymous]
     [ValidateAntiForgeryToken]
     [DonateRateLimit(10, 60, "support_chat_start")]
-    public async Task<IActionResult> Start([FromForm] string? visitorName, CancellationToken cancellationToken)
+    public async Task<IActionResult> Start(CancellationToken cancellationToken)
     {
         var isStaff = IsSupportStaff();
         if (isStaff) return Forbid();
 
         var userId = GetUserId();
-        string? guestHash = null;
-        if (userId == null)
-            guestHash = GetOrCreateGuestTokenHash();
+        if (!userId.HasValue) return Challenge();
 
         var existing = await FindCurrentConversationAsync(cancellationToken);
         if (existing != null)
@@ -49,14 +51,13 @@ public sealed class SupportChatController : Controller
         var signedInUser = userId.HasValue
             ? await _db.Users.Where(u => u.Id == userId.Value).Select(u => new { u.FullName, u.Username }).FirstOrDefaultAsync(cancellationToken)
             : null;
-        var displayName = (signedInUser?.FullName ?? visitorName ?? signedInUser?.Username ?? "Khách").Trim();
+        var displayName = (signedInUser?.FullName ?? signedInUser?.Username ?? "Người dùng").Trim();
         if (displayName.Length > 100) displayName = displayName[..100];
         if (string.IsNullOrWhiteSpace(displayName)) displayName = "Khách";
 
         var conversation = new SupportConversation
         {
-            UserId = userId,
-            GuestTokenHash = guestHash,
+            UserId = userId.Value,
             VisitorName = displayName,
             Status = "Open",
             CreatedAt = DateTime.UtcNow,
@@ -68,11 +69,13 @@ public sealed class SupportChatController : Controller
     }
 
     [HttpGet("Messages/{id:int}")]
-    [AllowAnonymous]
     public async Task<IActionResult> Messages(int id, long afterMessageId = 0, CancellationToken cancellationToken = default)
     {
-        var status = await _db.SupportConversations.Where(c => c.Id == id).Select(c => c.Status).FirstOrDefaultAsync(cancellationToken);
-        if (status == null) return NotFound();
+        var conversationState = await _db.SupportConversations
+            .Where(c => c.Id == id)
+            .Select(c => new { c.Status, c.AiPaused })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (conversationState == null) return NotFound();
         if (!await CanAccessConversationAsync(id, cancellationToken)) return NotFound();
 
         var isStaff = IsSupportStaff();
@@ -87,18 +90,17 @@ public sealed class SupportChatController : Controller
         var query = _db.SupportChatMessages.Where(m => m.ConversationId == id && m.Id > afterMessageId);
         var messages = afterMessageId > 0
             ? await query.OrderBy(m => m.Id).Take(100)
-                .Select(m => new { id = m.Id, senderName = m.SenderName, isFromSupport = m.IsFromSupport, content = m.Content, createdAt = m.CreatedAt })
+                .Select(m => new { id = m.Id, senderName = m.SenderName, isFromSupport = m.IsFromSupport, isAi = m.IsAi, content = m.Content, createdAt = m.CreatedAt })
                 .ToListAsync(cancellationToken)
             : await query.OrderByDescending(m => m.Id).Take(100)
-                .Select(m => new { id = m.Id, senderName = m.SenderName, isFromSupport = m.IsFromSupport, content = m.Content, createdAt = m.CreatedAt })
+                .Select(m => new { id = m.Id, senderName = m.SenderName, isFromSupport = m.IsFromSupport, isAi = m.IsAi, content = m.Content, createdAt = m.CreatedAt })
                 .ToListAsync(cancellationToken);
 
         if (afterMessageId == 0) messages.Reverse();
-        return Json(new { messages, status });
+        return Json(new { messages, status = conversationState.Status, aiPaused = conversationState.AiPaused });
     }
 
     [HttpPost("Send")]
-    [AllowAnonymous]
     [ValidateAntiForgeryToken]
     [DonateRateLimit(30, 60, "support_chat_send")]
     public async Task<IActionResult> Send([FromForm] int conversationId, [FromForm] string? message, CancellationToken cancellationToken)
@@ -120,6 +122,9 @@ public sealed class SupportChatController : Controller
                 : conversation.VisitorName;
         if (senderName.Length > 100) senderName = senderName[..100];
 
+        var wasAiPaused = conversation.AiPaused;
+        var requestsHuman = !isStaff && IsHumanHandoffRequest(content);
+
         _db.SupportChatMessages.Add(new SupportChatMessage
         {
             ConversationId = conversationId,
@@ -131,9 +136,54 @@ public sealed class SupportChatController : Controller
             IsReadByVisitor = !isStaff,
             CreatedAt = DateTime.UtcNow
         });
+        if (isStaff || requestsHuman)
+            conversation.AiPaused = true;
         conversation.LastMessageAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
-        return Ok(new { sent = true });
+
+        if (isStaff)
+            return Ok(new { sent = true, aiStatus = "paused" });
+
+        if (requestsHuman)
+        {
+            await AddAiMessageAsync(conversation, "Mình đã chuyển cuộc trò chuyện cho Hỗ trợ viên. Bạn vui lòng chờ nhân viên phản hồi nhé.", cancellationToken);
+            return Ok(new { sent = true, aiStatus = "handoff" });
+        }
+
+        if (wasAiPaused)
+            return Ok(new { sent = true, aiStatus = "paused" });
+
+        var aiReply = await _supportAiService.GenerateReplyAsync(conversationId, cancellationToken);
+        await _db.Entry(conversation).ReloadAsync(cancellationToken);
+
+        if (conversation.Status != "Open" || conversation.AiPaused)
+            return Ok(new { sent = true, aiStatus = "paused" });
+
+        if (aiReply.Status is SupportAiReplyStatus.Answered or SupportAiReplyStatus.OutOfScope or SupportAiReplyStatus.Handoff
+            && !string.IsNullOrWhiteSpace(aiReply.Message))
+        {
+            if (aiReply.Status == SupportAiReplyStatus.Handoff)
+                conversation.AiPaused = true;
+            await AddAiMessageAsync(conversation, aiReply.Message, cancellationToken);
+            var status = aiReply.Status switch
+            {
+                SupportAiReplyStatus.Handoff => "handoff",
+                SupportAiReplyStatus.OutOfScope => "outOfScope",
+                _ => "answered"
+            };
+            return Ok(new { sent = true, aiStatus = status });
+        }
+
+        // AI chưa cấu hình, đã chạm ngân sách hoặc gặp lỗi: chuyển quyền xử lý cho nhân viên để không thử gọi lặp.
+        conversation.AiPaused = true;
+        await _db.SaveChangesAsync(cancellationToken);
+        var statusMessage = aiReply.Status switch
+        {
+            SupportAiReplyStatus.NotConfigured => "notConfigured",
+            SupportAiReplyStatus.MonthlyLimitReached => "monthlyLimitReached",
+            _ => "unavailable"
+        };
+        return Ok(new { sent = true, aiStatus = statusMessage });
     }
 
     [HttpGet("Inbox")]
@@ -155,6 +205,7 @@ public sealed class SupportChatController : Controller
                 visitorName = c.VisitorName,
                 userEmail = c.User == null ? null : c.User.Email,
                 status = c.Status,
+                aiPaused = c.AiPaused,
                 lastMessageAt = c.LastMessageAt,
                 lastMessage = c.Messages.OrderByDescending(m => m.Id).Select(m => m.Content).FirstOrDefault() ?? "Chưa có tin nhắn",
                 unreadCount = c.Messages.Count(m => !m.IsFromSupport && !m.IsReadBySupport)
@@ -178,47 +229,54 @@ public sealed class SupportChatController : Controller
     private async Task<SupportConversation?> FindCurrentConversationAsync(CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        IQueryable<SupportConversation> query = _db.SupportConversations.Where(c => c.Status == "Open");
-        if (userId.HasValue)
-            query = query.Where(c => c.UserId == userId.Value);
-        else if (Request.Cookies.TryGetValue(GuestCookieName, out var token) && !string.IsNullOrWhiteSpace(token))
-            query = query.Where(c => c.GuestTokenHash == HashToken(token));
-        else
-            return null;
-        return await query.OrderByDescending(c => c.LastMessageAt).FirstOrDefaultAsync(cancellationToken);
+        if (!userId.HasValue) return null;
+        return await _db.SupportConversations
+            .Where(c => c.Status == "Open" && c.UserId == userId.Value)
+            .OrderByDescending(c => c.LastMessageAt)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private async Task<bool> CanAccessConversationAsync(int id, CancellationToken cancellationToken)
     {
         if (IsSupportStaff()) return true;
         var userId = GetUserId();
-        if (userId.HasValue)
-            return await _db.SupportConversations.AnyAsync(c => c.Id == id && c.UserId == userId.Value, cancellationToken);
-        if (!Request.Cookies.TryGetValue(GuestCookieName, out var token) || string.IsNullOrWhiteSpace(token)) return false;
-        var hash = HashToken(token);
-        return await _db.SupportConversations.AnyAsync(c => c.Id == id && c.GuestTokenHash == hash, cancellationToken);
+        return userId.HasValue
+            && await _db.SupportConversations.AnyAsync(c => c.Id == id && c.UserId == userId.Value, cancellationToken);
     }
 
     private bool IsSupportStaff() => User.IsInRole(UserRoles.Admin) || User.IsInRole(UserRoles.SupportAgent);
 
-    private int? GetUserId() => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
-
-    private string GetOrCreateGuestTokenHash()
+    private async Task AddAiMessageAsync(SupportConversation conversation, string content, CancellationToken cancellationToken)
     {
-        if (!Request.Cookies.TryGetValue(GuestCookieName, out var token) || string.IsNullOrWhiteSpace(token))
+        _db.SupportChatMessages.Add(new SupportChatMessage
         {
-            token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-            Response.Cookies.Append(GuestCookieName, token, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = Request.IsHttps || !HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().IsDevelopment(),
-                SameSite = SameSiteMode.Lax,
-                IsEssential = true,
-                MaxAge = TimeSpan.FromDays(180)
-            });
-        }
-        return HashToken(token);
+            ConversationId = conversation.Id,
+            SenderName = "Trợ lý AI DonateWeb",
+            IsFromSupport = true,
+            IsAi = true,
+            Content = content.Length > MaximumMessageLength ? content[..MaximumMessageLength] : content,
+            IsReadBySupport = true,
+            IsReadByVisitor = false,
+            CreatedAt = DateTime.UtcNow
+        });
+        conversation.LastMessageAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
     }
 
-    private static string HashToken(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+    private static bool IsHumanHandoffRequest(string message)
+    {
+        var decomposed = message.Normalize(NormalizationForm.FormD);
+        var withoutMarks = new string(decomposed.Where(character =>
+            CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark).ToArray());
+        var normalized = withoutMarks.Normalize(NormalizationForm.FormC).Replace('đ', 'd').Replace('Đ', 'D').ToLowerInvariant();
+
+        return new[]
+        {
+            "gap ho tro vien", "gap nhan vien", "noi chuyen voi nhan vien", "noi chuyen voi nguoi that",
+            "gap nguoi that", "chuyen cho nhan vien", "can nhan vien ho tro", "muon gap nhan vien"
+        }.Any(normalized.Contains);
+    }
+
+    private int? GetUserId() => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
+
 }

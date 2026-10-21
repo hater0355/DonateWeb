@@ -78,7 +78,7 @@
                                         </td>
                                         <td>
                                             <div class="small text-truncate" style="max-width: 250px;">
-                                                @string.Join(", ", order.Items.Select(i => $"{i.ProductName} (x{i.Quantity})"))
+                                                @string.Join(", ", order.Items.Select(i => string.IsNullOrWhiteSpace(i.VariantSelection) ? $"{i.ProductName} (x{i.Quantity})" : $"{i.ProductName} - {i.VariantSelection} (x{i.Quantity})"))
                                             </div>
                                         </td>
                                         <td>
@@ -165,7 +165,7 @@
                                             </td>
                                             <td>
                                                 <div class="small text-truncate" style="max-width: 250px;">
-                                                    @string.Join(", ", order.Items.Select(i => $"{i.ProductName} (x{i.Quantity})"))
+                                                    @string.Join(", ", order.Items.Select(i => string.IsNullOrWhiteSpace(i.VariantSelection) ? $"{i.ProductName} (x{i.Quantity})" : $"{i.ProductName} - {i.VariantSelection} (x{i.Quantity})"))
                                                 </div>
                                             </td>
                                             <td>

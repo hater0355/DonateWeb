@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Local DOCX preview</title>
+  <script src="/.tmp-contract-renderer/node_modules/.pnpm/jszip@3.10.2/node_modules/jszip/dist/jszip.min.js"></script>
+  <script src="/.tmp-contract-renderer/node_modules/.pnpm/docx-preview@0.4.1/node_modules/docx-preview/dist/docx-preview.js"></script>
+  <style>
+    body { margin: 0; padding: 24px; background: #e9edf0; font-family: Arial, sans-serif; }
+    #status { position: sticky; top: 0; z-index: 100; background: white; padding: 8px; }
+    #preview { margin: 20px auto; }
+    .docx-wrapper { background: #e9edf0 !important; padding: 0 !important; }
+    .docx { margin: 0 auto 18px !important; box-shadow: 0 1px 8px #888; }
+    @media print {
+      /* DOCX-preview đã đưa lề của trang Word vào padding nội bộ; không cộng lề lần nữa khi in PDF. */
+      @page { size: A4; margin: 0; }
+      body { margin: 0; padding: 0; background: white; }
+      #status, #render-status { display: none; }
+      #preview { margin: 0; }
+      .docx-wrapper { background: white !important; padding: 0 !important; }
+      .docx { margin: 0 !important; box-shadow: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="status">Loading DOCX…</div>
+  <div id="preview"></div>
+  <script>
+    (async () => {
+      const status = document.getElementById('status');
+      try {
+        const response = await fetch('/DonateWeb/DonateWeb/HopDongStreamer.docx');
+        if (!response.ok) throw new Error(`DOCX request failed: ${response.status}`);
+        const data = await response.arrayBuffer();
+        await docx.renderAsync(data, document.getElementById('preview'), null, { inWrapper: true, ignoreWidth: false, ignoreHeight: false, renderFooters: false });
+        status.textContent = `Rendered ${document.querySelectorAll('.docx').length} pages`;
+        status.id = 'render-status';
+      } catch (error) {
+        status.textContent = String(error);
+        throw error;
+      }
+    })();
+  </script>
+</body>
+</html>

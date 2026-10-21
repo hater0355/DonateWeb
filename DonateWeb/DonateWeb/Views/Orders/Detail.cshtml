@@ -106,6 +106,10 @@
                                 <td class="ps-3">
                                     <div class="fw-bold text-dark">@item.ProductName</div>
                                     <span class="small text-muted font-monospace">Mã SP: #@item.ShopProductId</span>
+                                    @if (!string.IsNullOrWhiteSpace(item.VariantSelection))
+                                    {
+                                        <div class="small text-muted">Size đã chọn: <strong>@item.VariantSelection</strong></div>
+                                    }
                                 </td>
                                 <td class="text-center font-monospace">@item.Price.ToString("N0") đ</td>
                                 <td class="text-center font-monospace fw-bold">@item.Quantity</td>

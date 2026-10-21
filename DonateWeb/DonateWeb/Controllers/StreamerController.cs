@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Globalization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +30,8 @@ namespace DonateWeb.Controllers
         private readonly IContentModerationService _contentModeration;
         private readonly IStreamerIdentityDocumentService _identityDocumentService;
         private readonly IStreamerBankQrService _streamerBankQrService;
+        private readonly StreamerAgreementContentService _agreementContent;
+        private readonly IDataProtector _contractSnapshotProtector;
 
         public StreamerController(
             IStreamerService streamerService,
@@ -41,7 +44,9 @@ namespace DonateWeb.Controllers
             IPayOSService payOS,
             IContentModerationService contentModeration,
             IStreamerIdentityDocumentService identityDocumentService,
-            IStreamerBankQrService streamerBankQrService)
+            IStreamerBankQrService streamerBankQrService,
+            StreamerAgreementContentService agreementContent,
+            IDataProtectionProvider dataProtectionProvider)
         {
             _streamerService = streamerService;
             _authService = authService;
@@ -54,6 +59,151 @@ namespace DonateWeb.Controllers
             _contentModeration = contentModeration;
             _identityDocumentService = identityDocumentService;
             _streamerBankQrService = streamerBankQrService;
+            _agreementContent = agreementContent;
+            _contractSnapshotProtector = dataProtectionProvider.CreateProtector("DonateWeb.StreamerContractSnapshot.v1");
+        }
+
+        [Authorize]
+        [HttpGet]
+        public async Task<IActionResult> Contract()
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+                return RedirectToAction("Login", "Auth");
+
+            var profile = await _context.StreamerProfiles.Include(p => p.User)
+                .FirstOrDefaultAsync(p => p.UserId == userId);
+            if (profile == null || profile.ApprovalStatus != StreamerApprovalStatus.Approved ||
+                string.IsNullOrWhiteSpace(profile.RequiredContractVersion))
+                return RedirectToAction(nameof(Config));
+
+            var identity = _identityDocumentService.UnprotectIdentity(profile.IdentityDataProtected);
+            if (identity == null)
+                return View("Contract", MakeContractViewModel(profile, null, null, "Không đọc được hồ sơ định danh đã mã hóa. Vui lòng liên hệ hỗ trợ trước khi ký."));
+
+            var acceptance = await _context.StreamerContractAcceptances.AsNoTracking()
+                .FirstOrDefaultAsync(a => a.StreamerProfileId == profile.Id && a.ContractVersion == profile.RequiredContractVersion);
+            string? snapshot = null;
+            if (acceptance != null)
+            {
+                try { snapshot = _contractSnapshotProtector.Unprotect(acceptance.ContractSnapshotProtected); }
+                catch (System.Security.Cryptography.CryptographicException) { }
+            }
+
+            var model = MakeContractViewModel(profile, identity, acceptance, null);
+            model.AcceptedSnapshot = snapshot;
+            if (acceptance != null && snapshot == null)
+                model.ErrorMessage = "Không mở được bản hợp đồng đã ký. Vui lòng liên hệ hỗ trợ; bản ghi và mã kiểm tra vẫn được lưu.";
+            return View("Contract", model);
+        }
+
+        [Authorize]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ContractAccept(string signerFullName, bool acceptAgreement, bool acknowledgePrivacy)
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+                return RedirectToAction("Login", "Auth");
+
+            var profile = await _context.StreamerProfiles.Include(p => p.User)
+                .FirstOrDefaultAsync(p => p.UserId == userId);
+            if (profile == null || profile.ApprovalStatus != StreamerApprovalStatus.Approved ||
+                string.IsNullOrWhiteSpace(profile.RequiredContractVersion))
+                return RedirectToAction(nameof(Config));
+
+            var existing = await _context.StreamerContractAcceptances.AsNoTracking()
+                .FirstOrDefaultAsync(a => a.StreamerProfileId == profile.Id && a.ContractVersion == profile.RequiredContractVersion);
+            if (existing != null)
+                return RedirectToAction(nameof(Contract));
+
+            var identity = _identityDocumentService.UnprotectIdentity(profile.IdentityDataProtected);
+            var options = _configuration.GetSection(PlatformContractOptions.SectionName).Get<PlatformContractOptions>() ?? new();
+            string? error = null;
+            if (!options.IsComplete)
+                error = "Bên vận hành chưa hoàn tất thông tin pháp lý của nền tảng. Chưa thể ký hợp đồng cho tới khi chủ nền tảng cấu hình đủ tư cách, địa chỉ, mã số thuế/mã định danh phù hợp với tư cách hoạt động và email liên hệ.";
+            else if (identity == null || profile.User == null)
+                error = "Không đọc được thông tin định danh hoặc tài khoản. Vui lòng liên hệ hỗ trợ.";
+            else if (!acceptAgreement || !acknowledgePrivacy)
+                error = "Bạn cần xác nhận đã đọc hợp đồng và chính sách bảo mật trước khi ký.";
+            else if (string.IsNullOrWhiteSpace(signerFullName) ||
+                     !string.Equals(NormalizePersonName(signerFullName), NormalizePersonName(identity.FullName), StringComparison.OrdinalIgnoreCase))
+                error = "Họ tên xác nhận phải trùng với họ tên trên hồ sơ CCCD đã được duyệt.";
+            else if (!TryGetAdultBirthDate(identity.DateOfBirth, out _))
+                error = "Quy trình ký hiện chỉ hỗ trợ người từ đủ 18 tuổi. Nếu thông tin ngày sinh không chính xác, hãy liên hệ hỗ trợ để được hướng dẫn.";
+
+            if (error != null)
+            {
+                var viewModel = MakeContractViewModel(profile, identity, null, error);
+                return View("Contract", viewModel);
+            }
+
+            var signedAt = DateTime.UtcNow;
+            var snapshotText = _agreementContent.BuildSnapshot(options, profile.User!, profile, identity!, GetPublicBaseUrl(), signedAt, signerFullName);
+            var acceptance = new StreamerContractAcceptance
+            {
+                StreamerProfileId = profile.Id,
+                UserId = userId,
+                ContractVersion = profile.RequiredContractVersion!,
+                ContractSnapshotProtected = _contractSnapshotProtector.Protect(snapshotText),
+                ContractSnapshotSha256 = StreamerAgreementContentService.Sha256(snapshotText),
+                SignerFullName = signerFullName.Trim(),
+                SignedAtUtc = signedAt,
+                ClientIpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = Request.Headers.UserAgent.ToString() is { Length: > 500 } agent ? agent[..500] : Request.Headers.UserAgent.ToString()
+            };
+            _context.StreamerContractAcceptances.Add(acceptance);
+            profile.IsActive = true;
+            profile.UpdatedAt = signedAt;
+            await _context.SaveChangesAsync();
+            await RefreshUserCookieClaimsAsync(userId);
+
+            TempData["SuccessMessage"] = "Hợp đồng đã được ký và hồ sơ Streamer đã được kích hoạt.";
+            return RedirectToAction(nameof(Contract));
+        }
+
+        private StreamerContractViewModel MakeContractViewModel(
+            StreamerProfile profile,
+            StreamerIdentityData? identity,
+            StreamerContractAcceptance? acceptance,
+            string? error)
+        {
+            var options = _configuration.GetSection(PlatformContractOptions.SectionName).Get<PlatformContractOptions>() ?? new();
+            return new StreamerContractViewModel
+            {
+                Version = _agreementContent.Document.Version,
+                Title = _agreementContent.Document.Title,
+                Sections = _agreementContent.Document.Sections,
+                PlatformDetailsComplete = options.IsComplete,
+                PlatformLegalName = options.OperatorLegalName,
+                PlatformCapacity = options.OperatorCapacity,
+                PlatformAddress = options.OperatorAddress,
+                PlatformRegistrationNumber = options.OperatorRegistrationNumber,
+                PlatformEmail = options.ContactEmail,
+                PlatformWebsite = GetPublicBaseUrl(),
+                StreamerFullName = identity?.FullName ?? string.Empty,
+                StreamerCitizenIdMasked = StreamerAgreementContentService.MaskIdentityNumber(identity?.CitizenId),
+                StreamerAddress = identity?.PermanentAddress ?? string.Empty,
+                StreamerEmail = profile.User?.Email ?? string.Empty,
+                StreamerChannelName = profile.DisplayName,
+                StreamerSlug = profile.Slug,
+                ErrorMessage = error,
+                HasAccepted = acceptance != null,
+                AcceptedHash = acceptance?.ContractSnapshotSha256,
+                SignedAtUtc = acceptance?.SignedAtUtc
+            };
+        }
+
+        private static string NormalizePersonName(string value) =>
+            System.Text.RegularExpressions.Regex.Replace(value.Trim(), @"\s+", " ");
+
+        private static bool TryGetAdultBirthDate(string value, out DateOnly dateOfBirth)
+        {
+            if (!DateOnly.TryParseExact(value, ["yyyy-MM-dd", "dd/MM/yyyy"], CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out dateOfBirth))
+                return false;
+            var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+            var age = today.Year - dateOfBirth.Year;
+            if (dateOfBirth > today.AddYears(-age)) age--;
+            return age >= 18;
         }
 
         /// <summary>
@@ -144,8 +294,25 @@ namespace DonateWeb.Controllers
             model.CentralBankName = _configuration["SePay:BankName"]?.Trim();
             model.CentralBankAccountNumber = _configuration["SePay:AccountNumber"]?.Trim();
             model.CentralBankAccountName = _configuration["SePay:AccountName"]?.Trim();
-            model.BankDonationQrBase64 = streamer.IsActive && streamer.ApprovalStatus == StreamerApprovalStatus.Approved
-                ? await _streamerBankQrService.CreateStaticQrPngDataUriAsync(
+            model.BankDonationQrDataUri = streamer.IsActive && streamer.ApprovalStatus == StreamerApprovalStatus.Approved
+                ? await _streamerBankQrService.CreateStaticQrImageDataUriAsync(
+                    model.CentralBankName,
+                    model.CentralBankAccountNumber,
+                    model.CentralBankAccountName,
+                    model.BankDonationTransferCode,
+                    HttpContext.RequestAborted)
+                : null;
+        }
+
+        /// <summary>Gắn QR chuyển khoản livestream dùng chung tài khoản SePay và mã riêng của streamer.</summary>
+        private async Task PopulateLiveDonationQrAsync(StreamerDonateViewModel model, StreamerProfile streamer)
+        {
+            model.BankDonationTransferCode = $"DW{streamer.Id}";
+            model.CentralBankName = _configuration["SePay:BankName"]?.Trim();
+            model.CentralBankAccountNumber = _configuration["SePay:AccountNumber"]?.Trim();
+            model.CentralBankAccountName = _configuration["SePay:AccountName"]?.Trim();
+            model.BankDonationQrDataUri = streamer.IsActive && streamer.ApprovalStatus == StreamerApprovalStatus.Approved
+                ? await _streamerBankQrService.CreateStaticQrImageDataUriAsync(
                     model.CentralBankName,
                     model.CentralBankAccountNumber,
                     model.CentralBankAccountName,
@@ -205,7 +372,7 @@ namespace DonateWeb.Controllers
             }
 
             // Hồ sơ đang chờ duyệt/từ chối chỉ được xem bởi chính chủ; không công khai trang nhận donate.
-            if (streamer.ApprovalStatus != StreamerApprovalStatus.Approved && !isOwnerStreamer)
+            if ((streamer.ApprovalStatus != StreamerApprovalStatus.Approved || !streamer.IsActive) && !isOwnerStreamer)
             {
                 ViewBag.NotFoundSlug = targetIdentifier ?? streamer.Slug;
                 return View("StreamerNotFound");
@@ -217,10 +384,8 @@ namespace DonateWeb.Controllers
             var defaultDonorName = User.Identity?.IsAuthenticated == true ? (User.FindFirst("FullName")?.Value ?? User.Identity.Name ?? "") : "";
             var defaultAmount = streamer.MinDonateAmount > 0 ? streamer.MinDonateAmount : 20000;
 
-            // QR cố định trên livestream chỉ mở trang donate; QR thanh toán PayOS
-            // được tạo riêng sau khi người ủng hộ nhập số tiền và lời nhắn.
-            var donatePageUrl = $"{GetPublicBaseUrl()}/{Uri.EscapeDataString(streamer.Slug)}";
-            var donatePageQr = GenerateQrCodeBase64(donatePageUrl);
+            // QR cố định ở thẻ "Quét nhanh" là QR chuyển khoản livestream qua tài khoản SePay trung tâm.
+            // Mã DW{id} trong nội dung giúp webhook phân bổ đúng streamer và phát alert.
 
             var model = new StreamerDonateViewModel
             {
@@ -252,12 +417,12 @@ namespace DonateWeb.Controllers
                 Amount = defaultAmount,
                 // [MỚI THÊM] Gán số dư tài khoản, nội dung chuyển khoản và mã QR vừa sinh vào ViewModel
                 CurrentWalletBalance = currentWalletBalance,
-                DonatePageUrl = donatePageUrl,
-                DonatePageQrBase64 = donatePageQr,
                 PaymentMethod = (User.Identity?.IsAuthenticated == true && currentWalletBalance >= defaultAmount)
                     ? PaymentMethod.Wallet
                     : PaymentMethod.BankTransfer
             };
+
+            await PopulateLiveDonationQrAsync(model, streamer);
 
             if (streamer.ApprovalStatus == StreamerApprovalStatus.Pending)
             {
@@ -412,11 +577,10 @@ namespace DonateWeb.Controllers
             model.BankAccountNumber = streamer.BankAccountNumber;
             model.BankAccountName = streamer.BankAccountName;
             model.PaymentQrUrl = streamer.PaymentQrUrl;
-            model.DonatePageUrl = $"{GetPublicBaseUrl()}/{Uri.EscapeDataString(streamer.Slug)}";
-            model.DonatePageQrBase64 = GenerateQrCodeBase64(model.DonatePageUrl);
             model.IsActive = streamer.IsActive;
             model.LockReason = streamer.LockReason;
             model.CurrentWalletBalance = currentWalletBalance;
+            await PopulateLiveDonationQrAsync(model, streamer);
 
             // KIỂM TRA: Nếu kênh streamer đang chờ duyệt hoặc bị từ chối thì chặn gửi donate
             if (streamer.ApprovalStatus == StreamerApprovalStatus.Pending)

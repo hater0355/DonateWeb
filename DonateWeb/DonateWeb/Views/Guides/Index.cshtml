@@ -1,72 +1,330 @@
 @{
-    ViewData["Title"] = "Guides";
+    ViewData["Title"] = "Trung tâm hướng dẫn";
 }
 
-<div class="mb-4">
-    <h5 class="fw-bold text-dark-green mb-0 d-flex align-items-center gap-2">
-        <span class="border-start border-3 border-success ps-2 text-uppercase">HƯỚNG DẪN</span>
-        <i class="fa-solid fa-book text-success opacity-75"></i>
-    </h5>
-</div>
+<section class="guides-page mx-auto" aria-labelledby="guides-title">
+    <div class="guides-hero rounded-4 p-4 p-md-5 mb-4">
+        <div class="guides-hero-content">
+            <span class="guides-eyebrow"><i class="fa-solid fa-book-open me-2"></i>TRUNG TÂM HỖ TRỢ</span>
+            <h1 id="guides-title" class="guides-title mt-3 mb-2">Hướng dẫn sử dụng DonateWeb</h1>
+            <p class="guides-intro mb-4">Tìm nhanh cách nạp ví, gửi donate, thiết lập livestream và quản lý gian hàng của bạn.</p>
 
-<div class="card card-custom border-0 bg-transparent">
-    <div class="accordion" id="guidesAccordion">
-        <!-- Item 1 -->
-        <div class="accordion-item border-0 mb-3 rounded-3 shadow-sm overflow-hidden" style="border: 1px solid var(--border-color) !important;">
-            <h2 class="accordion-header" id="headingOne">
-                <button class="accordion-button collapsed fw-bold text-dark-green" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne" style="background-color: var(--light-green);">
-                    Các câu hỏi thường gặp
-                </button>
-            </h2>
-            <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#guidesAccordion">
-                <div class="accordion-body bg-white text-muted">
-                    Nội dung các câu hỏi thường gặp sẽ được cập nhật tại đây. Bạn có thể tìm thấy các giải đáp cho những thắc mắc phổ biến nhất của người dùng về hệ thống Donate.
-                </div>
+            <label class="visually-hidden" for="guideSearch">Tìm nội dung hướng dẫn</label>
+            <div class="guides-search-wrap">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input id="guideSearch" type="search" class="form-control" placeholder="Bạn cần hướng dẫn về điều gì?" autocomplete="off" />
+                <kbd>Ctrl K</kbd>
             </div>
+            <div class="guides-search-hint mt-2">Ví dụ: nạp tiền, mã QR, OBS, sản phẩm, tồn kho</div>
         </div>
-
-        <!-- Item 2 -->
-        <div class="accordion-item border-0 mb-3 rounded-3 shadow-sm overflow-hidden" style="border: 1px solid var(--border-color) !important;">
-            <h2 class="accordion-header" id="headingTwo">
-                <button class="accordion-button collapsed fw-bold text-dark-green" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo" style="background-color: var(--light-green);">
-                    Cấu hình hướng dẫn cho Streamer
-                </button>
-            </h2>
-            <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#guidesAccordion">
-                <div class="accordion-body bg-white text-muted">
-                    Hướng dẫn chi tiết cách cấu hình dành cho Streamer mới đăng ký. Các bước thiết lập ban đầu, cách kết nối tài khoản ngân hàng và thiết lập giao diện hiển thị trên luồng live stream.
-                </div>
-            </div>
-        </div>
-
-        <!-- Item 3 -->
-        <div class="accordion-item border-0 mb-3 rounded-3 shadow-sm overflow-hidden" style="border: 1px solid var(--border-color) !important;">
-            <h2 class="accordion-header" id="headingThree">
-                <button class="accordion-button collapsed fw-bold text-dark-green" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree" style="background-color: var(--light-green);">
-                    Lỗi sửa hướng dẫn không hiển thị Donate
-                </button>
-            </h2>
-            <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#guidesAccordion">
-                <div class="accordion-body bg-white text-muted">
-                    Tổng hợp các bước khắc phục sự cố khi thông báo Donate không hiển thị trên phần mềm OBS, XSplit của bạn. Hướng dẫn làm mới URL Widget và kiểm tra kết nối mạng.
-                </div>
-            </div>
+        <div class="guides-hero-icon d-none d-md-flex" aria-hidden="true">
+            <i class="fa-solid fa-circle-question"></i>
         </div>
     </div>
-</div>
+
+    <nav class="guides-filters d-flex gap-2 flex-wrap mb-4" aria-label="Lọc nhóm hướng dẫn">
+        <button type="button" class="guide-filter active" data-guide-filter="all" aria-pressed="true">Tất cả</button>
+        <button type="button" class="guide-filter" data-guide-filter="viewer" aria-pressed="false"><i class="fa-solid fa-user me-1"></i>Người xem</button>
+        <button type="button" class="guide-filter" data-guide-filter="streamer" aria-pressed="false"><i class="fa-solid fa-video me-1"></i>Streamer</button>
+        <button type="button" class="guide-filter" data-guide-filter="troubleshoot" aria-pressed="false"><i class="fa-solid fa-screwdriver-wrench me-1"></i>Xử lý sự cố</button>
+    </nav>
+
+    <div id="guidesNoResults" class="guides-empty d-none" role="status">
+        <i class="fa-regular fa-face-meh"></i>
+        <strong>Chưa tìm thấy hướng dẫn phù hợp</strong>
+        <span>Thử từ khóa khác hoặc chọn “Tất cả”.</span>
+    </div>
+
+    <div class="guides-grid">
+        <section class="guide-group" data-guide-group="viewer" aria-labelledby="viewer-guides-title">
+            <div class="guide-group-heading">
+                <span class="guide-group-icon viewer-icon"><i class="fa-solid fa-user"></i></span>
+                <div><h2 id="viewer-guides-title">Dành cho người xem</h2><p>Tài khoản, ví, donate và mua hàng</p></div>
+            </div>
+            <div class="guide-list">
+                <details class="guide-card" data-guide-card="viewer" data-guide-keywords="tài khoản đăng ký đăng nhập google xác minh email">
+                    <summary><span class="guide-card-icon"><i class="fa-solid fa-right-to-bracket"></i></span><span class="guide-card-title">Tạo tài khoản và đăng nhập</span><i class="fa-solid fa-chevron-down guide-chevron"></i></summary>
+                    <div class="guide-card-body">
+                        <ol>
+                            <li>Chọn <strong>Đăng ký</strong> để tạo tài khoản bằng email, hoặc chọn đăng nhập bằng Google nếu muốn dùng tài khoản Google.</li>
+                            <li>Nếu đăng nhập bằng Google, hãy dùng tài khoản có địa chỉ email đã xác minh.</li>
+                            <li>Đăng nhập để sử dụng ví, gửi donate, đặt hàng và trò chuyện với bộ phận hỗ trợ.</li>
+                        </ol>
+                        <p class="guide-note"><i class="fa-solid fa-lock me-2"></i>Không chia sẻ mật khẩu hoặc mã xác minh với người khác.</p>
+                    </div>
+                </details>
+
+                <details class="guide-card" data-guide-card="viewer" data-guide-keywords="nạp ví tiền chuyển khoản vietqr thanh toán payos giao dịch chờ">
+                    <summary><span class="guide-card-icon"><i class="fa-solid fa-wallet"></i></span><span class="guide-card-title">Nạp tiền vào ví</span><i class="fa-solid fa-chevron-down guide-chevron"></i></summary>
+                    <div class="guide-card-body">
+                        <ol>
+                            <li>Đăng nhập rồi mở mục <strong>Ví donate</strong> hoặc nút <strong>Nạp tiền</strong>.</li>
+                            <li>Nhập số tiền, tạo yêu cầu nạp và thanh toán theo QR hoặc phương thức đang hiển thị trên trang.</li>
+                            <li>Giữ nguyên nội dung chuyển khoản được tạo cho giao dịch. Hệ thống cộng tiền sau khi nhận và xác nhận thanh toán.</li>
+                            <li>Xem trạng thái và lịch sử giao dịch trong trang ví. Nếu giao dịch vẫn chờ sau khi ngân hàng báo thành công, đừng tạo nhiều giao dịch lặp lại; hãy gửi mã giao dịch cho hỗ trợ viên.</li>
+                        </ol>
+                        <p class="guide-note"><i class="fa-solid fa-circle-info me-2"></i>Chỉ thanh toán theo đúng số tiền và thông tin của yêu cầu đang mở.</p>
+                    </div>
+                </details>
+
+                <details class="guide-card" data-guide-card="viewer" data-guide-keywords="donate ủng hộ streamer lời nhắn ẩn danh giấu tên">
+                    <summary><span class="guide-card-icon"><i class="fa-solid fa-heart"></i></span><span class="guide-card-title">Gửi donate cho streamer</span><i class="fa-solid fa-chevron-down guide-chevron"></i></summary>
+                    <div class="guide-card-body">
+                        <ol>
+                            <li>Mở trang cá nhân của streamer bạn muốn ủng hộ.</li>
+                            <li>Nhập số tiền và lời nhắn; nếu trang có lựa chọn ẩn danh, bật lựa chọn đó trước khi gửi.</li>
+                            <li>Chọn phương thức thanh toán được cung cấp và hoàn tất các bước hiển thị.</li>
+                            <li>Kiểm tra kết quả trong lịch sử giao dịch. Donate trả bằng ví sẽ trừ số dư ví theo số tiền hiển thị trước khi xác nhận.</li>
+                        </ol>
+                        <p class="guide-note"><i class="fa-solid fa-volume-high me-2"></i>Lời nhắn có thể được đọc trên livestream. Không ghi thông tin riêng tư hoặc nội dung bạn không muốn công khai.</p>
+                    </div>
+                </details>
+
+                <details class="guide-card" data-guide-card="viewer" data-guide-keywords="shop mua hàng biến thể size lựa chọn số lượng giá thanh toán vận chuyển">
+                    <summary><span class="guide-card-icon"><i class="fa-solid fa-bag-shopping"></i></span><span class="guide-card-title">Chọn sản phẩm và đặt hàng</span><i class="fa-solid fa-chevron-down guide-chevron"></i></summary>
+                    <div class="guide-card-body">
+                        <ol>
+                            <li>Mở <strong>Shop</strong>, tìm sản phẩm hoặc chọn danh mục và streamer.</li>
+                            <li>Trong trang sản phẩm, chọn đúng phân loại/tuỳ chọn (ví dụ kích cỡ hoặc gói 1, 2, 3 hộp). Giá và lượng hàng còn lại sẽ cập nhật theo lựa chọn.</li>
+                            <li>Chọn số lượng trong phạm vi tồn kho, nhập thông tin nhận hàng và xem lại phí vận chuyển cùng tổng tiền.</li>
+                            <li>Xác nhận đơn và theo dõi trạng thái tại lịch sử đơn hàng.</li>
+                        </ol>
+                        <p class="guide-note"><i class="fa-solid fa-truck me-2"></i>Phí vận chuyển được tính để hiển thị cho đơn hàng; chỉ đặt hàng khi trang xác nhận rõ phương thức thanh toán và tổng tiền.</p>
+                    </div>
+                </details>
+            </div>
+        </section>
+
+        <section class="guide-group" data-guide-group="streamer" aria-labelledby="streamer-guides-title">
+            <div class="guide-group-heading">
+                <span class="guide-group-icon streamer-icon"><i class="fa-solid fa-video"></i></span>
+                <div><h2 id="streamer-guides-title">Dành cho streamer</h2><p>Thiết lập kênh, livestream và gian hàng</p></div>
+            </div>
+            <div class="guide-list">
+                <details class="guide-card" data-guide-card="streamer" data-guide-keywords="đăng ký streamer hồ sơ admin duyệt căn cước xác minh">
+                    <summary><span class="guide-card-icon"><i class="fa-solid fa-user-check"></i></span><span class="guide-card-title">Gửi hồ sơ streamer để xét duyệt</span><i class="fa-solid fa-chevron-down guide-chevron"></i></summary>
+                    <div class="guide-card-body">
+                        <ol>
+                            <li>Đăng nhập tài khoản rồi mở mục đăng ký/nâng cấp streamer.</li>
+                            <li>Điền thông tin theo biểu mẫu và tải ảnh giấy tờ được yêu cầu, gồm mặt trước và mặt sau căn cước công dân.</li>
+                            <li>Gửi hồ sơ và chờ Admin xét duyệt. Quyền đăng streamer chỉ hoạt động sau khi hồ sơ được duyệt.</li>
+                            <li>Nếu hồ sơ cần bổ sung, cập nhật theo thông báo trong tài khoản rồi gửi lại.</li>
+                        </ol>
+                        <p class="guide-note"><i class="fa-solid fa-shield-halved me-2"></i>Ảnh giấy tờ là thông tin nhạy cảm; chỉ tải lên trang chính thức của DonateWeb.</p>
+                    </div>
+                </details>
+
+                <details class="guide-card" data-guide-card="streamer" data-guide-keywords="trang cá nhân cấu hình kênh qr live mã dw chuyển khoản tài khoản trung tâm">
+                    <summary><span class="guide-card-icon"><i class="fa-solid fa-qrcode"></i></span><span class="guide-card-title">Lấy QR để treo trên livestream</span><i class="fa-solid fa-chevron-down guide-chevron"></i></summary>
+                    <div class="guide-card-body">
+                        <ol>
+                            <li>Sau khi được duyệt, mở trang cá nhân hoặc phần cấu hình streamer để lấy <strong>QR nhận donate</strong> dành cho livestream.</li>
+                            <li>QR này đưa người xem tới tài khoản trung tâm của nền tảng với mã chuyển khoản riêng để hệ thống nhận diện streamer.</li>
+                            <li>Người xem tự nhập số tiền và lời nhắn trong ứng dụng ngân hàng. Nhắc họ giữ nguyên mã chuyển khoản được gợi ý trên trang.</li>
+                            <li>Đừng nhầm QR trang cá nhân (mở trang donate) với QR chuyển khoản ngân hàng dùng trong buổi live.</li>
+                        </ol>
+                        <p class="guide-note"><i class="fa-solid fa-circle-info me-2"></i>Hãy thử bằng một giao dịch nhỏ trước khi dùng QR trong buổi phát trực tiếp.</p>
+                    </div>
+                </details>
+
+                <details class="guide-card" data-guide-card="streamer" data-guide-keywords="obs browser source alertbox cảnh báo thông báo âm thanh tts elevenlabs widget">
+                    <summary><span class="guide-card-icon"><i class="fa-solid fa-bell"></i></span><span class="guide-card-title">Thêm thông báo donate vào OBS</span><i class="fa-solid fa-chevron-down guide-chevron"></i></summary>
+                    <div class="guide-card-body">
+                        <ol>
+                            <li>Mở mục cấu hình AlertBox/Widget trên DonateWeb và sao chép URL widget riêng của kênh.</li>
+                            <li>Trong OBS, thêm nguồn <strong>Browser Source</strong>, dán URL và đặt kích thước phù hợp với bố cục livestream.</li>
+                            <li>Bật tùy chọn điều khiển âm thanh qua OBS nếu muốn OBS nhận âm thanh thông báo và giọng đọc.</li>
+                            <li>Cấu hình giọng đọc/API trong trang cài đặt liên quan (nếu có), sau đó dùng chức năng thử thông báo để kiểm tra hình ảnh, âm lượng và lời nhắn.</li>
+                        </ol>
+                        <p class="guide-note"><i class="fa-solid fa-headphones me-2"></i>Nếu widget hiện nhưng không có tiếng, kiểm tra audio mixer của OBS, trạng thái mute và tùy chọn âm thanh của Browser Source.</p>
+                    </div>
+                </details>
+
+                <details class="guide-card" data-guide-card="streamer" data-guide-keywords="thêm sửa sản phẩm danh mục biến thể lựa chọn giá tồn kho size hộp">
+                    <summary><span class="guide-card-icon"><i class="fa-solid fa-boxes-stacked"></i></span><span class="guide-card-title">Thêm sản phẩm có nhiều lựa chọn và tồn kho</span><i class="fa-solid fa-chevron-down guide-chevron"></i></summary>
+                    <div class="guide-card-body">
+                        <ol>
+                            <li>Mở phần quản lý sản phẩm và tạo sản phẩm mới hoặc chỉnh sửa sản phẩm hiện có.</li>
+                            <li>Chọn danh mục, nhập tên và mô tả; thêm ảnh sản phẩm để người mua xem rõ hàng hóa.</li>
+                            <li>Thêm từng lựa chọn riêng, chẳng hạn <strong>S</strong>/<strong>M</strong>/<strong>L</strong> hoặc <strong>1 hộp</strong>/<strong>2 hộp</strong>. Điền giá và số lượng tồn cho từng lựa chọn.</li>
+                            <li>Lưu sản phẩm. Nếu cần kiểm tra trước, dùng trạng thái ẩn để gỡ sản phẩm khỏi gian hàng; có thể bật lại khi muốn bán tiếp.</li>
+                        </ol>
+                        <p class="guide-note"><i class="fa-solid fa-box-open me-2"></i>Hãy cập nhật tồn kho sau khi thay đổi số lượng hàng thực tế. Sản phẩm có thể cần Admin duyệt trước khi xuất hiện công khai.</p>
+                    </div>
+                </details>
+            </div>
+        </section>
+
+        <section class="guide-group" data-guide-group="troubleshoot" aria-labelledby="troubleshoot-guides-title">
+            <div class="guide-group-heading">
+                <span class="guide-group-icon troubleshoot-icon"><i class="fa-solid fa-screwdriver-wrench"></i></span>
+                <div><h2 id="troubleshoot-guides-title">Xử lý sự cố</h2><p>Các bước kiểm tra nhanh trước khi liên hệ hỗ trợ</p></div>
+            </div>
+            <div class="guide-list">
+                <details class="guide-card" data-guide-card="troubleshoot" data-guide-keywords="đã thanh toán giao dịch chờ chưa cộng tiền ví nạp tiền mã giao dịch">
+                    <summary><span class="guide-card-icon"><i class="fa-solid fa-hourglass-half"></i></span><span class="guide-card-title">Đã thanh toán nhưng giao dịch còn chờ</span><i class="fa-solid fa-chevron-down guide-chevron"></i></summary>
+                    <div class="guide-card-body">
+                        <ol>
+                            <li>Kiểm tra giao dịch trong ứng dụng ngân hàng và đối chiếu số tiền, thời gian, nội dung chuyển khoản.</li>
+                            <li>Mở lịch sử ví/đơn hàng để xem trạng thái mới nhất; tải lại trang một lần sau ít phút.</li>
+                            <li>Nếu trạng thái vẫn chưa đổi, liên hệ hỗ trợ và gửi mã giao dịch, mã đơn hoặc ảnh biên nhận đã che thông tin không cần thiết.</li>
+                        </ol>
+                        <p class="guide-note"><i class="fa-solid fa-triangle-exclamation me-2"></i>Không gửi mật khẩu, mã OTP, API key hoặc thông tin đăng nhập ngân hàng cho hỗ trợ viên.</p>
+                    </div>
+                </details>
+
+                <details class="guide-card" data-guide-card="troubleshoot" data-guide-keywords="alertbox obs không hiện donate widget không kết nối url browser source">
+                    <summary><span class="guide-card-icon"><i class="fa-solid fa-display"></i></span><span class="guide-card-title">Donate không hiện trên AlertBox</span><i class="fa-solid fa-chevron-down guide-chevron"></i></summary>
+                    <div class="guide-card-body">
+                        <ol>
+                            <li>Xác nhận giao dịch đã được hệ thống ghi nhận thành công và đúng streamer.</li>
+                            <li>Kiểm tra Browser Source đang dùng đúng URL widget của kênh; bấm làm mới nguồn trong OBS.</li>
+                            <li>Kiểm tra kết nối mạng, trạng thái ẩn của widget và hàng đợi thông báo; thử chức năng xem trước nếu có.</li>
+                            <li>Nếu vẫn lỗi, gửi cho hỗ trợ thời điểm donate, mã giao dịch và ảnh chụp trạng thái widget.</li>
+                        </ol>
+                    </div>
+                </details>
+
+                <details class="guide-card" data-guide-card="troubleshoot" data-guide-keywords="liên hệ hỗ trợ viên chat trợ giúp tài khoản">
+                    <summary><span class="guide-card-icon"><i class="fa-solid fa-comments"></i></span><span class="guide-card-title">Liên hệ hỗ trợ viên</span><i class="fa-solid fa-chevron-down guide-chevron"></i></summary>
+                    <div class="guide-card-body">
+                        <p>Đăng nhập rồi mở biểu tượng trò chuyện hỗ trợ ở góc màn hình. Mô tả ngắn gọn vấn đề, gửi mã giao dịch hoặc ảnh chụp phù hợp và chờ hỗ trợ viên phản hồi trong cùng cuộc trò chuyện.</p>
+                        <p class="guide-note"><i class="fa-solid fa-paperclip me-2"></i>Che số tài khoản, địa chỉ hoặc thông tin cá nhân không liên quan trước khi gửi ảnh.</p>
+                    </div>
+                </details>
+            </div>
+        </section>
+    </div>
+
+    <div class="guides-contact rounded-4 mt-4 p-4 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+            <h2 class="h5 fw-bold mb-1">Vẫn cần trợ giúp?</h2>
+            <p class="mb-0 text-muted">Đăng nhập và mở khung trò chuyện hỗ trợ để gửi câu hỏi cho đội ngũ DonateWeb.</p>
+        </div>
+        <span class="guides-contact-icon" aria-hidden="true"><i class="fa-solid fa-headset"></i></span>
+    </div>
+</section>
 
 <style>
-    /* Tuỳ chỉnh Accordion để ăn khớp với theme xanh của web */
-    .accordion-button:not(.collapsed) {
-        color: var(--dark-green);
-        background-color: #d1e3d8 !important; /* Xanh đậm hơn chút so với light-green khi mở */
-        box-shadow: inset 0 -1px 0 rgba(0,0,0,.125);
-    }
-    .accordion-button:focus {
-        border-color: var(--primary-green);
-        box-shadow: 0 0 0 0.25rem rgba(41, 80, 62, 0.25);
-    }
-    .accordion-button::after {
-        filter: invert(24%) sepia(16%) saturate(1450%) hue-rotate(101deg) brightness(97%) contrast(87%); /* Đổi màu icon mũi tên sang xanh */
+    .guides-page { max-width: 1080px; }
+    .guides-hero { position: relative; overflow: hidden; color: #fff; background: linear-gradient(120deg, #1f4a37, #2d7656 68%, #43a878); box-shadow: 0 14px 34px rgba(28, 78, 55, .15); }
+    .guides-hero-content { position: relative; z-index: 1; max-width: 690px; }
+    .guides-eyebrow { color: #d2f3df; font-size: .75rem; font-weight: 800; letter-spacing: .12em; }
+    .guides-title { font-size: clamp(1.65rem, 4vw, 2.35rem); font-weight: 800; letter-spacing: -.025em; }
+    .guides-intro { color: rgba(255,255,255,.82); max-width: 620px; }
+    .guides-hero-icon { position: absolute; right: 6%; top: 50%; transform: translateY(-50%); align-items: center; justify-content: center; width: 190px; height: 190px; border-radius: 50%; background: rgba(255,255,255,.1); color: rgba(255,255,255,.55); font-size: 6rem; }
+    .guides-search-wrap { position: relative; display: flex; align-items: center; gap: .7rem; padding: .45rem .8rem .45rem 1rem; border-radius: 14px; background: #fff; color: #6b7b71; box-shadow: 0 8px 20px rgba(15, 44, 30, .12); }
+    .guides-search-wrap .form-control { min-width: 0; border: 0; box-shadow: none; padding: .45rem 0; color: #203c2c; }
+    .guides-search-wrap .form-control::placeholder { color: #84928a; }
+    .guides-search-wrap kbd { flex-shrink: 0; color: #7a887f; background: #f1f5f2; border: 1px solid #e1e9e3; box-shadow: none; font-size: .68rem; }
+    .guides-search-hint { color: rgba(255,255,255,.7); font-size: .76rem; }
+    .guides-filters { overflow-x: auto; padding-bottom: .15rem; }
+    .guide-filter { flex-shrink: 0; border: 1px solid #dce7df; border-radius: 999px; padding: .52rem .95rem; color: #52675a; background: rgba(255,255,255,.9); font-size: .88rem; font-weight: 650; transition: .18s ease; }
+    .guide-filter:hover { border-color: #8bb79b; color: #24583d; }
+    .guide-filter.active { border-color: #24583d; color: #fff; background: #24583d; box-shadow: 0 5px 12px rgba(36,88,61,.16); }
+    .guides-grid { display: grid; gap: 1.65rem; }
+    .guide-group-heading { display: flex; align-items: center; gap: .85rem; margin: .5rem 0 1rem; }
+    .guide-group-heading h2 { margin: 0; color: #234936; font-size: 1.1rem; font-weight: 800; }
+    .guide-group-heading p { margin: .15rem 0 0; color: #7a887f; font-size: .82rem; }
+    .guide-group-icon { display: grid; flex: 0 0 42px; width: 42px; height: 42px; place-items: center; border-radius: 13px; font-size: 1rem; }
+    .viewer-icon { color: #276c4a; background: #e7f4eb; }
+    .streamer-icon { color: #2c6e84; background: #e7f3f7; }
+    .troubleshoot-icon { color: #936414; background: #fff5df; }
+    .guide-list { display: grid; gap: .75rem; }
+    .guide-card { overflow: hidden; border: 1px solid #e2eae4; border-radius: 15px; background: rgba(255,255,255,.96); box-shadow: 0 4px 14px rgba(25,62,42,.045); transition: border-color .18s ease, box-shadow .18s ease; }
+    .guide-card[open] { border-color: #a9cbb4; box-shadow: 0 8px 24px rgba(25,62,42,.08); }
+    .guide-card summary { display: flex; align-items: center; gap: .85rem; min-height: 68px; padding: .85rem 1rem; list-style: none; cursor: pointer; }
+    .guide-card summary::-webkit-details-marker { display: none; }
+    .guide-card summary:focus-visible { outline: 3px solid rgba(46,130,83,.35); outline-offset: -3px; border-radius: 14px; }
+    .guide-card-icon { display: grid; flex: 0 0 38px; width: 38px; height: 38px; place-items: center; border-radius: 11px; color: #2c704b; background: #edf6ef; }
+    .guide-card-title { flex: 1; color: #263d30; font-weight: 750; }
+    .guide-chevron { color: #829187; font-size: .8rem; transition: transform .2s ease; }
+    .guide-card[open] .guide-chevron { transform: rotate(180deg); color: #2c704b; }
+    .guide-card-body { padding: 0 1.1rem 1.1rem 4.35rem; color: #526158; font-size: .92rem; line-height: 1.7; }
+    .guide-card-body ol { margin: 0; padding-left: 1.15rem; }
+    .guide-card-body li { padding-left: .18rem; margin: .28rem 0; }
+    .guide-card-body p { margin: .55rem 0 0; }
+    .guide-note { padding: .7rem .8rem; border-radius: 10px; color: #47614f; background: #f0f7f1; font-size: .83rem; }
+    .guides-empty { padding: 2.5rem 1rem; text-align: center; border: 1px dashed #cbd9ce; border-radius: 16px; color: #6d7d72; background: rgba(255,255,255,.72); }
+    .guides-empty i { display: block; margin-bottom: .7rem; color: #87a891; font-size: 1.8rem; }
+    .guides-empty strong, .guides-empty span { display: block; }
+    .guides-empty strong { margin-bottom: .25rem; color: #315340; }
+    .guides-contact { border: 1px solid #dce9df; background: linear-gradient(110deg, #f2f8f3, #fff); }
+    .guides-contact h2 { color: #234936; }
+    .guides-contact p { font-size: .9rem; }
+    .guides-contact-icon { display: grid; flex: 0 0 48px; width: 48px; height: 48px; place-items: center; border-radius: 50%; color: #286345; background: #e3f1e7; font-size: 1.25rem; }
+    @@media (max-width: 575.98px) {
+        .guides-page { margin-left: -.35rem; margin-right: -.35rem; }
+        .guides-hero { padding: 1.2rem !important; border-radius: 18px !important; }
+        .guides-search-wrap { gap: .55rem; padding-left: .75rem; }
+        .guides-search-wrap kbd { display: none; }
+        .guide-filter { padding: .48rem .78rem; font-size: .82rem; }
+        .guide-card summary { gap: .65rem; min-height: 62px; padding: .72rem .75rem; font-size: .91rem; }
+        .guide-card-icon { flex-basis: 34px; width: 34px; height: 34px; }
+        .guide-card-body { padding: 0 .85rem .9rem 1rem; font-size: .87rem; }
+        .guide-group-heading h2 { font-size: 1rem; }
     }
 </style>
+
+@section Scripts {
+    <script>
+        (() => {
+            const search = document.getElementById('guideSearch');
+            const filters = [...document.querySelectorAll('[data-guide-filter]')];
+            const cards = [...document.querySelectorAll('[data-guide-card]')];
+            const groups = [...document.querySelectorAll('[data-guide-group]')];
+            const emptyState = document.getElementById('guidesNoResults');
+            let activeFilter = 'all';
+
+            const normalize = value => (value || '')
+                .toLocaleLowerCase('vi-VN')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/đ/g, 'd');
+
+            const applyFilter = () => {
+                const term = normalize(search.value.trim());
+                let visibleCount = 0;
+
+                cards.forEach(card => {
+                    const categoryMatches = activeFilter === 'all' || card.dataset.guideCard === activeFilter;
+                    const searchableText = normalize(`${card.innerText} ${card.dataset.guideKeywords || ''}`);
+                    const textMatches = !term || searchableText.includes(term);
+                    const visible = categoryMatches && textMatches;
+                    card.classList.toggle('d-none', !visible);
+                    if (!visible) card.removeAttribute('open');
+                    if (visible) visibleCount++;
+                });
+
+                groups.forEach(group => {
+                    const hasVisibleCard = [...group.querySelectorAll('[data-guide-card]')].some(card => !card.classList.contains('d-none'));
+                    group.classList.toggle('d-none', !hasVisibleCard);
+                });
+                emptyState.classList.toggle('d-none', visibleCount > 0);
+            };
+
+            filters.forEach(button => button.addEventListener('click', () => {
+                activeFilter = button.dataset.guideFilter;
+                filters.forEach(filter => {
+                    const selected = filter === button;
+                    filter.classList.toggle('active', selected);
+                    filter.setAttribute('aria-pressed', selected ? 'true' : 'false');
+                });
+                applyFilter();
+            }));
+
+            search.addEventListener('input', applyFilter);
+            document.addEventListener('keydown', event => {
+                if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+                    event.preventDefault();
+                    search.focus();
+                }
+                if (event.key === 'Escape' && document.activeElement === search) {
+                    search.value = '';
+                    applyFilter();
+                    search.blur();
+                }
+            });
+        })();
+    </script>
+}

@@ -12,10 +12,22 @@ services:
       PayOS__ClientId: ${PAYOS_CLIENT_ID:?Set PAYOS_CLIENT_ID in .env}
       PayOS__ApiKey: ${PAYOS_API_KEY:?Set PAYOS_API_KEY in .env}
       PayOS__ChecksumKey: ${PAYOS_CHECKSUM_KEY:?Set PAYOS_CHECKSUM_KEY in .env}
+      GHN__Token: ${GHN_TOKEN:-}
+      GHN__ShopId: ${GHN_SHOP_ID:-0}
       Authentication__Google__ClientId: ${GOOGLE_CLIENT_ID:-}
       Authentication__Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
       SePay__ApiKey: ${SEPAY_API_KEY:-}
       App__PublicBaseUrl: ${PUBLIC_BASE_URL:-}
+      PlatformContract__OperatorCapacity: ${PLATFORM_CONTRACT_OPERATOR_CAPACITY:-Cá nhân}
+      PlatformContract__OperatorLegalName: ${PLATFORM_CONTRACT_OPERATOR_LEGAL_NAME:-Nguyễn Anh Hiếu}
+      PlatformContract__OperatorAddress: "${PLATFORM_CONTRACT_OPERATOR_ADDRESS:-Thông tin minh họa (bài tập lớn)}"
+      PlatformContract__OperatorRegistrationNumber: "${PLATFORM_CONTRACT_OPERATOR_REGISTRATION_NUMBER:-Không áp dụng trong bản demo cá nhân}"
+      PlatformContract__ContactEmail: ${PLATFORM_CONTRACT_CONTACT_EMAIL:-cupitcookies@gmail.com}
+      # Khóa OpenAI chỉ nằm phía máy chủ; token AI được giới hạn theo tháng trong SQL Server.
+      SupportAi__ApiKey: ${SUPPORT_AI_API_KEY:-}
+      SupportAi__Model: ${SUPPORT_AI_MODEL:-gpt-5.4-mini}
+      SupportAi__MonthlyTokenLimit: ${SUPPORT_AI_MONTHLY_TOKEN_LIMIT:-100000}
+      SupportAi__MaxOutputTokens: ${SUPPORT_AI_MAX_OUTPUT_TOKENS:-500}
     ports:
       - "8080:8080"
     extra_hosts:

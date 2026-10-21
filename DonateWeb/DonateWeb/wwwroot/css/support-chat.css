@@ -13,6 +13,7 @@
 .support-chat-empty { margin: auto; max-width: 250px; color: #66736c; text-align: center; }
 .support-chat-message, .support-inbox-message { max-width: 88%; padding: 9px 11px; border-radius: 12px; overflow-wrap: anywhere; }
 .support-chat-message.from-support, .support-inbox-message.from-support { align-self: flex-start; background: #fff; border: 1px solid #e3ebe6; }
+.support-chat-message.from-ai, .support-inbox-message.from-ai { border-color: #b7d8c4; background: #f0f8f3; }
 .support-chat-message.from-visitor, .support-inbox-message.from-visitor { align-self: flex-end; color: #fff; background: #176b4a; }
 .support-chat-message strong, .support-chat-message time, .support-inbox-message strong, .support-inbox-message time { display: block; font-size: .75rem; opacity: .8; }
 .support-chat-message-text { white-space: pre-wrap; }

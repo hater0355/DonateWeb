@@ -20,6 +20,13 @@ namespace DonateWeb.Models.Entities
         [MaxLength(200)]
         public string ProductName { get; set; } = string.Empty;
 
+        /// <summary>Size/biến thể khách đã chọn, được lưu cùng bản chụp đơn hàng.</summary>
+        [MaxLength(50)]
+        public string? VariantSelection { get; set; }
+
+        /// <summary>Cho biết tồn kho đã được trừ từ một lựa chọn riêng hay từ kho chung cũ.</summary>
+        public bool UsesVariantStock { get; set; }
+
         [Column(TypeName = "decimal(18,2)")]
         public decimal Price { get; set; }
 

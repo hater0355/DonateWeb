@@ -1,0 +1,109 @@
+@model DonateWeb.ViewModels.Streamer.StreamerContractViewModel
+@{
+    ViewData["Title"] = "Hợp đồng Streamer";
+}
+
+<section class="streamer-contract-page">
+    <div class="streamer-contract-heading">
+        <div>
+            <span class="streamer-contract-kicker">DONATEWEB · HỢP ĐỒNG ĐIỆN TỬ</span>
+            <h1>@Model.Title</h1>
+            <p>Phiên bản @Model.Version. Đọc thông tin hai bên và toàn bộ điều khoản trước khi chấp nhận.</p>
+        </div>
+        @if (Model.HasAccepted)
+        {
+            <span class="streamer-contract-status"><i class="fas fa-check-circle"></i> Đã ký</span>
+        }
+    </div>
+
+    <div class="alert alert-info" role="note">
+        Đây là bản demo phục vụ bài tập lớn. Thông tin địa chỉ và mã định danh của Bên A đang dùng dữ liệu minh họa, không dùng để giao dịch thật.
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="alert alert-warning" role="alert">@Model.ErrorMessage</div>
+    }
+    @if (TempData["SuccessMessage"] is string successMessage)
+    {
+        <div class="alert alert-success" role="status">@successMessage</div>
+    }
+
+    @if (Model.HasAccepted)
+    {
+        <div class="streamer-contract-receipt card-custom">
+            <h2>Bản hợp đồng đã chấp nhận</h2>
+            <p>Thời điểm ghi nhận: <strong>@Model.SignedAtUtc?.AddHours(7).ToString("dd/MM/yyyy HH:mm:ss") (UTC+7)</strong></p>
+            <p>Mã SHA-256 của nội dung đã ký:</p>
+            <code class="streamer-contract-hash">@Model.AcceptedHash</code>
+            <button type="button" class="btn btn-outline-success mt-3" onclick="window.print()"><i class="fas fa-print"></i> In / lưu bản hợp đồng</button>
+            @if (!string.IsNullOrWhiteSpace(Model.AcceptedSnapshot))
+            {
+                <pre class="streamer-contract-snapshot">@Model.AcceptedSnapshot</pre>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="streamer-contract-parties">
+            <article class="card-custom streamer-contract-party">
+                <h2>Bên A · Đơn vị cung cấp nền tảng</h2>
+                <dl>
+                    <dt>Tư cách</dt><dd>@(string.IsNullOrWhiteSpace(Model.PlatformCapacity) ? "Chưa cấu hình" : Model.PlatformCapacity)</dd>
+                    <dt>Họ và tên</dt><dd>@(string.IsNullOrWhiteSpace(Model.PlatformLegalName) ? "Chưa cấu hình" : Model.PlatformLegalName)</dd>
+                    <dt>Địa chỉ</dt><dd>@(string.IsNullOrWhiteSpace(Model.PlatformAddress) ? "Chưa cấu hình" : Model.PlatformAddress)</dd>
+                    <dt>Mã số thuế / mã định danh / đăng ký</dt><dd>@(string.IsNullOrWhiteSpace(Model.PlatformRegistrationNumber) ? "Chưa cấu hình" : Model.PlatformRegistrationNumber)</dd>
+                    <dt>Email</dt><dd>@(string.IsNullOrWhiteSpace(Model.PlatformEmail) ? "Chưa cấu hình" : Model.PlatformEmail)</dd>
+                    <dt>Website</dt><dd>@Model.PlatformWebsite</dd>
+                </dl>
+            </article>
+            <article class="card-custom streamer-contract-party">
+                <h2>Bên B · Streamer</h2>
+                <dl>
+                    <dt>Họ tên theo CCCD</dt><dd>@Model.StreamerFullName</dd>
+                    <dt>CCCD</dt><dd>@Model.StreamerCitizenIdMasked</dd>
+                    <dt>Địa chỉ thường trú</dt><dd>@Model.StreamerAddress</dd>
+                    <dt>Email tài khoản</dt><dd>@Model.StreamerEmail</dd>
+                    <dt>Kênh / trang</dt><dd>@Model.StreamerChannelName · /@Model.StreamerSlug</dd>
+                </dl>
+            </article>
+        </div>
+
+        @if (!Model.PlatformDetailsComplete)
+        {
+            <div class="alert alert-danger" role="alert">
+                Chưa thể ký: chủ nền tảng cần cấu hình đủ tư cách pháp lý, địa chỉ, mã số thuế/mã định danh phù hợp với tư cách hoạt động và email liên hệ. Hợp đồng không cho phép ký với thông tin pháp lý còn thiếu.
+            </div>
+        }
+
+        <div class="card-custom streamer-contract-body">
+            @foreach (var clause in Model.Sections)
+            {
+            <article class="streamer-contract-section">
+                    <h2>@clause.Title</h2>
+                    @foreach (var paragraph in clause.Paragraphs)
+                    {
+                        <p>@paragraph</p>
+                    }
+            </article>
+            }
+        </div>
+
+        <form asp-action="ContractAccept" method="post" class="card-custom streamer-contract-sign">
+            @Html.AntiForgeryToken()
+            <h2>Xác nhận và ký hợp đồng điện tử</h2>
+            <label for="signerFullName" class="form-label">Nhập lại họ tên đúng như trên CCCD</label>
+            <input id="signerFullName" name="signerFullName" class="form-control" maxlength="100" autocomplete="name" required value="@Model.StreamerFullName" />
+            <label class="streamer-contract-check">
+                <input type="checkbox" name="acceptAgreement" value="true" required disabled="@(Model.PlatformDetailsComplete ? null : "disabled")" />
+                <span>Tôi đã đọc, hiểu và đồng ý toàn bộ hợp đồng điện tử phiên bản @Model.Version.</span>
+            </label>
+            <label class="streamer-contract-check">
+                <input type="checkbox" name="acknowledgePrivacy" value="true" required disabled="@(Model.PlatformDetailsComplete ? null : "disabled")" />
+                <span>Tôi đã đọc <a href="/privacy" target="_blank" rel="noopener">Chính sách bảo mật và quyền riêng tư</a>, và hiểu cách xử lý dữ liệu để thực hiện hợp đồng.</span>
+            </label>
+            <p class="streamer-contract-sign-note">Khi bấm nút, hệ thống lưu bản nội dung đã chấp nhận, mã kiểm tra, thời điểm, tài khoản, địa chỉ IP và thông tin trình duyệt để đối chiếu việc giao kết. Đây là xác nhận điện tử qua tài khoản, không phải chữ ký số chứng thư.</p>
+            <button type="submit" class="btn btn-success btn-lg" disabled="@(Model.PlatformDetailsComplete ? null : "disabled")"><i class="fas fa-file-signature"></i> Chấp nhận và ký</button>
+        </form>
+    }
+</section>
