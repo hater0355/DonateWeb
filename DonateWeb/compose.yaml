@@ -9,6 +9,11 @@ services:
       ConnectionStrings__DefaultConnection: "Server=${DB_SERVER:-host.docker.internal},${DB_PORT:-1433};Database=${DB_NAME:-DonateWebDB};User Id=${DB_USER:?Set DB_USER in .env};Password=${DB_PASSWORD:?Set DB_PASSWORD in .env};Encrypt=True;TrustServerCertificate=True;MultipleActiveResultSets=true"
       DataProtection__KeysPath: /var/lib/donateweb/keys
       IdentityDocuments__StoragePath: /var/lib/donateweb/private-documents
+      Jwt__SecretKey: ${JWT_SECRET_KEY:-}
+      BankConfig__BankId: ${BANK_CONFIG_BANK_ID:-MB}
+      BankConfig__AccountNo: "${BANK_CONFIG_ACCOUNT_NO:-${SEPAY_ACCOUNT_NUMBER:-}}"
+      BankConfig__AccountName: "${BANK_CONFIG_ACCOUNT_NAME:-${SEPAY_ACCOUNT_NAME:-}}"
+      BankConfig__BankName: "${BANK_CONFIG_BANK_NAME:-${SEPAY_BANK_NAME:-MB Bank}}"
       PayOS__ClientId: ${PAYOS_CLIENT_ID:?Set PAYOS_CLIENT_ID in .env}
       PayOS__ApiKey: ${PAYOS_API_KEY:?Set PAYOS_API_KEY in .env}
       PayOS__ChecksumKey: ${PAYOS_CHECKSUM_KEY:?Set PAYOS_CHECKSUM_KEY in .env}
@@ -16,6 +21,8 @@ services:
       GHN__ShopId: ${GHN_SHOP_ID:-0}
       Authentication__Google__ClientId: ${GOOGLE_CLIENT_ID:-}
       Authentication__Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
+      Authentication__Facebook__AppId: ${FACEBOOK_APP_ID:-}
+      Authentication__Facebook__AppSecret: ${FACEBOOK_APP_SECRET:-}
       SePay__ApiKey: ${SEPAY_API_KEY:-}
       App__PublicBaseUrl: ${PUBLIC_BASE_URL:-}
       PlatformContract__OperatorCapacity: ${PLATFORM_CONTRACT_OPERATOR_CAPACITY:-Cá nhân}
@@ -36,7 +43,7 @@ services:
       - dataprotection-keys:/var/lib/donateweb/keys
       - private-identity-documents:/var/lib/donateweb/private-documents
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health/ready"]
       interval: 30s
       timeout: 5s
       retries: 3

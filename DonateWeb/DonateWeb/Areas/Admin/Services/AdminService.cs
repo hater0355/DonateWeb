@@ -457,113 +457,140 @@ namespace DonateWeb.Areas.Admin.Services
             var user = streamer.User;
             var streamerName = streamer.DisplayName;
             var streamerSlug = streamer.Slug;
+            var frontDocumentKey = streamer.CitizenIdFrontDocumentKey;
+            var backDocumentKey = streamer.CitizenIdBackDocumentKey;
 
-            if (user != null && user.Username.Equals("admin", StringComparison.OrdinalIgnoreCase))
+            if (user != null && (user.Username.Equals("admin", StringComparison.OrdinalIgnoreCase) ||
+                                 user.UserRoles.Any(userRole => userRole.Role?.Name == UserRoles.Admin)))
             {
                 return (false, "Không thể xóa hồ sơ của tài khoản Quản trị viên hệ thống.");
             }
 
-            // 1. Dọn dẹp Widgets & Goals
-            var alertBoxes = await _context.AlertBoxConfigs
-                .Where(abc => abc.StreamerProfileId == streamer.Id)
-                .ToListAsync();
-            if (alertBoxes.Any())
+            // Hồ sơ streamer được các khoản donate, yêu cầu rút tiền, đơn hàng và lượt theo dõi
+            // tham chiếu tới. Không xóa cứng để tránh làm mất sổ giao dịch hoặc vi phạm khóa ngoại.
+            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
+            try
             {
-                _context.AlertBoxConfigs.RemoveRange(alertBoxes);
-            }
+                transaction = await _context.Database.BeginTransactionAsync();
 
-            var goals = await _context.StreamerGoals
-                .Where(sg => sg.StreamerProfileId == streamer.Id)
-                .ToListAsync();
-            if (goals.Any())
-            {
-                _context.StreamerGoals.RemoveRange(goals);
-            }
-
-            // 2. Gán null StreamerProfileId trong WithdrawalRequests để giữ lịch sử rút tiền
-            var withdrawalRequests = await _context.WithdrawalRequests
-                .Where(wr => wr.StreamerProfileId == streamer.Id)
-                .ToListAsync();
-            foreach (var wr in withdrawalRequests)
-            {
-                wr.StreamerProfileId = null;
-            }
-
-            // 3. Dọn dẹp Donations và AuditLogs nhận được của streamer này để tránh vi phạm FK Restrict
-            var donations = await _context.Donations
-                .Where(d => d.StreamerProfileId == streamer.Id)
-                .ToListAsync();
-            if (donations.Any())
-            {
-                var donationIds = donations.Select(d => d.Id).ToList();
-                var auditLogs = await _context.TransactionAuditLogs
-                    .Where(al => donationIds.Contains(al.DonationId))
+                var alertBoxes = await _context.AlertBoxConfigs
+                    .Where(config => config.StreamerProfileId == streamer.Id)
                     .ToListAsync();
-                _context.TransactionAuditLogs.RemoveRange(auditLogs);
-                _context.Donations.RemoveRange(donations);
-            }
+                _context.AlertBoxConfigs.RemoveRange(alertBoxes);
 
-            // 4. Xóa StreamerProfile
-            _context.StreamerProfiles.Remove(streamer);
+                var goals = await _context.StreamerGoals
+                    .Where(goal => goal.StreamerProfileId == streamer.Id)
+                    .ToListAsync();
+                _context.StreamerGoals.RemoveRange(goals);
 
-            if (user != null)
-            {
-                if (deleteUserAccount)
+                var activations = await _context.StreamerEffectActivations
+                    .Where(activation => activation.StreamerProfileId == streamer.Id)
+                    .ToListAsync();
+                _context.StreamerEffectActivations.RemoveRange(activations);
+
+                // Ẩn sản phẩm khỏi gian hàng nhưng giữ sản phẩm và đơn cũ để tra soát.
+                var products = await _context.ShopProducts
+                    .Where(product => product.StreamerProfileId == streamer.Id)
+                    .ToListAsync();
+                foreach (var product in products)
                 {
-                    // Xóa hoàn toàn User và toàn bộ dữ liệu phụ thuộc
-                    var userDonationsSent = await _context.Donations.Where(d => d.DonorUserId == user.Id).ToListAsync();
-                    foreach (var d in userDonationsSent) { d.DonorUserId = null; }
-
-                    var userWithdrawals = await _context.WithdrawalRequests.Where(wr => wr.UserId == user.Id).ToListAsync();
-                    _context.WithdrawalRequests.RemoveRange(userWithdrawals);
-
-                    var userWalletTx = await _context.WalletTransactions.Where(wt => wt.UserId == user.Id).ToListAsync();
-                    _context.WalletTransactions.RemoveRange(userWalletTx);
-
-                    var externalLogins = await _context.ExternalLogins.Where(el => el.UserId == user.Id).ToListAsync();
-                    _context.ExternalLogins.RemoveRange(externalLogins);
-
-                    _context.Users.Remove(user);
-
-                    await _context.SaveChangesAsync();
-                    _logger.LogInformation("Admin {Admin} đã xóa vĩnh viễn Streamer {Name} (/{Slug}) và toàn bộ tài khoản {User}.", adminUsername, streamerName, streamerSlug, user.Username);
-                    return (true, $"Đã xóa vĩnh viễn kênh Streamer '{streamerName}' (/{streamerSlug}) cùng tài khoản người dùng '{user.Username}' khỏi hệ thống.");
+                    product.IsActive = false;
+                    product.UpdatedAt = DateTime.UtcNow;
                 }
-                else
+
+                // Gỡ kênh khỏi trang công khai và chặn các chức năng streamer.
+                streamer.IsActive = false;
+                streamer.ApprovalStatus = StreamerApprovalStatus.Rejected;
+                streamer.RejectionReason = "Kênh đã được quản trị viên gỡ khỏi nền tảng.";
+                streamer.IsVerified = false;
+                streamer.LockReason = null;
+                streamer.LockedAt = null;
+                streamer.BankName = null;
+                streamer.BankAccountNumber = null;
+                streamer.BankAccountName = null;
+                streamer.PaymentQrUrl = null;
+                streamer.CitizenIdFrontDocumentKey = null;
+                streamer.CitizenIdBackDocumentKey = null;
+                streamer.IdentityDataProtected = null;
+                streamer.IdentityDataConsentAt = null;
+                streamer.UpdatedAt = DateTime.UtcNow;
+
+                if (user != null)
                 {
-                    // Chuyển vai trò sang Viewer
-                    var streamerRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == UserRoles.Streamer);
-                    if (streamerRole != null)
+                    if (deleteUserAccount)
                     {
-                        var userStreamerRole = user.UserRoles.FirstOrDefault(ur => ur.RoleId == streamerRole.Id);
-                        if (userStreamerRole != null)
+                        // Giữ bản ghi tài khoản vì còn dữ liệu tài chính/historic tham chiếu tới User.
+                        // IsActive được AuthService kiểm tra cho cả đăng nhập mật khẩu lẫn OAuth.
+                        user.IsActive = false;
+                        _context.UserRoles.RemoveRange(user.UserRoles);
+                    }
+                    else
+                    {
+                        var streamerRole = await _context.Roles.FirstOrDefaultAsync(role => role.Name == UserRoles.Streamer);
+                        if (streamerRole != null)
                         {
-                            _context.UserRoles.Remove(userStreamerRole);
+                            var streamerUserRole = user.UserRoles.FirstOrDefault(userRole => userRole.RoleId == streamerRole.Id);
+                            if (streamerUserRole != null)
+                                _context.UserRoles.Remove(streamerUserRole);
                         }
-                    }
 
-                    var viewerRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == UserRoles.Viewer);
-                    if (viewerRole == null)
+                        var viewerRole = await _context.Roles.FirstOrDefaultAsync(role => role.Name == UserRoles.Viewer);
+                        if (viewerRole == null)
+                        {
+                            viewerRole = new Role { Name = UserRoles.Viewer, Description = "Người xem, ủng hộ và nạp ví" };
+                            _context.Roles.Add(viewerRole);
+                            await _context.SaveChangesAsync();
+                        }
+
+                        if (!user.UserRoles.Any(userRole => userRole.RoleId == viewerRole.Id))
+                            _context.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = viewerRole.Id });
+
+                        user.AccountId = await _accountIdService.DowngradeToViewerIdAsync(user.AccountId, user.CreatedAt.Year);
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch (Exception exception)
+            {
+                if (transaction != null)
+                {
+                    try
                     {
-                        viewerRole = new Role { Name = UserRoles.Viewer, Description = "Người xem, ủng hộ và nạp ví" };
-                        _context.Roles.Add(viewerRole);
-                        await _context.SaveChangesAsync();
+                        await transaction.RollbackAsync();
                     }
-
-                    if (!user.UserRoles.Any(ur => ur.RoleId == viewerRole.Id))
+                    catch (Exception rollbackException)
                     {
-                        _context.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = viewerRole.Id });
+                        _logger.LogWarning(rollbackException, "Không rollback được thao tác gỡ streamer {StreamerId}.", streamerId);
                     }
+                }
+                _logger.LogError(exception, "Không thể gỡ streamer {StreamerId} ({Name}) theo yêu cầu của admin {Admin}.", streamerId, streamerName, adminUsername);
+                return (false, "Không thể gỡ kênh lúc này. Dữ liệu chưa bị xóa; hãy kiểm tra log ứng dụng để xem chi tiết.");
+            }
+            finally
+            {
+                if (transaction != null)
+                    await transaction.DisposeAsync();
+            }
 
-                    // Chuyển đổi mã AccountId từ 1 sang 9
-                    user.AccountId = await _accountIdService.DowngradeToViewerIdAsync(user.AccountId, user.CreatedAt.Year);
+            // Xóa file CCCD ngoài wwwroot sau khi thay đổi cơ sở dữ liệu đã được commit.
+            foreach (var documentKey in new[] { frontDocumentKey, backDocumentKey })
+            {
+                try
+                {
+                    await _identityDocumentService.DeleteDocumentAsync(documentKey);
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogWarning(exception, "Không xóa được file CCCD của hồ sơ streamer {StreamerId}.", streamerId);
                 }
             }
 
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("Admin {Admin} đã xóa kênh Streamer {Name} (/{Slug}). Tài khoản được chuyển về Viewer.", adminUsername, streamerName, streamerSlug);
-            return (true, $"Đã xóa kênh Streamer '{streamerName}' (/{streamerSlug}) thành công. Tài khoản đã được chuyển về vai trò Viewer với mã ID: {user?.AccountId}.");
+            _logger.LogInformation("Admin {Admin} đã gỡ kênh Streamer {Name} (/{Slug}). Lịch sử donate, đơn hàng và rút tiền được giữ lại. Tài khoản bị vô hiệu hóa: {AccountDisabled}.", adminUsername, streamerName, streamerSlug, deleteUserAccount);
+            return deleteUserAccount
+                ? (true, $"Đã gỡ kênh Streamer '{streamerName}' (/{streamerSlug}) và vô hiệu hóa tài khoản đăng nhập. Lịch sử giao dịch được giữ lại.")
+                : (true, $"Đã gỡ kênh Streamer '{streamerName}' (/{streamerSlug}). Tài khoản đã chuyển về Viewer với mã ID: {user?.AccountId}. Lịch sử giao dịch được giữ lại.");
         }
 
 

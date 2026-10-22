@@ -131,7 +131,8 @@ public class PaymentFlowIntegrationTests
         await database.Context.Entry(profile).ReloadAsync();
         await database.Context.Entry(donation).ReloadAsync();
 
-        Assert.Equal(30000m, user.WalletBalance);
+        Assert.Equal(0m, user.WalletBalance);
+        Assert.Equal(27000m, user.StreamerEarningsBalance);
         Assert.Equal(30000m, profile.TotalReceived);
         Assert.Equal(DonationStatus.Success, donation.Status);
         Assert.Single(await database.Context.TransactionAuditLogs.ToListAsync());

@@ -19,4 +19,9 @@
   <ItemGroup>
     <ProjectReference Include="..\DonateWeb\DonateWeb.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\scripts\database\baseline-existing-database.sql"
+          Link="database\baseline-existing-database.sql"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

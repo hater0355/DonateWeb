@@ -423,7 +423,7 @@
 
                 <div class="modal-header bg-danger text-white">
                     <h5 class="modal-title" id="deleteStreamerModalLabel">
-                        <i class="fa-solid fa-trash-can me-2"></i>Xác nhận Xóa Streamer
+                        <i class="fa-solid fa-trash-can me-2"></i>Xác nhận Gỡ Streamer
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -432,22 +432,22 @@
                     <div class="alert alert-danger-subtle border-0 d-flex gap-2 mb-3">
                         <i class="fa-solid fa-triangle-exclamation text-danger fs-5 flex-shrink-0 mt-1"></i>
                         <div>
-                            <strong>Cảnh báo hành động quan trọng!</strong><br />
-                            Bạn đang thực hiện xóa kênh Streamer: <strong id="modalDeleteStreamerInfo" class="text-danger"></strong>.
+                            <strong>Gỡ kênh khỏi nền tảng</strong><br />
+                            Kênh sẽ bị ẩn và không thể nhận donate/bán hàng: <strong id="modalDeleteStreamerInfo" class="text-danger"></strong>.
                         </div>
                     </div>
 
                     <p class="small text-muted mb-3">
-                        Hồ sơ kênh streamer, cấu hình widget và mục tiêu donate liên quan sẽ bị xóa vĩnh viễn khỏi hệ thống.
+                        Lịch sử donate, rút tiền và đơn hàng được giữ để đối soát. Cấu hình widget/mục tiêu sẽ bị xóa; ảnh và thông tin CCCD, cùng thông tin ngân hàng hiện tại, sẽ được gỡ khỏi hồ sơ.
                     </p>
 
                     <div class="form-check p-3 rounded-3 border bg-light">
                         <input class="form-check-input" type="checkbox" name="deleteUserAccount" value="true" id="checkDeleteUserAccount" />
                         <label class="form-check-label small fw-semibold text-dark" for="checkDeleteUserAccount">
-                            Xóa vĩnh viễn cả tài khoản người dùng khỏi hệ thống
+                            Vô hiệu hóa luôn tài khoản đăng nhập
                         </label>
                         <div class="text-muted" style="font-size: 0.72rem;">
-                            (Mặc định: Bỏ chọn sẽ giữ lại tài khoản người dùng và chuyển về vai trò <strong>Viewer</strong> với mã ID bắt đầu bằng <strong>9</strong>).
+                            (Nếu bỏ chọn, người dùng vẫn đăng nhập được với vai trò <strong>Viewer</strong> và mã ID bắt đầu bằng <strong>9</strong>. Nếu chọn, tài khoản bị vô hiệu hóa; dữ liệu tài chính vẫn được giữ để đối soát.)
                         </div>
                     </div>
                 </div>
@@ -455,7 +455,7 @@
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy bỏ</button>
                     <button type="submit" class="btn btn-danger fw-semibold">
-                        <i class="fa-solid fa-trash-can me-1"></i> Xác nhận Xóa
+                        <i class="fa-solid fa-trash-can me-1"></i> Xác nhận Gỡ Kênh
                     </button>
                 </div>
             </form>

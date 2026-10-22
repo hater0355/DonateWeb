@@ -41,8 +41,10 @@ namespace DonateWeb.Controllers
                 return RedirectToAction("Login", "Auth");
             }
 
-            // Nếu là tài khoản Streamer, hợp nhất trang Thông tin cá nhân và Trang công khai thành 1 trang duy nhất tại /{slug}
-            if (user.StreamerProfile != null && !string.IsNullOrWhiteSpace(user.StreamerProfile.Slug))
+            var hasApprovedStreamerProfile = user.StreamerProfile?.ApprovalStatus == DonateWeb.Models.Enums.StreamerApprovalStatus.Approved;
+
+            // Hồ sơ đã gỡ/từ chối không còn được xem là trang Streamer; cho tài khoản dùng hồ sơ Viewer.
+            if (hasApprovedStreamerProfile && !string.IsNullOrWhiteSpace(user.StreamerProfile!.Slug))
             {
                 return Redirect("/" + user.StreamerProfile.Slug);
             }
@@ -52,18 +54,18 @@ namespace DonateWeb.Controllers
                 AccountId = user.AccountId,
                 Email = user.Email,
                 FullName = user.FullName,
-                DisplayName = user.StreamerProfile?.DisplayName ?? user.Username,
+                DisplayName = hasApprovedStreamerProfile ? user.StreamerProfile!.DisplayName : user.Username,
                 AvatarUrl = user.AvatarUrl,
-                CoverUrl = user.StreamerProfile?.BannerUrl ?? "/images/default-banner.jpg",
+                CoverUrl = hasApprovedStreamerProfile ? user.StreamerProfile!.BannerUrl : "/images/default-banner.jpg",
                 PhoneNumber = user.PhoneNumber ?? "",
-                PaymentQrUrl = user.StreamerProfile?.PaymentQrUrl ?? "",
-                Bio = user.StreamerProfile?.Bio ?? "",
-                Category = user.StreamerProfile != null ? "Streamer / Content Creator" : "Viewer / Donor"
+                PaymentQrUrl = hasApprovedStreamerProfile ? user.StreamerProfile!.PaymentQrUrl ?? "" : "",
+                Bio = hasApprovedStreamerProfile ? user.StreamerProfile!.Bio ?? "" : "",
+                Category = hasApprovedStreamerProfile ? "Streamer / Content Creator" : "Viewer / Donor"
             };
 
             ViewBag.UserEntity = user;
-            ViewBag.IsStreamer = user.StreamerProfile != null;
-            ViewBag.StreamerSlug = user.StreamerProfile?.Slug;
+            ViewBag.IsStreamer = hasApprovedStreamerProfile;
+            ViewBag.StreamerSlug = hasApprovedStreamerProfile ? user.StreamerProfile!.Slug : null;
 
             return View(viewModel);
         }
@@ -107,7 +109,7 @@ namespace DonateWeb.Controllers
                 user.AvatarUrl = uploadedAvatarPath;
             }
 
-            if (user.StreamerProfile != null)
+            if (user.StreamerProfile?.ApprovalStatus == DonateWeb.Models.Enums.StreamerApprovalStatus.Approved)
             {
                 user.StreamerProfile.DisplayName = model.DisplayName?.Trim() ?? user.StreamerProfile.DisplayName;
                 user.StreamerProfile.Bio = model.Bio?.Trim();
@@ -141,7 +143,7 @@ namespace DonateWeb.Controllers
             {
                 if (ur.Role != null) claims.Add(new Claim(ClaimTypes.Role, ur.Role.Name));
             }
-            if (user.StreamerProfile != null)
+            if (user.StreamerProfile?.ApprovalStatus == DonateWeb.Models.Enums.StreamerApprovalStatus.Approved)
             {
                 claims.Add(new Claim("StreamerSlug", user.StreamerProfile.Slug));
             }

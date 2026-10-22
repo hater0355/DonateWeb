@@ -186,7 +186,7 @@ namespace DonateWeb.Controllers
             }
 
             // Nếu tài khoản là Streamer, điều hướng sang chức năng Rút tiền dành cho Streamer
-            if (User.IsInRole(UserRoles.Streamer) || user.StreamerProfile != null)
+            if (user.StreamerProfile?.ApprovalStatus == StreamerApprovalStatus.Approved)
             {
                 return RedirectToAction(nameof(Withdraw));
             }
@@ -261,7 +261,7 @@ namespace DonateWeb.Controllers
                 return Json(new { success = false, message = "Không tìm thấy thông tin tài khoản người dùng." });
             }
 
-            if (User.IsInRole(UserRoles.Streamer) || user.StreamerProfile != null)
+            if (user.StreamerProfile?.ApprovalStatus == StreamerApprovalStatus.Approved)
             {
                 return Json(new { success = false, message = "Chức năng Nạp tiền chỉ dành cho tài khoản Người dùng (Viewer)." });
             }
@@ -826,14 +826,9 @@ namespace DonateWeb.Controllers
                 return RedirectToAction("Login", "Auth");
             }
 
-            if (!User.IsInRole(UserRoles.Streamer) && userForSync.StreamerProfile == null)
-            {
-                return RedirectToAction(nameof(Deposit));
-            }
-
             if (userForSync.StreamerProfile?.ApprovalStatus != StreamerApprovalStatus.Approved)
             {
-                return Forbid();
+                return RedirectToAction(nameof(Deposit));
             }
 
             // Sử dụng Database Transaction để đảm bảo kiểm tra số dư, trừ tiền và tạo yêu cầu rút đồng bộ tuyệt đối
@@ -1070,7 +1065,7 @@ namespace DonateWeb.Controllers
                 claims.Add(new Claim(ClaimTypes.Role, r));
             }
 
-            if (user.StreamerProfile != null)
+            if (user.StreamerProfile?.ApprovalStatus == StreamerApprovalStatus.Approved)
             {
                 claims.Add(new Claim("StreamerSlug", user.StreamerProfile.Slug));
             }

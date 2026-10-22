@@ -47,7 +47,6 @@ public class WalletAndWidgetSecurityTests
 
         var service = new StreamerService(
             database.Context,
-            Mock.Of<IPasswordHasher>(),
             Mock.Of<IContentModerationService>(),
             Mock.Of<IAccountIdService>());
 
@@ -102,7 +101,8 @@ public class WalletAndWidgetSecurityTests
         Assert.Single(results, result => result.Success);
         Assert.Single(results, result => !result.Success);
         Assert.Equal(30000m, donor.WalletBalance);
-        Assert.Equal(60000m, streamerUser.WalletBalance);
+        Assert.Equal(0m, streamerUser.WalletBalance);
+        Assert.Equal(54000m, streamerUser.StreamerEarningsBalance);
         Assert.Equal(60000m, profile.TotalReceived);
         Assert.Single(await database.Context.Donations.ToListAsync());
     }
@@ -147,7 +147,8 @@ public class WalletAndWidgetSecurityTests
         await database.Context.Entry(buyer).ReloadAsync();
         await database.Context.Entry(streamerUser).ReloadAsync();
         Assert.Equal(30000m, buyer.WalletBalance);
-        Assert.Equal(60000m, streamerUser.WalletBalance);
+        Assert.Equal(0m, streamerUser.WalletBalance);
+        Assert.Equal(42000m, streamerUser.StreamerEarningsBalance);
         Assert.Single(await database.Context.ShopOrders.ToListAsync());
     }
 
@@ -181,7 +182,8 @@ public class WalletAndWidgetSecurityTests
         await database.Context.Entry(streamerUser).ReloadAsync();
         await database.Context.Entry(profile).ReloadAsync();
         Assert.All(results, result => Assert.True(result.Success, result.Error));
-        Assert.Equal(120000m, streamerUser.WalletBalance);
+        Assert.Equal(0m, streamerUser.WalletBalance);
+        Assert.Equal(108000m, streamerUser.StreamerEarningsBalance);
         Assert.Equal(120000m, profile.TotalReceived);
         Assert.Equal(2, await database.Context.Donations.CountAsync());
     }
@@ -354,7 +356,7 @@ public class WalletAndWidgetSecurityTests
         moderation.Setup(service => service.SanitizeForStream(It.IsAny<string?>()))
             .Returns((string? value) => value ?? string.Empty);
 
-        return new StreamerService(context, Mock.Of<IPasswordHasher>(), moderation.Object, Mock.Of<IAccountIdService>());
+        return new StreamerService(context, moderation.Object, Mock.Of<IAccountIdService>());
     }
 
     private static StreamerDonateViewModel CreateWalletDonation(int profileId, decimal amount) => new()

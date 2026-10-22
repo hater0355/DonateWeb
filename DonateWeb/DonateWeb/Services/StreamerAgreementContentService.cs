@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net.Mail;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -37,6 +38,9 @@ public sealed class StreamerAgreementContentService
         DateTime signedAtUtc,
         string signerName)
     {
+        if (!options.IsComplete)
+            throw new InvalidOperationException("Chưa thể tạo hợp đồng khi thông tin pháp lý của bên vận hành còn thiếu hoặc là giá trị minh họa.");
+
         var localTime = signedAtUtc.AddHours(7);
         var sb = new StringBuilder();
         sb.AppendLine(_document.Title);
@@ -44,7 +48,6 @@ public sealed class StreamerAgreementContentService
         sb.AppendLine($"Thời điểm chấp nhận: {localTime.ToString("dd/MM/yyyy HH:mm:ss", CultureInfo.InvariantCulture)} (UTC+7)");
         sb.AppendLine();
         sb.AppendLine("BÊN A - ĐƠN VỊ CUNG CẤP NỀN TẢNG");
-        sb.AppendLine("Lưu ý: Đây là bản demo phục vụ bài tập lớn; địa chỉ và mã định danh Bên A là dữ liệu minh họa.");
         sb.AppendLine($"Tư cách: {options.OperatorCapacity.Trim()}");
         sb.AppendLine($"Họ và tên: {options.OperatorLegalName.Trim()}");
         sb.AppendLine($"Địa chỉ: {options.OperatorAddress.Trim()}");
@@ -110,9 +113,50 @@ public sealed class PlatformContractOptions
     public string ContactEmail { get; set; } = "cupitcookies@gmail.com";
 
     public bool IsComplete =>
-        !string.IsNullOrWhiteSpace(OperatorCapacity) &&
-        !string.IsNullOrWhiteSpace(OperatorLegalName) &&
-        !string.IsNullOrWhiteSpace(OperatorAddress) &&
-        !string.IsNullOrWhiteSpace(OperatorRegistrationNumber) &&
-        !string.IsNullOrWhiteSpace(ContactEmail);
+        IsConfiguredValue(OperatorCapacity) &&
+        IsConfiguredValue(OperatorLegalName) &&
+        IsConfiguredValue(OperatorAddress) && OperatorAddress.Trim().Length >= 10 &&
+        IsConfiguredValue(OperatorRegistrationNumber) &&
+        IsValidContactEmail(ContactEmail);
+
+    private static bool IsValidContactEmail(string? value)
+    {
+        if (!IsConfiguredValue(value))
+            return false;
+
+        var email = value!.Trim();
+        if (!MailAddress.TryCreate(email, out var address) ||
+            !string.Equals(address.Address, email, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return !address.Host.Contains("example.", StringComparison.OrdinalIgnoreCase) &&
+               !address.Host.EndsWith(".test", StringComparison.OrdinalIgnoreCase) &&
+               !address.Host.EndsWith(".invalid", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsConfiguredValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var normalized = value.Trim().ToLowerInvariant();
+        string[] placeholderMarkers =
+        [
+            "minh họa",
+            "bài tập lớn",
+            "demo",
+            "placeholder",
+            "change_me",
+            "change me",
+            "your_",
+            "chưa cấu hình",
+            "chưa cập nhật",
+            "điền thông tin",
+            "không áp dụng",
+            "n/a",
+            "example."
+        ];
+
+        return !placeholderMarkers.Any(normalized.Contains);
+    }
 }

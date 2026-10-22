@@ -320,6 +320,7 @@ namespace DonateWeb.Services
                 existingProfile.IdentityDataConsentAt = identitySubmission.ConsentAtUtc;
                 existingProfile.ApprovalStatus = StreamerApprovalStatus.Pending;
                 existingProfile.RejectionReason = null;
+                existingProfile.IsActive = true;
                 existingProfile.UpdatedAt = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();

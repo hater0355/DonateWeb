@@ -4,12 +4,24 @@
 
 The web application runs in the Linux container. SQL Server must be reachable from that container; on a VPS, set `DB_SERVER` to the SQL Server host/IP in `.env` (do not use `host.docker.internal` unless SQL Server runs on the VPS host).
 
-1. Copy `.env.example` to `.env` and replace every placeholder with database credentials and newly issued PayOS credentials.
+1. Copy `.env.example` to `.env` for local Docker, or `.env.vps.example` to `.env` on the VPS. Enter database, payment and OAuth credentials in that private file; `appsettings.json` contains only non-secret defaults.
 2. Start the application from this directory with `docker compose up --build -d`.
 3. Check `http://localhost:8080/health`. It returns healthy only when the app can connect to SQL Server.
 4. Put a host-level HTTPS reverse proxy in front of `127.0.0.1:8080` and configure the PayOS webhook URL as `https://your-domain/api/payment/webhook`. Forward `X-Forwarded-Proto` and support WebSocket upgrades for `/paymentHub`.
 
 The compose file persists ASP.NET Data Protection keys in a named Docker volume. Keep that volume when upgrading or replacing the container so existing login cookies remain valid.
+
+The actual `.env` file is not part of deployment ZIPs. The central deposit account can use `BANK_CONFIG_*`; blank account number/name fields fall back to the configured SePay account. Set `JWT_SECRET_KEY` if the API token endpoint is used.
+
+## Database migrations and safe deployment
+
+The application no longer creates or alters tables when it starts. Apply the reviewed SQL migration script before starting a new deployment. Docker health checks use `/health/ready`, which requires SQL Server and an up-to-date EF Core migration history; `/health/live` only reports whether the web process is alive.
+
+- For a **new empty database**, review and run `scripts/database/upgrade-idempotent.sql` against that database.
+- For an **existing database created by older DonateWeb versions**, do not run the upgrade script directly: its initial migration would collide with existing tables. First make a full SQL Server backup, compare the live schema with the initial migration, then follow `scripts/database/README.md` and the gated baseline script. If any required table or column is missing, stop and prepare a tailored repair migration; do not stamp the baseline.
+- Keep the backup until the upgraded app has been checked. Rollback means restoring the database backup and the corresponding uploaded-image, private-document, and Data Protection key volumes. Do not use an automatic EF downgrade for the initial schema migration.
+
+The `DONATEWEB_TEST_SQLSERVER` connection string is only for disposable integration-test databases. Never point it at a production database: the test fixture creates and drops databases.
 
 ## Google sign-in
 

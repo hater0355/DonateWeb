@@ -16,13 +16,14 @@ internal sealed class SqlServerDatabase : IAsyncDisposable
     }
 
     public string ConnectionString { get; }
+    public string Name => _databaseName;
     public AppDbContext Context { get; }
 
     public AppDbContext CreateContext() => new(new DbContextOptionsBuilder<AppDbContext>()
         .UseSqlServer(ConnectionString)
         .Options);
 
-    public static async Task<SqlServerDatabase> CreateAsync()
+    public static async Task<SqlServerDatabase> CreateAsync(bool applyMigrations = true)
     {
         var configuredConnection = Environment.GetEnvironmentVariable("DONATEWEB_TEST_SQLSERVER")
             ?? throw new InvalidOperationException("DONATEWEB_TEST_SQLSERVER is not set.");
@@ -41,7 +42,8 @@ internal sealed class SqlServerDatabase : IAsyncDisposable
             .UseSqlServer(databaseBuilder.ConnectionString)
             .Options;
         var context = new AppDbContext(options);
-        await context.Database.EnsureCreatedAsync();
+        if (applyMigrations)
+            await context.Database.MigrateAsync();
         return new SqlServerDatabase(databaseBuilder.ConnectionString, databaseName, context);
     }
 

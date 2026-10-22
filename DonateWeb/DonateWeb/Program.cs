@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using DonateWeb.Data;
 using DonateWeb.Models.Enums;
@@ -37,6 +38,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
 });
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseReadinessHealthCheck>("database-ready", tags: ["ready"]);
 
 // 2. Đăng ký các Services cho DI
 builder.Services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
@@ -223,8 +226,16 @@ app.UseAuthorization();
 
 // Ánh xạ SignalR Hub
 app.MapHub<DonateWeb.Hubs.PaymentHub>("/paymentHub");
-app.MapGet("/health", async (AppDbContext context, CancellationToken cancellationToken) =>
-    await context.Database.CanConnectAsync(cancellationToken) ? Results.Ok(new { status = "healthy" }) : Results.StatusCode(StatusCodes.Status503ServiceUnavailable));
+// Liveness không truy cập SQL; readiness kiểm tra SQL và migration history.
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false,
+    ResponseWriter = WriteHealthResponseAsync
+}).AllowAnonymous();
+
+// Giữ /health tương thích với cấu hình Docker cũ và bổ sung endpoint readiness rõ ràng.
+app.MapHealthChecks("/health/ready", CreateReadinessOptions()).AllowAnonymous();
+app.MapHealthChecks("/health", CreateReadinessOptions()).AllowAnonymous();
 
 // Ánh xạ các API Controllers (bao gồm PaymentWebhookController và WidgetsApiController)
 app.MapControllers();
@@ -257,3 +268,19 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+
+static HealthCheckOptions CreateReadinessOptions() => new()
+{
+    Predicate = registration => registration.Tags.Contains("ready"),
+    ResponseWriter = WriteHealthResponseAsync
+};
+
+static async Task WriteHealthResponseAsync(HttpContext context, Microsoft.Extensions.Diagnostics.HealthChecks.HealthReport report)
+{
+    context.Response.ContentType = "application/json";
+    await context.Response.WriteAsJsonAsync(new
+    {
+        status = report.Status.ToString().ToLowerInvariant(),
+        checks = report.Entries.ToDictionary(entry => entry.Key, entry => entry.Value.Status.ToString().ToLowerInvariant())
+    });
+}

@@ -1039,6 +1039,12 @@ namespace DonateWeb.Controllers
                 return RedirectToAction("Register", "Streamer");
             }
 
+            if (streamer.ApprovalStatus != StreamerApprovalStatus.Approved)
+            {
+                TempData["ErrorMessage"] = "Hồ sơ Streamer này chưa được duyệt hoặc đã được gỡ. Bạn có thể gửi hồ sơ đăng ký lại.";
+                return RedirectToAction(nameof(Register));
+            }
+
             // Xây dựng đường dẫn trang donate của streamer: https://localhost:7111/{ID hoặc Slug}
             var identifier = !string.IsNullOrWhiteSpace(streamer.Slug) ? streamer.Slug : streamer.Id.ToString();
             var donatePageUrl = $"{GetPublicBaseUrl()}/{Uri.EscapeDataString(identifier)}";
@@ -1142,6 +1148,12 @@ namespace DonateWeb.Controllers
             {
                 TempData["ErrorMessage"] = "Bạn chưa có hồ sơ Streamer. Vui lòng đăng ký trước!";
                 return RedirectToAction("Register", "Streamer");
+            }
+
+            if (streamer.ApprovalStatus != StreamerApprovalStatus.Approved)
+            {
+                TempData["ErrorMessage"] = "Hồ sơ Streamer này chưa được duyệt hoặc đã được gỡ. Bạn có thể gửi hồ sơ đăng ký lại.";
+                return RedirectToAction(nameof(Register));
             }
 
             var bankFields = new[] { model.BankName, model.BankAccountNumber, model.BankAccountName };
